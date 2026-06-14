@@ -130,8 +130,10 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     const tick = () => {
       const totalW = totalWRef.current
       if (!pausedRef.current && totalW > 0) {
-        posRef.current += SPEED
+        const dir = lang === 'ar' ? -1 : 1
+        posRef.current += SPEED * dir
         if (posRef.current >= totalW) posRef.current -= totalW
+        if (posRef.current < 0) posRef.current += totalW
         track.style.transform = `translateX(-${posRef.current}px)`
       }
       animRef.current = requestAnimationFrame(tick)
