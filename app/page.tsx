@@ -321,11 +321,23 @@ export default function MenuPage() {
   const [showOrder, setShowOrder] = useState(false)
   const [pulseKey, setPulseKey] = useState(0)
   const [lang, setLang] = useState<'tr'|'en'|'ar'>('tr')
+  const [showWelcome, setShowWelcome] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('kahfe_lang') as 'tr'|'en'|'ar'
-    if (saved) setLang(saved)
+    if (saved) {
+      setLang(saved)
+      setShowWelcome(false)
+    } else {
+      setShowWelcome(true)
+    }
   }, [])
+
+  function selectLang(l: 'tr'|'en'|'ar') {
+    setLang(l)
+    localStorage.setItem('kahfe_lang', l)
+    setShowWelcome(false)
+  }
 
   function changeLang(l: 'tr'|'en'|'ar') {
     setLang(l)
@@ -394,6 +406,7 @@ export default function MenuPage() {
         @keyframes pulseScale{0%{transform:scale(1);}28%{transform:scale(1.035);}60%{transform:scale(.992);}100%{transform:scale(1);}}
         @keyframes heroGlow{0%{opacity:.55;transform:translate(-2%,-2%);}100%{opacity:.9;transform:translate(2%,2%);}}
         @keyframes shimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
+        @keyframes welcomeIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:scale(1);}}
         ::-webkit-scrollbar{display:none;}*{scrollbar-width:none;}
         .kahfe-bg{background-color:#0D0D0D;background-image:radial-gradient(circle,rgba(201,168,76,.055) 1px,transparent 1px);background-size:28px 28px;}
         .corner-card{position:relative;}
@@ -402,7 +415,77 @@ export default function MenuPage() {
         .corner-card::after{bottom:7px;right:7px;border-bottom:1.5px solid #C9A84C;border-right:1.5px solid #C9A84C;border-radius:0 0 3px 0;}
         .corner-card:hover::before,.corner-card:hover::after{opacity:1;}
         .gold-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.25),rgba(192,57,43,.15),transparent);margin:0;}
+        .lang-pick-btn:active{transform:scale(.97);}
       `}</style>
+
+      {/* WELCOME POPUP */}
+      {showWelcome && (
+        <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,.92)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, maxWidth:480, margin:'0 auto' }}>
+          <div style={{ width:'100%', background:'#141414', borderRadius:24, overflow:'hidden', border:'1px solid rgba(201,168,76,.2)', boxShadow:'0 0 60px rgba(0,0,0,.8)', animation:'welcomeIn .5s cubic-bezier(.18,.84,.26,1) both' }}>
+
+            {/* top gold bar */}
+            <div style={{ height:3, background:'linear-gradient(90deg,transparent,#C9A84C,#C0392B,#C9A84C,transparent)' }}/>
+
+            <div style={{ padding:'32px 28px 28px', textAlign:'center' }}>
+
+              {/* logo */}
+              <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:180, height:'auto', margin:'0 auto 20px', display:'block', filter:'drop-shadow(0 4px 16px rgba(201,168,76,.2))' }}/>
+
+              {/* divider */}
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
+                <span style={{ flex:1, height:1, background:'linear-gradient(90deg,transparent,rgba(201,168,76,.3))' }}/>
+                <span style={{ width:5, height:5, background:'#C0392B', transform:'rotate(45deg)', display:'block', flexShrink:0 }}/>
+                <span style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.3),transparent)' }}/>
+              </div>
+
+              {/* welcome text - all 3 languages */}
+              <div style={{ marginBottom:28 }}>
+                <p style={{ color:'#F0EDE8', fontFamily:'var(--serif)', fontSize:18, fontWeight:700, marginBottom:4 }}>Hoş Geldiniz</p>
+                <p style={{ color:'rgba(240,237,232,.5)', fontSize:12, letterSpacing:1 }}>Welcome &nbsp;|&nbsp; أهلاً وسهلاً</p>
+              </div>
+
+              {/* language buttons */}
+              <p style={{ color:'rgba(240,237,232,.4)', fontSize:11, letterSpacing:2, marginBottom:14, textTransform:'uppercase' }}>Choose your language</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+
+                <button className="lang-pick-btn" onClick={() => selectLang('tr')}
+                  style={{ width:'100%', background:'linear-gradient(135deg,rgba(201,168,76,.12),rgba(201,168,76,.06))', border:'1px solid rgba(201,168,76,.3)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
+                  <span style={{ fontSize:22 }}>🇹🇷</span>
+                  <div style={{ textAlign:'center', flex:1 }}>
+                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>Türkçe</div>
+                    <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>Turkish</div>
+                  </div>
+                  <span style={{ color:'#C9A84C', fontSize:16 }}>›</span>
+                </button>
+
+                <button className="lang-pick-btn" onClick={() => selectLang('en')}
+                  style={{ width:'100%', background:'linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03))', border:'1px solid rgba(240,237,232,.1)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
+                  <span style={{ fontSize:22 }}>🇬🇧</span>
+                  <div style={{ textAlign:'center', flex:1 }}>
+                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>English</div>
+                    <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>English</div>
+                  </div>
+                  <span style={{ color:'#888', fontSize:16 }}>›</span>
+                </button>
+
+                <button className="lang-pick-btn" onClick={() => selectLang('ar')}
+                  style={{ width:'100%', background:'linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03))', border:'1px solid rgba(240,237,232,.1)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
+                  <span style={{ fontSize:22 }}>🇸🇦</span>
+                  <div style={{ textAlign:'center', flex:1 }}>
+                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>العربية</div>
+                    <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>Arabic</div>
+                  </div>
+                  <span style={{ color:'#888', fontSize:16 }}>›</span>
+                </button>
+
+              </div>
+            </div>
+
+            {/* bottom gold bar */}
+            <div style={{ height:3, background:'linear-gradient(90deg,transparent,#C0392B,#C9A84C,transparent)' }}/>
+          </div>
+        </div>
+      )}
 
       <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
         <Hero lang={lang} onLangChange={changeLang}/>
