@@ -110,17 +110,20 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   const animRef = useRef<number>(0)
   const posRef = useRef(0)
   const pausedRef = useRef(false)
-  const SPEED = 0.5
+  const dragRef = useRef({ dragging: false, startX: 0, startPos: 0 })
+  const SPEED = 0.4
 
   useEffect(() => {
     const track = trackRef.current
     if (!track || cats.length === 0) return
-    const totalW = track.scrollWidth / 2
+    const getTotalW = () => track.scrollWidth / 2
 
     const tick = () => {
       if (!pausedRef.current) {
+        const totalW = getTotalW()
         posRef.current += SPEED
-        if (posRef.current >= totalW) posRef.current = 0
+        if (posRef.current >= totalW) posRef.current -= totalW
+        if (posRef.current < 0) posRef.current += totalW
         track.style.transform = `translateX(-${posRef.current}px)`
       }
       animRef.current = requestAnimationFrame(tick)
@@ -130,19 +133,72 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   }, [cats])
 
   function handleClick(id: string) {
+    if (dragRef.current.dragging) return
     pausedRef.current = true
     onChange(id)
-    setTimeout(() => { pausedRef.current = false }, 2000)
+    setTimeout(() => { pausedRef.current = false }, 2500)
+  }
+
+  // Mouse drag
+  function onMouseDown(e: React.MouseEvent) {
+    dragRef.current = { dragging: false, startX: e.clientX, startPos: posRef.current }
+    pausedRef.current = true
+  }
+  function onMouseMove(e: React.MouseEvent) {
+    if (!pausedRef.current) return
+    const dx = dragRef.current.startX - e.clientX
+    if (Math.abs(dx) > 3) dragRef.current.dragging = true
+    const track = trackRef.current
+    if (!track) return
+    const totalW = track.scrollWidth / 2
+    let newPos = dragRef.current.startPos + dx
+    if (newPos < 0) newPos += totalW
+    if (newPos >= totalW) newPos -= totalW
+    posRef.current = newPos
+    track.style.transform = `translateX(-${newPos}px)`
+  }
+  function onMouseUp() {
+    setTimeout(() => {
+      dragRef.current.dragging = false
+      pausedRef.current = false
+    }, 300)
+  }
+
+  // Touch drag
+  function onTouchStart(e: React.TouchEvent) {
+    dragRef.current = { dragging: false, startX: e.touches[0].clientX, startPos: posRef.current }
+    pausedRef.current = true
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    const dx = dragRef.current.startX - e.touches[0].clientX
+    if (Math.abs(dx) > 3) dragRef.current.dragging = true
+    const track = trackRef.current
+    if (!track) return
+    const totalW = track.scrollWidth / 2
+    let newPos = dragRef.current.startPos + dx
+    if (newPos < 0) newPos += totalW
+    if (newPos >= totalW) newPos -= totalW
+    posRef.current = newPos
+    track.style.transform = `translateX(-${newPos}px)`
+  }
+  function onTouchEnd() {
+    setTimeout(() => {
+      dragRef.current.dragging = false
+      pausedRef.current = false
+    }, 300)
   }
 
   const doubled = [...cats, ...cats]
 
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)', overflow: 'hidden' }}
-      onMouseEnter={() => { pausedRef.current = true }}
-      onMouseLeave={() => { pausedRef.current = false }}
-      onTouchStart={() => { pausedRef.current = true }}
-      onTouchEnd={() => { setTimeout(() => { pausedRef.current = false }, 1500) }}>
+    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)', overflow: 'hidden', cursor: 'grab', userSelect: 'none' }}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseUp}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}>
       <div style={{ position: 'relative', padding: '11px 0 13px', display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => (
           <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
