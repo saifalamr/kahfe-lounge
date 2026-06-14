@@ -110,6 +110,7 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   const animRef = useRef<number>(0)
   const posRef = useRef(0)
   const pausedRef = useRef(false)
+  const totalWRef = useRef(0)
   const dragRef = useRef({ dragging: false, startX: 0, startPos: 0 })
   const SPEED = 0.4
 
@@ -117,23 +118,26 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     const track = trackRef.current
     if (!track || cats.length === 0) return
 
-    // Reset position when lang changes so loop recalculates correctly
     posRef.current = 0
     track.style.transform = `translateX(0px)`
 
+    // measure the single-set width after render settles
+    const measure = () => { totalWRef.current = track.scrollWidth / 2 }
+    measure()
+    const measureTimer = setTimeout(measure, 100)
+    const measureTimer2 = setTimeout(measure, 400)
+
     const tick = () => {
-      if (!pausedRef.current) {
-        const totalW = track.scrollWidth / 2
-        if (totalW <= 0) { animRef.current = requestAnimationFrame(tick); return }
+      const totalW = totalWRef.current
+      if (!pausedRef.current && totalW > 0) {
         posRef.current += SPEED
         if (posRef.current >= totalW) posRef.current -= totalW
-        if (posRef.current < 0) posRef.current += totalW
         track.style.transform = `translateX(-${posRef.current}px)`
       }
       animRef.current = requestAnimationFrame(tick)
     }
     animRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(animRef.current)
+    return () => { cancelAnimationFrame(animRef.current); clearTimeout(measureTimer); clearTimeout(measureTimer2) }
   }, [cats, lang])
 
   function handleClick(id: string) {
@@ -143,7 +147,16 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     setTimeout(() => { pausedRef.current = false }, 2500)
   }
 
-  // Mouse drag
+  function applyDrag(dx: number) {
+    const track = trackRef.current
+    const totalW = totalWRef.current
+    if (!track || totalW <= 0) return
+    let newPos = dragRef.current.startPos + dx
+    newPos = ((newPos % totalW) + totalW) % totalW
+    posRef.current = newPos
+    track.style.transform = `translateX(-${newPos}px)`
+  }
+
   function onMouseDown(e: React.MouseEvent) {
     dragRef.current = { dragging: false, startX: e.clientX, startPos: posRef.current }
     pausedRef.current = true
@@ -157,8 +170,6 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   function onMouseUp() {
     setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)
   }
-
-  // Touch drag
   function onTouchStart(e: React.TouchEvent) {
     dragRef.current = { dragging: false, startX: e.touches[0].clientX, startPos: posRef.current }
     pausedRef.current = true
@@ -170,18 +181,6 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   }
   function onTouchEnd() {
     setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)
-  }
-
-  function applyDrag(dx: number) {
-    const track = trackRef.current
-    if (!track) return
-    const totalW = track.scrollWidth / 2
-    if (totalW <= 0) return
-    let newPos = dragRef.current.startPos + dx
-    // wrap around so it never gets stuck at edges
-    newPos = ((newPos % totalW) + totalW) % totalW
-    posRef.current = newPos
-    track.style.transform = `translateX(-${newPos}px)`
   }
 
   const doubled = [...cats, ...cats]
