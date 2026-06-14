@@ -141,9 +141,8 @@ function MenuCard({ item, qty, index, onOpen, onAdd, onInc, onDec, lang }: { ite
   )
 }
 
-const HOURS = lang==='en'?[['Monday – Sunday','10:00 – 02:00']]:lang==='ar'?[['الاثنين – الأحد','10:00 – 02:00']]:[['Pazartesi – Pazar','10:00 – 02:00']]
-
 function Contact({ lang }: { lang: string }) {
+  const HOURS = lang==='en'?[['Monday – Sunday','10:00 – 02:00']]:lang==='ar'?[['الاثنين – الأحد','10:00 – 02:00']]:[['Pazartesi – Pazar','10:00 – 02:00']]
   return (
     <section style={{ padding:'40px 18px 8px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
