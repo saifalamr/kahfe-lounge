@@ -39,7 +39,7 @@ function Hero() {
     <header style={{ position: 'relative', overflow: 'hidden', textAlign: 'center', padding: '60px 26px 32px' }}>
       <div style={{ position: 'absolute', left: '-20%', right: '-20%', top: '-30%', height: '160%', pointerEvents: 'none', background: 'radial-gradient(60% 48% at 50% 8%,rgba(201,168,76,.18),rgba(13,13,13,0) 68%),radial-gradient(40% 30% at 70% 0%,rgba(192,57,43,.07),rgba(13,13,13,0) 70%)', animation: 'heroGlow 16s ease-in-out infinite alternate' }} />
       <div style={{ position: 'relative', zIndex: 1 }}>
-        <img src="/kahfe-logo.jpg" alt="Kahfe Lounge" style={{ width: '85%', maxWidth: 320, height: 'auto', margin: '0 auto', display: 'block', animation: 'logoIn .9s .1s both' }} />
+        <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width: '85%', maxWidth: 320, height: 'auto', margin: '0 auto', display: 'block', animation: 'logoIn .9s .1s both' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '20px auto 16px', animation: 'logoIn .9s .2s both' }}>
           <span style={{ position: 'relative', width: 120, height: 1, background: 'linear-gradient(90deg,transparent,rgba(192,57,43,.5),transparent)', display: 'block' }}>
             <span style={{ position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, transform: 'translate(-50%,-50%) rotate(45deg)', background: '#C0392B', display: 'block' }} />
@@ -269,7 +269,7 @@ export default function MenuPage() {
   if(loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#0D0D0D' }}>
       <div style={{ textAlign:'center' }}>
-        <img src="/kahfe-logo.jpg" alt="Kahfe Lounge" style={{ width:200, height:'auto', marginBottom:16, opacity:.9 }}/>
+        <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:200, height:'auto', marginBottom:16, opacity:.9 }}/>
         <div style={{ color:'#888', fontSize:13 }}>Menü yükleniyor...</div>
       </div>
     </div>
@@ -309,7 +309,7 @@ export default function MenuPage() {
         <Contact/>
 
         <footer style={{ textAlign:'center', padding:'28px 16px 120px', marginTop:14, borderTop:'1px solid rgba(240,237,232,.05)' }}>
-          <img src="/kahfe-logo.jpg" alt="Kahfe Lounge" style={{ width:120, height:'auto', opacity:.6, marginBottom:12 }}/>
+          <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:120, height:'auto', opacity:.6, marginBottom:12 }}/>
           <div style={{ fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.01em' }}>© 2024 Kahfe Lounge — Tüm hakları saklıdır</div>
         </footer>
 
