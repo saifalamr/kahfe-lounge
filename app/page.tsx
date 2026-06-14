@@ -34,7 +34,7 @@ function KImg({ label, src, h = 160, rounded = 0 }: { label: string; src?: strin
   )
 }
 
-function Hero() {
+function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en'|'ar') => void }) {
   return (
     <header style={{ position: 'relative', overflow: 'hidden', textAlign: 'center', padding: '60px 26px 32px' }}>
       <div style={{ position: 'absolute', left: '-20%', right: '-20%', top: '-30%', height: '160%', pointerEvents: 'none', background: 'radial-gradient(60% 48% at 50% 8%,rgba(201,168,76,.18),rgba(13,13,13,0) 68%),radial-gradient(40% 30% at 70% 0%,rgba(192,57,43,.07),rgba(13,13,13,0) 70%)', animation: 'heroGlow 16s ease-in-out infinite alternate' }} />
@@ -51,7 +51,7 @@ function Hero() {
   )
 }
 
-function TabBar({ cats, active, onChange }: { cats: Category[]; active: string; onChange: (id: string) => void }) {
+function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: string; onChange: (id: string) => void; lang: string }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const animRef = useRef<number>(0)
   const posRef = useRef(0)
@@ -93,7 +93,7 @@ function TabBar({ cats, active, onChange }: { cats: Category[]; active: string; 
         {doubled.map((c, i) => (
           <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
             style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative' }}>
-            {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{c.name}
+            {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name}
             {active === c.id && <span style={{ position: 'absolute', bottom: -4, left: '14px', right: '14px', height: 2, borderRadius: 2, background: '#C9A84C', boxShadow: '0 0 8px rgba(201,168,76,.45)', display: 'block' }} />}
           </button>
         ))}
@@ -113,19 +113,19 @@ function QtyPill({ qty, onDec, onInc, size = 'md' }: { qty: number; onDec: () =>
   )
 }
 
-function MenuCard({ item, qty, index, onOpen, onAdd, onInc, onDec }: { item:MenuItem; qty:number; index:number; onOpen:()=>void; onAdd:()=>void; onInc:()=>void; onDec:()=>void }) {
+function MenuCard({ item, qty, index, onOpen, onAdd, onInc, onDec, lang }: { item:MenuItem; qty:number; index:number; onOpen:()=>void; onAdd:()=>void; onInc:()=>void; onDec:()=>void; lang:string }) {
   return (
     <article onClick={onOpen} className='corner-card' style={{ position:'relative', background:'#1A1A1A', borderRadius:18, overflow:'hidden', cursor:'pointer', border:'1px solid rgba(240,237,232,.05)', animation:'fadeUp .55s both', animationDelay:`${Math.min(index,8)*55}ms`, transition:'transform .28s ease,box-shadow .35s ease,border-color .35s ease' }}
       onMouseEnter={e=>{const el=e.currentTarget as HTMLElement;el.style.transform='translateY(-3px)';el.style.borderColor='rgba(192,57,43,.45)';el.style.boxShadow='0 0 0 1px rgba(192,57,43,.25),0 14px 30px rgba(0,0,0,.45)'}}
       onMouseLeave={e=>{const el=e.currentTarget as HTMLElement;el.style.transform='translateY(0)';el.style.borderColor='rgba(240,237,232,.05)';el.style.boxShadow='none'}}>
       <div style={{ overflow:'hidden' }}><KImg label={item.name} src={item.image_url||''} h={160}/></div>
       <div style={{ padding:'12px 13px 13px' }}>
-        <h3 style={{ fontFamily:'var(--sans)', fontWeight:600, fontSize:14.5, lineHeight:1.28, margin:0, color:'#F0EDE8', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight:'2.56em' }}>{item.name}</h3>
+        <h3 style={{ fontFamily:'var(--sans)', fontWeight:600, fontSize:14.5, lineHeight:1.28, margin:0, color:'#F0EDE8', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight:'2.56em' }}>{lang==='en'?(item.name_en||item.name):lang==='ar'?(item.name_ar||item.name):item.name}</h3>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginTop:11 }}>
           <span style={{ fontFamily:'var(--sans)', fontWeight:700, fontSize:16, color:'#C9A84C', letterSpacing:'.01em' }}>{fmt(item.price)}</span>
           {qty>0
             ? <QtyPill qty={qty} onDec={onDec} onInc={onInc} size="sm"/>
-            : <button onClick={e=>{e.stopPropagation();onAdd()}} style={{ appearance:'none', border:'1px solid #C9A84C', background:'#C9A84C', color:'#1A0E06', fontFamily:'var(--sans)', fontWeight:700, fontSize:12.5, padding:'8px 17px', borderRadius:999, cursor:'pointer', minHeight:34 }}>Ekle</button>
+            : <button onClick={e=>{e.stopPropagation();onAdd()}} style={{ appearance:'none', border:'1px solid #C9A84C', background:'#C9A84C', color:'#1A0E06', fontFamily:'var(--sans)', fontWeight:700, fontSize:12.5, padding:'8px 17px', borderRadius:999, cursor:'pointer', minHeight:34 }}>{lang==='en'?'Add':lang==='ar'?'أضف':'Ekle'}</button>
           }
         </div>
       </div>
@@ -192,7 +192,7 @@ function Contact() {
   )
 }
 
-function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec }: { item:MenuItem; qty:number; onClose:()=>void; onAdd:()=>void; onInc:()=>void; onDec:()=>void }) {
+function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:MenuItem; qty:number; onClose:()=>void; onAdd:()=>void; onInc:()=>void; onDec:()=>void; lang:string }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
@@ -202,8 +202,8 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec }: { item:MenuItem;
         <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
         <div style={{ padding:'8px 14px 0' }}><KImg label={item.name} src={item.image_url||''} h={260} rounded={20}/></div>
         <div style={{ padding:'18px 22px 0' }}>
-          <h2 style={{ fontFamily:'var(--serif)', fontWeight:700, fontSize:25, lineHeight:1.18, margin:0, color:'#F0EDE8' }}>{item.name}</h2>
-          {item.description && <p style={{ margin:'11px 0 0', color:'rgba(240,237,232,.62)', fontSize:14, lineHeight:1.6 }}>{item.description}</p>}
+          <h2 style={{ fontFamily:'var(--serif)', fontWeight:700, fontSize:25, lineHeight:1.18, margin:0, color:'#F0EDE8', direction:lang==='ar'?'rtl':'ltr' }}>{lang==='en'?(item.name_en||item.name):lang==='ar'?(item.name_ar||item.name):item.name}</h2>
+          {item.description && <p style={{ margin:'11px 0 0', color:'rgba(240,237,232,.62)', fontSize:14, lineHeight:1.6, direction:lang==='ar'?'rtl':'ltr' }}>{lang==='en'?(item.description_en||item.description):lang==='ar'?(item.description_ar||item.description):item.description}</p>}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, marginTop:22, paddingTop:18, borderTop:'1px solid rgba(240,237,232,.07)' }}>
             <div>
               <span style={{ display:'block', fontSize:10, textTransform:'uppercase', letterSpacing:'.18em', color:'rgba(201,168,76,.7)', marginBottom:4 }}>Fiyat</span>
@@ -211,7 +211,7 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec }: { item:MenuItem;
             </div>
             {qty>0
               ? <QtyPill qty={qty} onDec={onDec} onInc={onInc} size="lg"/>
-              : <button onClick={onAdd} style={{ appearance:'none', border:'none', background:'#C9A84C', color:'#1A0E06', fontFamily:'var(--sans)', fontWeight:700, fontSize:14.5, padding:'0 26px', minHeight:50, borderRadius:13, cursor:'pointer', flexShrink:0, boxShadow:'0 8px 22px rgba(201,168,76,.3)' }}>Sepete Ekle</button>
+              : <button onClick={onAdd} style={{ appearance:'none', border:'none', background:'#C9A84C', color:'#1A0E06', fontFamily:'var(--sans)', fontWeight:700, fontSize:14.5, padding:'0 26px', minHeight:50, borderRadius:13, cursor:'pointer', flexShrink:0, boxShadow:'0 8px 22px rgba(201,168,76,.3)' }}>{lang==='en'?'Add to Order':lang==='ar'?'أضف للطلب':'Sepete Ekle'}</button>
             }
           </div>
         </div>
@@ -220,7 +220,7 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec }: { item:MenuItem;
   )
 }
 
-function OrderSummary({ lines, total, count, onClose, onInc, onDec }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void }) {
+function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
@@ -237,7 +237,7 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec }: { lines:Li
             <div key={l.id} style={{ display:'grid', gridTemplateColumns:'48px 1fr auto auto', alignItems:'center', gap:11, padding:'13px 0', borderBottom:'1px dashed rgba(201,168,76,.18)' }}>
               <div style={{ width:48, height:48, borderRadius:10, overflow:'hidden' }}><KImg label={l.name} src={l.image_url||''} h={48}/></div>
               <div style={{ display:'flex', flexDirection:'column', minWidth:0 }}>
-                <span style={{ fontWeight:600, fontSize:13.5, color:'#F0EDE8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.name}</span>
+                <span style={{ fontWeight:600, fontSize:13.5, color:'#F0EDE8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lang==='en'?(l.name_en||l.name):lang==='ar'?(l.name_ar||l.name):l.name}</span>
                 <span style={{ fontSize:11, color:'rgba(240,237,232,.5)', marginTop:2 }}>{fmt(l.price)} · adet</span>
               </div>
               <QtyPill qty={l.qty} onDec={()=>onDec(l)} onInc={()=>onInc(l)} size="sm"/>
@@ -250,8 +250,8 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec }: { lines:Li
           <span style={{ fontFamily:'var(--sans)', fontWeight:700, fontSize:25, color:'#C9A84C' }}>{fmt(total)}</span>
         </div>
         <div style={{ margin:'14px 22px 0', border:'1px solid rgba(201,168,76,.3)', borderRadius:14, padding:'14px 16px', background:'rgba(201,168,76,.04)', display:'flex', flexDirection:'column', gap:5 }}>
-          <span style={{ color:'#C9A84C', fontWeight:700, fontSize:12.5, textTransform:'uppercase', letterSpacing:'.08em' }}>Garsona Göster</span>
-          <span style={{ fontSize:12.5, color:'rgba(240,237,232,.62)', lineHeight:1.5 }}>Bu ekranı görevliye gösterin. Siparişiniz masanıza getirilecektir.</span>
+          <span style={{ color:'#C9A84C', fontWeight:700, fontSize:12.5, textTransform:'uppercase', letterSpacing:'.08em' }}>{lang==='en'?'Show Waiter':lang==='ar'?'أرِ النادل':'Garsona Göster'}</span>
+          <span style={{ fontSize:12.5, color:'rgba(240,237,232,.62)', lineHeight:1.5 }}>{lang==='en'?'Show this screen to the waiter. Your order will be brought to your table.':lang==='ar'?'أرِ هذه الشاشة للنادل. سيُحضر طلبك إلى طاولتك.':'Bu ekranı görevliye gösterin. Siparişiniz masanıza getirilecektir.'}</span>
         </div>
       </div>
     </div>
@@ -267,6 +267,29 @@ export default function MenuPage() {
   const [openItemId, setOpenItemId] = useState<string|null>(null)
   const [showOrder, setShowOrder] = useState(false)
   const [pulseKey, setPulseKey] = useState(0)
+  const [lang, setLang] = useState<'tr'|'en'|'ar'>('tr')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('kahfe_lang') as 'tr'|'en'|'ar'
+    if (saved) setLang(saved)
+  }, [])
+
+  function changeLang(l: 'tr'|'en'|'ar') {
+    setLang(l)
+    localStorage.setItem('kahfe_lang', l)
+  }
+
+  function t(item: any, field: string) {
+    if (lang === 'en') return item[field+'_en'] || item[field] || ''
+    if (lang === 'ar') return item[field+'_ar'] || item[field] || ''
+    return item[field] || ''
+  }
+
+  function catName(cat: any) {
+    if (lang === 'en') return cat.name_en || cat.name
+    if (lang === 'ar') return cat.name_ar || cat.name
+    return cat.name
+  }
 
   useEffect(()=>{
     async function load() {
@@ -328,14 +351,14 @@ export default function MenuPage() {
         .gold-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.25),rgba(192,57,43,.15),transparent);margin:0;}
       `}</style>
 
-      <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px' }}>
-        <Hero/>
-        <div className='gold-divider'/><TabBar cats={categories} active={activeCat} onChange={setActiveCat}/>
+      <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
+        <Hero lang={lang} onLangChange={changeLang}/>
+        <div className='gold-divider'/><TabBar cats={categories} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
           {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>Bu kategoride henüz ürün yok.</div>}
           {items.map((it,i)=>(
-            <MenuCard key={it.id} item={it} qty={cart[it.id]||0} index={i}
+            <MenuCard key={it.id} item={it} qty={cart[it.id]||0} index={i} lang={lang}
               onOpen={()=>setOpenItemId(it.id)}
               onAdd={()=>add(it)} onInc={()=>inc(it)} onDec={()=>dec(it)}/>
           ))}
@@ -360,13 +383,13 @@ export default function MenuPage() {
         )}
 
         {openItem && (
-          <ItemSheet item={openItem} qty={cart[openItem.id]||0}
+          <ItemSheet item={openItem} qty={cart[openItem.id]||0} lang={lang}
             onClose={()=>setOpenItemId(null)}
             onAdd={()=>{add(openItem);setOpenItemId(null)}}
             onInc={()=>inc(openItem)} onDec={()=>dec(openItem)}/>
         )}
         {showOrder && count>0 && (
-          <OrderSummary lines={lines as Line[]} total={total} count={count}
+          <OrderSummary lines={lines as Line[]} total={total} count={count} lang={lang}
             onClose={()=>setShowOrder(false)} onInc={inc} onDec={dec}/>
         )}
       </div>
