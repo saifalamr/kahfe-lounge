@@ -301,7 +301,7 @@ export default function MenuPage() {
         .gold-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.25),rgba(192,57,43,.15),transparent);margin:0;}
       `}</style>
 
-      <div className='kahfe-bg' style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative' }}>
+      <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px' }}>
         <Hero/>
         <div className='gold-divider'/><TabBar cats={categories} active={activeCat} onChange={setActiveCat}/>
 
