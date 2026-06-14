@@ -28,6 +28,7 @@ export default function AdminPage() {
   const [itemAvail, setItemAvail] = useState(true)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [imagePreview, setImagePreview] = useState('')
+  const [filterCat, setFilterCat] = useState('')
 
   useEffect(() => {
     const saved = localStorage.getItem('kahfe_admin')
@@ -285,8 +286,14 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div style={{ color: '#888', fontSize: 12, marginBottom: 12, letterSpacing: 1 }}>MEVCUT ÜRÜNLER ({items.length})</div>
-          {items.map(item => {
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ color: '#888', fontSize: 12, letterSpacing: 1 }}>MEVCUT ÜRÜNLER ({items.filter(i => !filterCat || i.category_id === filterCat).length})</div>
+          </div>
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ ...s.input, marginBottom: 14 }}>
+            <option value="">Tüm Kategoriler</option>
+            {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name} ({items.filter(i => i.category_id === cat.id).length})</option>)}
+          </select>
+          {items.filter(i => !filterCat || i.category_id === filterCat).map(item => {
             const cat = categories.find(c => c.id === item.category_id)
             return (
               <div key={item.id} style={{ ...s.card, opacity: item.available ? 1 : 0.5 }}>
