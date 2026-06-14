@@ -139,6 +139,7 @@ export default function AdminPage() {
   const [itemPrice, setItemPrice] = useState('')
   const [itemCat, setItemCat] = useState('')
   const [itemAvail, setItemAvail] = useState(true)
+  const [itemRec, setItemRec] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
 
   // Image crop states
@@ -208,11 +209,11 @@ export default function AdminPage() {
       if (croppedBlob) imageUrl = await uploadBlob(croppedBlob)
 
       if (editingItem) {
-        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail }).eq('id', editingItem.id)
+        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec }).eq('id', editingItem.id)
         showMsg('Ürün güncellendi ✓'); setEditingItem(null)
       } else {
         const maxOrder = items.length ? Math.max(...items.map(i => i.order_index)) + 1 : 0
-        await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, order_index: maxOrder })
+        await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, order_index: maxOrder })
         showMsg('Ürün eklendi ✓')
       }
       resetItemForm(); await loadData()
@@ -234,12 +235,13 @@ export default function AdminPage() {
   function startEditItem(item: MenuItem) {
     setEditingItem(item); setItemName(item.name); setItemDesc(item.description || '')
     setItemPrice(item.price.toString()); setItemCat(item.category_id); setItemAvail(item.available)
+    setItemRec(item.recommended || false)
     setExistingImageUrl(item.image_url || ''); setCroppedBlob(null); setCroppedPreview(item.image_url || '')
     setRawImageSrc(''); setShowCropper(false)
   }
 
   function resetItemForm() {
-    setItemName(''); setItemDesc(''); setItemPrice(''); setItemCat(''); setItemAvail(true)
+    setItemName(''); setItemDesc(''); setItemPrice(''); setItemCat(''); setItemAvail(true); setItemRec(false)
     setEditingItem(null); setCroppedBlob(null); setCroppedPreview(''); setRawImageSrc('')
     setExistingImageUrl(''); setShowCropper(false)
   }
@@ -402,9 +404,14 @@ export default function AdminPage() {
                 </div>
               ) : null}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <input type="checkbox" id="avail" checked={itemAvail} onChange={e => setItemAvail(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#C0392B' }} />
                 <label htmlFor="avail" style={{ color: '#F0EDE8', fontSize: 14, cursor: 'pointer' }}>Satışta (aktif)</label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, background: itemRec ? 'rgba(201,168,76,.08)' : 'transparent', border: itemRec ? '1px solid rgba(201,168,76,.3)' : '1px solid #2A2A2A', borderRadius: 10, padding: '10px 12px' }}>
+                <input type="checkbox" id="rec" checked={itemRec} onChange={e => setItemRec(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#C9A84C' }} />
+                <label htmlFor="rec" style={{ color: '#C9A84C', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>⭐ Öne Çıkan (Önerilen)</label>
               </div>
 
               <div style={{ display: 'flex', gap: 8 }}>
@@ -434,13 +441,13 @@ export default function AdminPage() {
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: 22 }}>📷</div>}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.name}</div>
+                      <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.recommended && <span style={{ marginRight: 4 }}>⭐</span>}{item.name}</div>
                       <div style={{ color: '#888', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}</div>
                       <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 14 }}>{item.price} ₺</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <button onClick={() => startEditItem(item)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                      <button onClick={() => toggleAvail(item)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: item.available ? '#4CAF50' : '#888', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.available ? 'Aktif' : 'Pasif'}</button>
+                      <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: item.recommended ? '#C9A84C' : '#888', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
                       <button onClick={() => deleteItem(item.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                     </div>
                   </div>
