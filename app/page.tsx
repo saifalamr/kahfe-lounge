@@ -152,20 +152,10 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     if (!pausedRef.current) return
     const dx = dragRef.current.startX - e.clientX
     if (Math.abs(dx) > 3) dragRef.current.dragging = true
-    const track = trackRef.current
-    if (!track) return
-    const totalW = track.scrollWidth / 2
-    if (totalW <= 0) return
-    let newPos = dragRef.current.startPos + dx
-    newPos = Math.max(0, Math.min(newPos, totalW - 1))
-    posRef.current = newPos
-    track.style.transform = `translateX(-${newPos}px)`
+    applyDrag(dx)
   }
   function onMouseUp() {
-    setTimeout(() => {
-      dragRef.current.dragging = false
-      pausedRef.current = false
-    }, 300)
+    setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)
   }
 
   // Touch drag
@@ -174,23 +164,24 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     pausedRef.current = true
   }
   function onTouchMove(e: React.TouchEvent) {
-    const track = trackRef.current
-    if (!track) return
     const dx = dragRef.current.startX - e.touches[0].clientX
     if (Math.abs(dx) > 3) dragRef.current.dragging = true
+    applyDrag(dx)
+  }
+  function onTouchEnd() {
+    setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)
+  }
+
+  function applyDrag(dx: number) {
+    const track = trackRef.current
+    if (!track) return
     const totalW = track.scrollWidth / 2
     if (totalW <= 0) return
     let newPos = dragRef.current.startPos + dx
-    // clamp within valid range instead of wrapping during drag
-    newPos = Math.max(0, Math.min(newPos, totalW - 1))
+    // wrap around so it never gets stuck at edges
+    newPos = ((newPos % totalW) + totalW) % totalW
     posRef.current = newPos
     track.style.transform = `translateX(-${newPos}px)`
-  }
-  function onTouchEnd() {
-    setTimeout(() => {
-      dragRef.current.dragging = false
-      pausedRef.current = false
-    }, 300)
   }
 
   const doubled = [...cats, ...cats]
