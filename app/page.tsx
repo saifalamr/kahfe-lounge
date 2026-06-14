@@ -419,13 +419,16 @@ export default function MenuPage() {
       ])
       const c=cats||[]; const i=its||[]
       setCategories(c); setAllItems(i)
-      if(c.length) setActiveCat(c[0].id)
+      const hasRecommended = i.some(x => x.recommended)
+      if (hasRecommended) setActiveCat('__recommended__')
+      else if(c.length) setActiveCat(c[0].id)
       setLoading(false)
     }
     load()
   },[])
 
-  const items  = useMemo(()=>allItems.filter(i=>i.category_id===activeCat),[activeCat,allItems])
+  const recommendedItems = useMemo(()=>allItems.filter(i=>i.recommended),[allItems])
+  const items  = useMemo(()=> activeCat==='__recommended__' ? recommendedItems : allItems.filter(i=>i.category_id===activeCat),[activeCat,allItems,recommendedItems])
   const byId   = useMemo(()=>{ const m:Record<string,MenuItem>={};allItems.forEach(i=>m[i.id]=i);return m },[allItems])
   const setQty = (id:string,next:number)=>setCart(c=>{const n={...c};if(next<=0)delete n[id];else n[id]=next;return n})
   const add    = (item:MenuItem)=>{setQty(item.id,(cart[item.id]||0)+1);setPulseKey(k=>k+1)}
@@ -544,7 +547,7 @@ export default function MenuPage() {
 
       <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
         <Hero lang={lang} onLangChange={changeLang}/>
-        <div className='gold-divider'/><TabBar cats={categories} active={activeCat} onChange={setActiveCat} lang={lang}/>
+        <div className='gold-divider'/><TabBar cats={recommendedItems.length>0 ? [{id:'__recommended__', name:'Öne Çıkanlar', name_en:'Recommended', name_ar:'موصى به', icon:'⭐', order_index:-1, created_at:''} as Category, ...categories] : categories} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
           {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
