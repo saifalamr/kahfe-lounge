@@ -188,7 +188,7 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   const doubled = [...cats, ...cats]
 
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)', overflow: 'hidden', cursor: 'grab', userSelect: 'none' }}
+    <div dir="ltr" style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)', overflow: 'hidden', cursor: 'grab', userSelect: 'none' }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
@@ -196,12 +196,12 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}>
-      <div style={{ position: 'relative', padding: '11px 0 13px', display: 'flex', width: 'max-content' }} ref={trackRef}>
+      <div dir="ltr" style={{ position: 'relative', padding: '11px 0 13px', display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => {
           const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
           return (
           <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
-            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative', direction: lang==='ar' ? 'rtl' : 'ltr' }}>
+            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative' }}>
             {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{displayName || c.name}
             {active === c.id && <span style={{ position: 'absolute', bottom: -4, left: '14px', right: '14px', height: 2, borderRadius: 2, background: '#C9A84C', boxShadow: '0 0 8px rgba(201,168,76,.45)', display: 'block' }} />}
           </button>
