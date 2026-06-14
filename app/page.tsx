@@ -36,25 +36,71 @@ function KImg({ label, src, h = 160, rounded = 0 }: { label: string; src?: strin
 
 function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en'|'ar') => void }) {
   return (
-    <header style={{ position: 'relative', overflow: 'hidden', textAlign: 'center', padding: '60px 26px 32px' }}>
-      <div style={{ position: 'absolute', left: '-20%', right: '-20%', top: '-30%', height: '160%', pointerEvents: 'none', background: 'radial-gradient(60% 48% at 50% 8%,rgba(201,168,76,.18),rgba(13,13,13,0) 68%),radial-gradient(40% 30% at 70% 0%,rgba(192,57,43,.07),rgba(13,13,13,0) 70%)', animation: 'heroGlow 16s ease-in-out infinite alternate' }} />
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width: '85%', maxWidth: 320, height: 'auto', margin: '0 auto', display: 'block', animation: 'logoIn .9s .1s both' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '20px auto 16px', animation: 'logoIn .9s .2s both' }}>
-          <span style={{ position: 'relative', width: 120, height: 1, background: 'linear-gradient(90deg,transparent,rgba(192,57,43,.5),transparent)', display: 'block' }}>
-            <span style={{ position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, transform: 'translate(-50%,-50%) rotate(45deg)', background: '#C0392B', display: 'block' }} />
-          </span>
+    <header style={{ position: 'relative', overflow: 'hidden', textAlign: 'center', padding: '52px 24px 36px' }}>
+
+      {/* layered background glows */}
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+        background:'radial-gradient(ellipse 80% 55% at 50% 0%, rgba(201,168,76,.13) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 50% 100%, rgba(192,57,43,.07) 0%, transparent 70%)',
+        animation:'heroGlow 16s ease-in-out infinite alternate' }} />
+
+      {/* top corner ornaments */}
+      <div style={{ position:'absolute', top:14, left:14, width:28, height:28, pointerEvents:'none' }}>
+        <span style={{ position:'absolute', top:0, left:0, width:14, height:1.5, background:'#C9A84C', display:'block', opacity:.5 }}/>
+        <span style={{ position:'absolute', top:0, left:0, width:1.5, height:14, background:'#C9A84C', display:'block', opacity:.5 }}/>
+      </div>
+      <div style={{ position:'absolute', top:14, right:14, width:28, height:28, pointerEvents:'none' }}>
+        <span style={{ position:'absolute', top:0, right:0, width:14, height:1.5, background:'#C9A84C', display:'block', opacity:.5 }}/>
+        <span style={{ position:'absolute', top:0, right:0, width:1.5, height:14, background:'#C9A84C', display:'block', opacity:.5 }}/>
+      </div>
+      <div style={{ position:'absolute', bottom:14, left:14, width:28, height:28, pointerEvents:'none' }}>
+        <span style={{ position:'absolute', bottom:0, left:0, width:14, height:1.5, background:'#C9A84C', display:'block', opacity:.5 }}/>
+        <span style={{ position:'absolute', bottom:0, left:0, width:1.5, height:14, background:'#C9A84C', display:'block', opacity:.5 }}/>
+      </div>
+      <div style={{ position:'absolute', bottom:14, right:14, width:28, height:28, pointerEvents:'none' }}>
+        <span style={{ position:'absolute', bottom:0, right:0, width:14, height:1.5, background:'#C9A84C', display:'block', opacity:.5 }}/>
+        <span style={{ position:'absolute', bottom:0, right:0, width:1.5, height:14, background:'#C9A84C', display:'block', opacity:.5 }}/>
+      </div>
+
+      <div style={{ position:'relative', zIndex:1 }}>
+
+        {/* logo with gold glow ring */}
+        <div style={{ position:'relative', display:'inline-block', animation:'logoIn .9s .1s both' }}>
+          <div style={{ position:'absolute', inset:-12, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%)', pointerEvents:'none' }}/>
+          <img src="/kahfe-logo.png" alt="Kahfe Lounge"
+            style={{ width:'82%', maxWidth:300, height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 24px rgba(201,168,76,.18))' }} />
         </div>
-        <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 500, fontSize: 15, color: 'rgba(240,237,232,.62)', margin: 0, animation: 'logoIn .9s .28s both' }}>{lang==='en'?'The Address of Taste and Peace':lang==='ar'?'عنوان الذوق والراحة':'Lezzetin ve Huzurun Adresi'}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 18, animation: 'logoIn .9s .35s both' }}>
+
+        {/* elegant wide divider */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, margin:'20px auto 14px', animation:'logoIn .9s .2s both' }}>
+          <span style={{ flex:1, maxWidth:60, height:1, background:'linear-gradient(90deg,transparent,rgba(201,168,76,.4))' }}/>
+          <span style={{ display:'flex', gap:5, alignItems:'center' }}>
+            <span style={{ width:3, height:3, background:'rgba(201,168,76,.4)', borderRadius:'50%', display:'block' }}/>
+            <span style={{ width:5, height:5, background:'#C0392B', transform:'rotate(45deg)', display:'block' }}/>
+            <span style={{ width:3, height:3, background:'rgba(201,168,76,.4)', borderRadius:'50%', display:'block' }}/>
+          </span>
+          <span style={{ flex:1, maxWidth:60, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.4),transparent)' }}/>
+        </div>
+
+        {/* tagline */}
+        <p style={{ fontFamily:'var(--serif)', fontStyle:'italic', fontWeight:500, fontSize:14, color:'rgba(240,237,232,.55)', margin:'0 0 20px', letterSpacing:'.04em', animation:'logoIn .9s .28s both' }}>
+          {lang==='en'?'The Address of Taste & Peace':lang==='ar'?'عنوان الذوق والراحة':'Lezzetin ve Huzurun Adresi'}
+        </p>
+
+        {/* lang switcher - pill style */}
+        <div style={{ display:'inline-flex', background:'rgba(240,237,232,.06)', border:'1px solid rgba(240,237,232,.1)', borderRadius:30, padding:3, gap:2, animation:'logoIn .9s .35s both' }}>
           {(['tr','en','ar'] as const).map(l => (
             <button key={l} onClick={() => onLangChange(l)}
-              style={{ background: lang===l ? '#C9A84C' : 'rgba(240,237,232,.08)', border: lang===l ? 'none' : '1px solid rgba(240,237,232,.15)', borderRadius: 20, padding: '6px 16px', color: lang===l ? '#1A0E06' : 'rgba(240,237,232,.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, transition: 'all .2s' }}>
-              {l === 'tr' ? 'TR' : l === 'en' ? 'EN' : 'AR'}
+              style={{ background: lang===l ? '#C9A84C' : 'transparent', border:'none', borderRadius:24, padding:'6px 18px', color: lang===l ? '#1A0E06' : 'rgba(240,237,232,.45)', fontSize:11, fontWeight:800, cursor:'pointer', letterSpacing:1.5, transition:'all .25s' }}>
+              {l.toUpperCase()}
             </button>
           ))}
         </div>
+
       </div>
+
+      {/* bottom border with center gem */}
+      <div style={{ position:'absolute', bottom:0, left:24, right:24, height:1, background:'linear-gradient(90deg,transparent,rgba(201,168,76,.2),rgba(192,57,43,.15),rgba(201,168,76,.2),transparent)' }}/>
+
     </header>
   )
 }
