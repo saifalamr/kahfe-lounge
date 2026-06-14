@@ -155,9 +155,9 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     const track = trackRef.current
     if (!track) return
     const totalW = track.scrollWidth / 2
+    if (totalW <= 0) return
     let newPos = dragRef.current.startPos + dx
-    if (newPos < 0) newPos += totalW
-    if (newPos >= totalW) newPos -= totalW
+    newPos = Math.max(0, Math.min(newPos, totalW - 1))
     posRef.current = newPos
     track.style.transform = `translateX(-${newPos}px)`
   }
@@ -174,14 +174,15 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     pausedRef.current = true
   }
   function onTouchMove(e: React.TouchEvent) {
-    const dx = dragRef.current.startX - e.touches[0].clientX
-    if (Math.abs(dx) > 3) dragRef.current.dragging = true
     const track = trackRef.current
     if (!track) return
+    const dx = dragRef.current.startX - e.touches[0].clientX
+    if (Math.abs(dx) > 3) dragRef.current.dragging = true
     const totalW = track.scrollWidth / 2
+    if (totalW <= 0) return
     let newPos = dragRef.current.startPos + dx
-    if (newPos < 0) newPos += totalW
-    if (newPos >= totalW) newPos -= totalW
+    // clamp within valid range instead of wrapping during drag
+    newPos = Math.max(0, Math.min(newPos, totalW - 1))
     posRef.current = newPos
     track.style.transform = `translateX(-${newPos}px)`
   }
