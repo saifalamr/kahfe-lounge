@@ -116,11 +116,15 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
   useEffect(() => {
     const track = trackRef.current
     if (!track || cats.length === 0) return
-    const getTotalW = () => track.scrollWidth / 2
+
+    // Reset position when lang changes so loop recalculates correctly
+    posRef.current = 0
+    track.style.transform = `translateX(0px)`
 
     const tick = () => {
       if (!pausedRef.current) {
-        const totalW = getTotalW()
+        const totalW = track.scrollWidth / 2
+        if (totalW <= 0) { animRef.current = requestAnimationFrame(tick); return }
         posRef.current += SPEED
         if (posRef.current >= totalW) posRef.current -= totalW
         if (posRef.current < 0) posRef.current += totalW
@@ -130,7 +134,7 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     }
     animRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(animRef.current)
-  }, [cats])
+  }, [cats, lang])
 
   function handleClick(id: string) {
     if (dragRef.current.dragging) return
@@ -200,13 +204,15 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}>
       <div style={{ position: 'relative', padding: '11px 0 13px', display: 'flex', width: 'max-content' }} ref={trackRef}>
-        {doubled.map((c, i) => (
+        {doubled.map((c, i) => {
+          const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
+          return (
           <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
-            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative' }}>
-            {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name}
+            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative', direction: lang==='ar' ? 'rtl' : 'ltr' }}>
+            {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{displayName || c.name}
             {active === c.id && <span style={{ position: 'absolute', bottom: -4, left: '14px', right: '14px', height: 2, borderRadius: 2, background: '#C9A84C', boxShadow: '0 0 8px rgba(201,168,76,.45)', display: 'block' }} />}
           </button>
-        ))}
+        )})}
       </div>
     </div>
   )
