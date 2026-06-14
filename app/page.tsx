@@ -88,7 +88,7 @@ function QtyPill({ qty, onDec, onInc, size = 'md' }: { qty: number; onDec: () =>
 
 function MenuCard({ item, qty, index, onOpen, onAdd, onInc, onDec }: { item:MenuItem; qty:number; index:number; onOpen:()=>void; onAdd:()=>void; onInc:()=>void; onDec:()=>void }) {
   return (
-    <article onClick={onOpen} style={{ position:'relative', background:'#1A1A1A', borderRadius:18, overflow:'hidden', cursor:'pointer', border:'1px solid rgba(240,237,232,.05)', animation:'fadeUp .55s both', animationDelay:`${Math.min(index,8)*55}ms`, transition:'transform .28s ease,box-shadow .35s ease,border-color .35s ease' }}
+    <article onClick={onOpen} className='corner-card' style={{ position:'relative', background:'#1A1A1A', borderRadius:18, overflow:'hidden', cursor:'pointer', border:'1px solid rgba(240,237,232,.05)', animation:'fadeUp .55s both', animationDelay:`${Math.min(index,8)*55}ms`, transition:'transform .28s ease,box-shadow .35s ease,border-color .35s ease' }}
       onMouseEnter={e=>{const el=e.currentTarget as HTMLElement;el.style.transform='translateY(-3px)';el.style.borderColor='rgba(192,57,43,.45)';el.style.boxShadow='0 0 0 1px rgba(192,57,43,.25),0 14px 30px rgba(0,0,0,.45)'}}
       onMouseLeave={e=>{const el=e.currentTarget as HTMLElement;el.style.transform='translateY(0)';el.style.borderColor='rgba(240,237,232,.05)';el.style.boxShadow='none'}}>
       <div style={{ overflow:'hidden' }}><KImg label={item.name} src={item.image_url||''} h={160}/></div>
@@ -290,12 +290,20 @@ export default function MenuPage() {
         @keyframes sheetDown{from{transform:translateY(0);}to{transform:translateY(100%);}}
         @keyframes pulseScale{0%{transform:scale(1);}28%{transform:scale(1.035);}60%{transform:scale(.992);}100%{transform:scale(1);}}
         @keyframes heroGlow{0%{opacity:.55;transform:translate(-2%,-2%);}100%{opacity:.9;transform:translate(2%,2%);}}
+        @keyframes shimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
         ::-webkit-scrollbar{display:none;}*{scrollbar-width:none;}
+        .kahfe-bg{background-color:#0D0D0D;background-image:radial-gradient(circle,rgba(201,168,76,.055) 1px,transparent 1px);background-size:28px 28px;}
+        .corner-card{position:relative;}
+        .corner-card::before,.corner-card::after{content:'';position:absolute;width:10px;height:10px;opacity:0;transition:opacity .3s;z-index:2;}
+        .corner-card::before{top:7px;left:7px;border-top:1.5px solid #C9A84C;border-left:1.5px solid #C9A84C;border-radius:3px 0 0 0;}
+        .corner-card::after{bottom:7px;right:7px;border-bottom:1.5px solid #C9A84C;border-right:1.5px solid #C9A84C;border-radius:0 0 3px 0;}
+        .corner-card:hover::before,.corner-card:hover::after{opacity:1;}
+        .gold-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.25),rgba(192,57,43,.15),transparent);margin:0;}
       `}</style>
 
-      <div style={{ background:'#0D0D0D', minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative' }}>
+      <div className='kahfe-bg' style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative' }}>
         <Hero/>
-        <TabBar cats={categories} active={activeCat} onChange={setActiveCat}/>
+        <div className='gold-divider'/><TabBar cats={categories} active={activeCat} onChange={setActiveCat}/>
 
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
           {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>Bu kategoride henüz ürün yok.</div>}
