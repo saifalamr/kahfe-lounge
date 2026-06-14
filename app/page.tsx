@@ -52,24 +52,51 @@ function Hero() {
 }
 
 function TabBar({ cats, active, onChange }: { cats: Category[]; active: string; onChange: (id: string) => void }) {
-  const rowRef = useRef<HTMLDivElement>(null)
-  const [ind, setInd] = useState({ left: 0, width: 0 })
-  useLayoutEffect(() => {
-    const row = rowRef.current; if (!row) return
-    const el = row.querySelector(`[data-cat="${active}"]`) as HTMLElement; if (!el) return
-    setInd({ left: el.offsetLeft, width: el.offsetWidth })
-    row.scrollTo({ left: Math.max(0, el.offsetLeft - 20), behavior: 'smooth' })
-  }, [active, cats])
+  const trackRef = useRef<HTMLDivElement>(null)
+  const animRef = useRef<number>(0)
+  const posRef = useRef(0)
+  const pausedRef = useRef(false)
+  const SPEED = 0.5
+
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track || cats.length === 0) return
+    const totalW = track.scrollWidth / 2
+
+    const tick = () => {
+      if (!pausedRef.current) {
+        posRef.current += SPEED
+        if (posRef.current >= totalW) posRef.current = 0
+        track.style.transform = `translateX(-${posRef.current}px)`
+      }
+      animRef.current = requestAnimationFrame(tick)
+    }
+    animRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(animRef.current)
+  }, [cats])
+
+  function handleClick(id: string) {
+    pausedRef.current = true
+    onChange(id)
+    setTimeout(() => { pausedRef.current = false }, 2000)
+  }
+
+  const doubled = [...cats, ...cats]
+
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)' }}>
-      <div ref={rowRef} style={{ position: 'relative', display: 'flex', gap: 4, overflowX: 'auto', padding: '11px 16px 13px', scrollbarWidth: 'none' }}>
-        {cats.map(c => (
-          <button key={c.id} data-cat={c.id} onClick={() => onChange(c.id)}
-            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 10px', transition: 'color .25s' }}>
+    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)', overflow: 'hidden' }}
+      onMouseEnter={() => { pausedRef.current = true }}
+      onMouseLeave={() => { pausedRef.current = false }}
+      onTouchStart={() => { pausedRef.current = true }}
+      onTouchEnd={() => { setTimeout(() => { pausedRef.current = false }, 1500) }}>
+      <div style={{ position: 'relative', padding: '11px 0 13px', display: 'flex', width: 'max-content' }} ref={trackRef}>
+        {doubled.map((c, i) => (
+          <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
+            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative' }}>
             {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{c.name}
+            {active === c.id && <span style={{ position: 'absolute', bottom: -4, left: '14px', right: '14px', height: 2, borderRadius: 2, background: '#C9A84C', boxShadow: '0 0 8px rgba(201,168,76,.45)', display: 'block' }} />}
           </button>
         ))}
-        <span style={{ position: 'absolute', bottom: 7, left: 0, height: 2, borderRadius: 2, background: '#C9A84C', boxShadow: '0 0 8px rgba(201,168,76,.45)', transition: 'transform .32s cubic-bezier(.45,0,.15,1),width .32s cubic-bezier(.45,0,.15,1)', transform: `translateX(${ind.left}px)`, width: ind.width }} />
       </div>
     </div>
   )
