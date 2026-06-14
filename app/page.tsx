@@ -46,6 +46,14 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
           </span>
         </div>
         <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 500, fontSize: 15, color: 'rgba(240,237,232,.62)', margin: 0, animation: 'logoIn .9s .28s both' }}>Lezzetin ve Huzurun Adresi</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 18, animation: 'logoIn .9s .35s both' }}>
+          {(['tr','en','ar'] as const).map(l => (
+            <button key={l} onClick={() => onLangChange(l)}
+              style={{ background: lang===l ? '#C9A84C' : 'rgba(240,237,232,.08)', border: lang===l ? 'none' : '1px solid rgba(240,237,232,.15)', borderRadius: 20, padding: '6px 16px', color: lang===l ? '#1A0E06' : 'rgba(240,237,232,.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, transition: 'all .2s' }}>
+              {l === 'tr' ? 'TR' : l === 'en' ? 'EN' : 'AR'}
+            </button>
+          ))}
+        </div>
       </div>
     </header>
   )
