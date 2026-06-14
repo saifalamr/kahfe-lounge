@@ -45,7 +45,7 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
             <span style={{ position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, transform: 'translate(-50%,-50%) rotate(45deg)', background: '#C0392B', display: 'block' }} />
           </span>
         </div>
-        <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 500, fontSize: 15, color: 'rgba(240,237,232,.62)', margin: 0, animation: 'logoIn .9s .28s both' }}>Lezzetin ve Huzurun Adresi</p>
+        <p style={{ fontFamily: 'var(--serif)', fontStyle: 'italic', fontWeight: 500, fontSize: 15, color: 'rgba(240,237,232,.62)', margin: 0, animation: 'logoIn .9s .28s both' }}>{lang==='en'?'The Address of Taste and Peace':lang==='ar'?'عنوان الذوق والراحة':'Lezzetin ve Huzurun Adresi'}</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 18, animation: 'logoIn .9s .35s both' }}>
           {(['tr','en','ar'] as const).map(l => (
             <button key={l} onClick={() => onLangChange(l)}
@@ -141,19 +141,19 @@ function MenuCard({ item, qty, index, onOpen, onAdd, onInc, onDec, lang }: { ite
   )
 }
 
-const HOURS = [['Pazartesi – Pazar','10:00 – 02:00']]
+const HOURS = lang==='en'?[['Monday – Sunday','10:00 – 02:00']]:lang==='ar'?[['الاثنين – الأحد','10:00 – 02:00']]:[['Pazartesi – Pazar','10:00 – 02:00']]
 
-function Contact() {
+function Contact({ lang }: { lang: string }) {
   return (
     <section style={{ padding:'40px 18px 8px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
-        <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.1em', color:'#C9A84C', whiteSpace:'nowrap' }}>B İ Z E &nbsp; U L A Ş I N</span>
+        <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.1em', color:'#C9A84C', whiteSpace:'nowrap' }}>{lang==='en'?'CONTACT US':lang==='ar'?'تواصل معنا':'B İ Z E   U L A Ş I N'}</span>
         <span style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.4),transparent)' }}/>
       </div>
 
       {[
-        { href:'tel:+902126262424', icon:<IconPhone size={20}/>, main:'+90 212 626 2424', sub:'Rezervasyon & paket sipariş' },
-        { href:'https://maps.app.goo.gl/XhAE7ymB1VZaadKo8', icon:<IconMap size={20}/>, main:'Konumumuz', sub:'Google Maps\'te görüntüle' },
+        { href:'tel:+902126262424', icon:<IconPhone size={20}/>, main:'+90 212 626 2424', sub:lang==='en'?'Reservation & takeaway':lang==='ar'?'حجز وطلبات خارجية':'Rezervasyon & paket sipariş' },
+        { href:'https://maps.app.goo.gl/XhAE7ymB1VZaadKo8', icon:<IconMap size={20}/>, main:lang==='en'?'Our Location':lang==='ar'?'موقعنا':'Konumumuz', sub:'Google Maps\'te görüntüle' },
       ].map(({href,icon,main,sub})=>(
         <a key={href} href={href} target="_blank" rel="noreferrer" style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 2px', textDecoration:'none', color:'#F0EDE8', borderBottom:'1px solid rgba(240,237,232,.05)', transition:'opacity .2s' }}>
           <span style={{ width:42, height:42, flexShrink:0, display:'grid', placeItems:'center', borderRadius:12, border:'1px solid rgba(201,168,76,.3)', color:'#C9A84C' }}>{icon}</span>
@@ -167,13 +167,13 @@ function Contact() {
       <a href="https://maps.app.goo.gl/XhAE7ymB1VZaadKo8" target="_blank" rel="noreferrer" style={{ display:'block', margin:'18px 0', border:'1px solid rgba(240,237,232,.07)', borderRadius:16, overflow:'hidden', position:'relative', textDecoration:'none' }}>
         <div style={{ width:'100%', height:150, background:'#161310', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8 }}>
           <span style={{ color:'#C9A84C', fontSize:28 }}><IconPin size={32}/></span>
-          <span style={{ color:'rgba(240,237,232,.5)', fontSize:12, letterSpacing:'.1em' }}>HARİTADA GÖR</span>
+          <span style={{ color:'rgba(240,237,232,.5)', fontSize:12, letterSpacing:'.1em' }}>{lang==='en'?'VIEW ON MAP':lang==='ar'?'عرض على الخريطة':'HARİTADA GÖR'}</span>
         </div>
       </a>
 
       <div style={{ marginTop:16, background:'#141414', border:'1px solid rgba(240,237,232,.05)', borderRadius:14, padding:'14px 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:9, color:'#C9A84C', fontWeight:600, fontSize:12.5, letterSpacing:'.03em', paddingBottom:11, marginBottom:6, borderBottom:'1px solid rgba(201,168,76,.16)' }}>
-          <IconClock size={18}/> Çalışma Saatleri
+          <IconClock size={18}/> {lang==='en'?'Opening Hours':lang==='ar'?'ساعات العمل':'Çalışma Saatleri'}
         </div>
         {HOURS.map(([d,t],i)=>(
           <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', fontSize:13.5, color:'rgba(240,237,232,.78)' }}>
@@ -214,7 +214,7 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:Men
           {item.description && <p style={{ margin:'11px 0 0', color:'rgba(240,237,232,.62)', fontSize:14, lineHeight:1.6, direction:lang==='ar'?'rtl':'ltr' }}>{lang==='en'?(item.description_en||item.description):lang==='ar'?(item.description_ar||item.description):item.description}</p>}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:14, marginTop:22, paddingTop:18, borderTop:'1px solid rgba(240,237,232,.07)' }}>
             <div>
-              <span style={{ display:'block', fontSize:10, textTransform:'uppercase', letterSpacing:'.18em', color:'rgba(201,168,76,.7)', marginBottom:4 }}>Fiyat</span>
+              <span style={{ display:'block', fontSize:10, textTransform:'uppercase', letterSpacing:'.18em', color:'rgba(201,168,76,.7)', marginBottom:4 }}>{lang==='en'?'Price':lang==='ar'?'السعر':'Fiyat'}</span>
               <span style={{ fontFamily:'var(--sans)', fontWeight:700, fontSize:26, color:'#C9A84C' }}>{fmt(item.price)}</span>
             </div>
             {qty>0
@@ -237,8 +237,8 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
         <div style={{ width:38, height:4, borderRadius:4, background:'rgba(240,237,232,.18)', margin:'10px auto 2px' }}/>
         <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
         <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', padding:'18px 22px 0' }}>
-          <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.08em', color:'#C9A84C' }}>S İ P A R İ Ş &nbsp; Ö Z E T İ</span>
-          <span style={{ fontSize:12, color:'rgba(240,237,232,.5)' }}>{count} ürün</span>
+          <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.08em', color:'#C9A84C' }}>{lang==='en'?'ORDER SUMMARY':lang==='ar'?'ملخص الطلب':'S İ P A R İ Ş   Ö Z E T İ'}</span>
+          <span style={{ fontSize:12, color:'rgba(240,237,232,.5)' }}>{count} {lang==='en'?'items':lang==='ar'?'عناصر':'ürün'}</span>
         </div>
         <div style={{ display:'flex', flexDirection:'column', padding:'16px 22px 2px' }}>
           {lines.map(l=>(
@@ -254,7 +254,7 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
           ))}
         </div>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', margin:'4px 22px 0', padding:'16px 0', borderTop:'1px solid rgba(201,168,76,.3)' }}>
-          <span style={{ fontSize:13, textTransform:'uppercase', letterSpacing:'.1em', color:'rgba(240,237,232,.5)' }}>Toplam</span>
+          <span style={{ fontSize:13, textTransform:'uppercase', letterSpacing:'.1em', color:'rgba(240,237,232,.5)' }}>{lang==='en'?'TOTAL':lang==='ar'?'المجموع':'Toplam'}</span>
           <span style={{ fontFamily:'var(--sans)', fontWeight:700, fontSize:25, color:'#C9A84C' }}>{fmt(total)}</span>
         </div>
         <div style={{ margin:'14px 22px 0', border:'1px solid rgba(201,168,76,.3)', borderRadius:14, padding:'14px 16px', background:'rgba(201,168,76,.04)', display:'flex', flexDirection:'column', gap:5 }}>
@@ -328,7 +328,7 @@ export default function MenuPage() {
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#0D0D0D' }}>
       <div style={{ textAlign:'center' }}>
         <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:200, height:'auto', marginBottom:16, opacity:.9 }}/>
-        <div style={{ color:'#888', fontSize:13 }}>Menü yükleniyor...</div>
+        <div style={{ color:'#888', fontSize:13 }}>{lang==='en'?'Loading menu...':lang==='ar'?'جارٍ تحميل القائمة...':'Menü yükleniyor...'}</div>
       </div>
     </div>
   )
@@ -364,7 +364,7 @@ export default function MenuPage() {
         <div className='gold-divider'/><TabBar cats={categories} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
-          {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>Bu kategoride henüz ürün yok.</div>}
+          {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
           {items.map((it,i)=>(
             <MenuCard key={it.id} item={it} qty={cart[it.id]||0} index={i} lang={lang}
               onOpen={()=>setOpenItemId(it.id)}
@@ -372,11 +372,11 @@ export default function MenuPage() {
           ))}
         </div>
 
-        <Contact/>
+        <Contact lang={lang}/>
 
         <footer style={{ textAlign:'center', padding:'28px 16px 120px', marginTop:14, borderTop:'1px solid rgba(240,237,232,.05)' }}>
           <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:120, height:'auto', opacity:.6, marginBottom:12 }}/>
-          <div style={{ fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.01em' }}>© 2024 Kahfe Lounge — Tüm hakları saklıdır</div>
+          <div style={{ fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.01em' }}>{lang==='en'?'© 2024 Kahfe Lounge — All rights reserved':lang==='ar'?'© 2024 كهفة لاونج — جميع الحقوق محفوظة':'© 2024 Kahfe Lounge — Tüm hakları saklıdır'}</div>
         </footer>
 
         {count>0 && (
@@ -384,7 +384,7 @@ export default function MenuPage() {
             <button key={pulseKey} onClick={()=>setShowOrder(true)}
               style={{ pointerEvents:'auto', width:'100%', minHeight:56, border:'none', cursor:'pointer', background:'#C9A84C', borderRadius:16, display:'flex', alignItems:'center', gap:12, padding:'0 16px 0 12px', color:'#1A0E06', boxShadow:'0 12px 34px rgba(201,168,76,.34),0 4px 14px rgba(0,0,0,.5)', animation:'pulseScale .45s ease' }}>
               <span style={{ width:30, height:30, flexShrink:0, background:'rgba(0,0,0,.2)', borderRadius:9, display:'grid', placeItems:'center', fontWeight:700, fontSize:13.5, color:'#1A0E06' }}>{count}</span>
-              <span style={{ flex:1, textAlign:'left', fontWeight:600, fontSize:14.5, letterSpacing:'.01em' }}>Sipariş Özeti</span>
+              <span style={{ flex:1, textAlign:'left', fontWeight:600, fontSize:14.5, letterSpacing:'.01em' }}>{lang==='en'?'View Order':lang==='ar'?'عرض الطلب':'Sipariş Özeti'}</span>
               <span style={{ fontWeight:700, fontSize:16.5 }}>{fmt(total)}</span>
             </button>
           </div>
