@@ -324,15 +324,34 @@ export default function AdminPage() {
                 {editingCat && <button onClick={() => { setEditingCat(null); setCatName(''); setCatIcon('') }} style={s.btnSecondary}>İptal</button>}
               </div>
             </div>
-            <div style={{ color: '#888', fontSize: 12, marginBottom: 12, letterSpacing: 1 }}>MEVCUT KATEGORİLER ({categories.length})</div>
-            {categories.map(cat => (
-              <div key={cat.id} style={s.card}>
+            <div style={{ color: '#888', fontSize: 12, marginBottom: 12, letterSpacing: 1 }}>MEVCUT KATEGORİLER ({categories.length}) — ⠿ Sürükle ile sırala</div>
+            {categories.map((cat, idx) => (
+              <div key={cat.id}
+                draggable
+                onDragStart={e => { e.dataTransfer.setData('text/plain', String(idx)); (e.currentTarget as HTMLElement).style.opacity='0.4' }}
+                onDragEnd={e => { (e.currentTarget as HTMLElement).style.opacity='1' }}
+                onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor='#C9A84C' }}
+                onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='#2A2A2A' }}
+                onDrop={async e => {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLElement).style.borderColor='#2A2A2A'
+                  const fromIdx = parseInt(e.dataTransfer.getData('text/plain'))
+                  if (fromIdx === idx) return
+                  const reordered = [...categories]
+                  const [moved] = reordered.splice(fromIdx, 1)
+                  reordered.splice(idx, 0, moved)
+                  await Promise.all(reordered.map((c, i) => supabase.from('categories').update({ order_index: i }).eq('id', c.id)))
+                  showMsg('Sıralama güncellendi ✓')
+                  await loadData()
+                }}
+                style={{ ...s.card, cursor: 'grab', transition: 'border-color .2s, opacity .2s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: '#555', fontSize: 18, cursor: 'grab', userSelect: 'none' }}>⠿</span>
                     {cat.icon && <span style={{ fontSize: 22 }}>{cat.icon}</span>}
                     <div>
                       <div style={{ color: '#F0EDE8', fontWeight: 700 }}>{cat.name}</div>
-                      <div style={{ color: '#888', fontSize: 12 }}>{items.filter(i => i.category_id === cat.id).length} ürün</div>
+                      <div style={{ color: '#888', fontSize: 12 }}>{items.filter(i => i.category_id === cat.id).length} ürün · #{idx + 1}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
