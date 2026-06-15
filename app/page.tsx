@@ -70,7 +70,7 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
           <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
             <img src="/friend1.jpg" alt=""
               style={{ width:62, height:62, borderRadius:'50%', objectFit:'cover', objectPosition:'top', border:'2px solid rgba(201,168,76,.55)', boxShadow:'0 0 14px rgba(201,168,76,.18)' }} />
-            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Asil</span>
+            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Majed</span>
           </div>
 
           {/* Logo */}
@@ -84,7 +84,7 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
           <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
             <img src="/friend2.jpg" alt=""
               style={{ width:62, height:62, borderRadius:'50%', objectFit:'cover', objectPosition:'top', border:'2px solid rgba(201,168,76,.55)', boxShadow:'0 0 14px rgba(201,168,76,.18)' }} />
-            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Waleed</span>
+            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Mustafa</span>
           </div>
 
         </div>
