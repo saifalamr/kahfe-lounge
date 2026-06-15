@@ -173,9 +173,12 @@ function TabRow({
       onTouchEnd={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}>
       <div dir="ltr" style={{ display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => {
-          const displayName = CAT_TRANSLATIONS[c.name]
-            ? (lang==='en' ? (c.name_en || CAT_TRANSLATIONS[c.name].name_en) : lang==='ar' ? (c.name_ar || CAT_TRANSLATIONS[c.name].name_ar) : c.name)
-            : (lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name)
+          const _ov = CAT_TRANSLATIONS[c.name]
+          const displayName = lang==='en'
+            ? (_ov ? (_ov.name_en) : (c.name_en||c.name))
+            : lang==='ar'
+            ? (_ov ? (_ov.name_ar) : (c.name_ar||c.name))
+            : c.name
           return (
             <button key={`${c.id}-${i}`} onClick={() => handleClick(c.id)}
               style={{ flexShrink: 0, background: active === c.id ? 'rgba(201,168,76,.14)' : 'rgba(240,237,232,.05)', border: active === c.id ? '1px solid rgba(201,168,76,.45)' : '1px solid rgba(240,237,232,.1)', borderRadius: 22, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.6)', padding: '7px 16px', margin: '0 4px', transition: 'all .25s' }}>
