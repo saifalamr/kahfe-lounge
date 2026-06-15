@@ -208,6 +208,15 @@ function TabBar({ cats, recCat, active, onChange, lang }: { cats: Category[]; re
         </div>
       )}
 
+      {/* swipe hint */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'5px 20px 3px' }}>
+        <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, transparent, rgba(201,168,76,.15))' }}/>
+        <span style={{ fontSize:9, fontWeight:600, letterSpacing:'0.16em', color:'rgba(201,168,76,.4)', whiteSpace:'nowrap', textTransform:'uppercase' }}>
+          {lang==='en' ? '⟵  swipe & pick a category  ⟶' : lang==='ar' ? '⟵  اسحب واختر فئة  ⟶' : '⟵  kaydır & kategori seç  ⟶'}
+        </span>
+        <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, rgba(201,168,76,.15), transparent)' }}/>
+      </div>
+
       {/* thin separator */}
       <div style={{ height:1, margin:'0 16px', background:'linear-gradient(90deg,transparent,rgba(201,168,76,.1),transparent)' }}/>
 
