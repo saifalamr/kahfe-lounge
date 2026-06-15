@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 
 type CartMap = Record<string, number>
@@ -36,7 +36,7 @@ function KImg({ label, src, h = 160, rounded = 0 }: { label: string; src?: strin
 
 function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en'|'ar') => void }) {
   return (
-    <header style={{ position: 'relative', overflow: 'hidden', textAlign: 'center', padding: '52px 24px 36px' }}>
+    <header style={{ position: 'relative', overflow: 'hidden', textAlign: 'center', padding: '28px 24px 32px' }}>
 
       {/* layered background glows */}
       <div style={{ position:'absolute', inset:0, pointerEvents:'none',
@@ -63,15 +63,15 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
 
       <div style={{ position:'relative', zIndex:1 }}>
 
-        {/* logo with gold glow ring */}
+        {/* logo — larger and higher */}
         <div style={{ position:'relative', display:'inline-block', animation:'logoIn .9s .1s both' }}>
           <div style={{ position:'absolute', inset:-12, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%)', pointerEvents:'none' }}/>
           <img src="/kahfe-logo.png" alt="Kahfe Lounge"
-            style={{ width:'82%', maxWidth:300, height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 24px rgba(201,168,76,.18))' }} />
+            style={{ width:'92%', maxWidth:340, height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 28px rgba(201,168,76,.22))' }} />
         </div>
 
         {/* elegant wide divider */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, margin:'20px auto 14px', animation:'logoIn .9s .2s both' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, margin:'16px auto 12px', animation:'logoIn .9s .2s both' }}>
           <span style={{ flex:1, maxWidth:60, height:1, background:'linear-gradient(90deg,transparent,rgba(201,168,76,.4))' }}/>
           <span style={{ display:'flex', gap:5, alignItems:'center' }}>
             <span style={{ width:3, height:3, background:'rgba(201,168,76,.4)', borderRadius:'50%', display:'block' }}/>
@@ -82,7 +82,7 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
         </div>
 
         {/* tagline */}
-        <p style={{ fontFamily:'var(--serif)', fontStyle:'italic', fontWeight:500, fontSize:14, color:'rgba(240,237,232,.55)', margin:'0 0 20px', letterSpacing:'.04em', animation:'logoIn .9s .28s both' }}>
+        <p style={{ fontFamily:'var(--serif)', fontStyle:'italic', fontWeight:500, fontSize:14, color:'rgba(240,237,232,.55)', margin:'0 0 18px', letterSpacing:'.04em', animation:'logoIn .9s .28s both' }}>
           {lang==='en'?'The Address of Taste & Peace':lang==='ar'?'عنوان الذوق والراحة':'Lezzetin ve Huzurun Adresi'}
         </p>
 
@@ -105,33 +105,34 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
   )
 }
 
-function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: string; onChange: (id: string) => void; lang: string }) {
+/* ── Single scrolling row of category pills ── */
+function TabRow({
+  cats, active, onChange, lang, direction
+}: {
+  cats: Category[]; active: string; onChange: (id: string) => void; lang: string; direction: 'ltr' | 'rtl'
+}) {
   const trackRef = useRef<HTMLDivElement>(null)
-  const animRef = useRef<number>(0)
-  const posRef = useRef(0)
+  const animRef  = useRef<number>(0)
+  const posRef   = useRef(0)
   const pausedRef = useRef(false)
   const totalWRef = useRef(0)
-  const dragRef = useRef({ dragging: false, startX: 0, startPos: 0 })
-  const SPEED = 0.4
+  const dragRef  = useRef({ dragging: false, startX: 0, startPos: 0 })
+  const SPEED    = 0.38
 
   useEffect(() => {
     const track = trackRef.current
     if (!track || cats.length === 0) return
-
     posRef.current = 0
     track.style.transform = `translateX(0px)`
-
-    // measure the single-set width after render settles
     const measure = () => { totalWRef.current = track.scrollWidth / 2 }
     measure()
-    const measureTimer = setTimeout(measure, 100)
-    const measureTimer2 = setTimeout(measure, 400)
-
+    const t1 = setTimeout(measure, 100)
+    const t2 = setTimeout(measure, 400)
     const tick = () => {
       const totalW = totalWRef.current
       if (!pausedRef.current && totalW > 0) {
-        const dir = lang === 'ar' ? -1 : 1
-        posRef.current += SPEED * dir
+        // direction: ltr rows scroll left (pos increases), rtl rows scroll right (pos decreases)
+        posRef.current += direction === 'ltr' ? SPEED : -SPEED
         if (posRef.current >= totalW) posRef.current -= totalW
         if (posRef.current < 0) posRef.current += totalW
         track.style.transform = `translateX(-${posRef.current}px)`
@@ -139,8 +140,8 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
       animRef.current = requestAnimationFrame(tick)
     }
     animRef.current = requestAnimationFrame(tick)
-    return () => { cancelAnimationFrame(animRef.current); clearTimeout(measureTimer); clearTimeout(measureTimer2) }
-  }, [cats, lang])
+    return () => { cancelAnimationFrame(animRef.current); clearTimeout(t1); clearTimeout(t2) }
+  }, [cats, direction])
 
   function handleClick(id: string) {
     if (dragRef.current.dragging) return
@@ -159,63 +160,53 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
     track.style.transform = `translateX(-${newPos}px)`
   }
 
-  function onMouseDown(e: React.MouseEvent) {
-    dragRef.current = { dragging: false, startX: e.clientX, startPos: posRef.current }
-    pausedRef.current = true
-  }
-  function onMouseMove(e: React.MouseEvent) {
-    if (!pausedRef.current) return
-    const dx = dragRef.current.startX - e.clientX
-    if (Math.abs(dx) > 3) dragRef.current.dragging = true
-    applyDrag(dx)
-  }
-  function onMouseUp() {
-    setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)
-  }
-  function onTouchStart(e: React.TouchEvent) {
-    dragRef.current = { dragging: false, startX: e.touches[0].clientX, startPos: posRef.current }
-    pausedRef.current = true
-  }
-  function onTouchMove(e: React.TouchEvent) {
-    const dx = dragRef.current.startX - e.touches[0].clientX
-    if (Math.abs(dx) > 3) dragRef.current.dragging = true
-    applyDrag(dx)
-  }
-  function onTouchEnd() {
-    setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)
-  }
-
   const doubled = [...cats, ...cats]
 
   return (
-    <div dir="ltr" style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)', overflow: 'hidden', cursor: 'grab', userSelect: 'none' }}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}>
+    <div dir="ltr" style={{ overflow: 'hidden', cursor: 'grab', userSelect: 'none', padding: '5px 0' }}
+      onMouseDown={e => { dragRef.current = { dragging: false, startX: e.clientX, startPos: posRef.current }; pausedRef.current = true }}
+      onMouseMove={e => { if (!pausedRef.current) return; const dx = dragRef.current.startX - e.clientX; if (Math.abs(dx) > 3) dragRef.current.dragging = true; applyDrag(dx) }}
+      onMouseUp={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}
+      onMouseLeave={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}
+      onTouchStart={e => { dragRef.current = { dragging: false, startX: e.touches[0].clientX, startPos: posRef.current }; pausedRef.current = true }}
+      onTouchMove={e => { const dx = dragRef.current.startX - e.touches[0].clientX; if (Math.abs(dx) > 3) dragRef.current.dragging = true; applyDrag(dx) }}
+      onTouchEnd={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}>
+      <div dir="ltr" style={{ display: 'flex', width: 'max-content' }} ref={trackRef}>
+        {doubled.map((c, i) => {
+          const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
+          return (
+            <button key={`${c.id}-${i}`} onClick={() => handleClick(c.id)}
+              style={{ flexShrink: 0, background: active === c.id ? 'rgba(201,168,76,.14)' : 'rgba(240,237,232,.05)', border: active === c.id ? '1px solid rgba(201,168,76,.45)' : '1px solid rgba(240,237,232,.1)', borderRadius: 22, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.6)', padding: '7px 16px', margin: '0 4px', transition: 'all .25s' }}>
+              {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{displayName || c.name}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
+/* ── Double tab bar: top row LTR, bottom row RTL ── */
+function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: string; onChange: (id: string) => void; lang: string }) {
+  return (
+    <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)' }}>
       {/* hint line */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'7px 20px 0' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'7px 20px 2px' }}>
         <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, transparent, rgba(201,168,76,.2))' }}/>
         <span style={{ fontSize:9.5, fontWeight:600, letterSpacing:'0.18em', color:'rgba(201,168,76,.45)', whiteSpace:'nowrap', textTransform:'uppercase' }}>
-          {lang==='en' ? '✦ Swipe to explore categories ✦' : lang==='ar' ? '✦ اسحب لاستعراض الفئات ✦' : '✦ Kaydır & kategori seç ✦'}
+          {lang==='en' ? '✦ Tap a category ✦' : lang==='ar' ? '✦ اختر فئة ✦' : '✦ Kategori seç ✦'}
         </span>
         <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, rgba(201,168,76,.2), transparent)' }}/>
       </div>
 
-      <div dir="ltr" style={{ position: 'relative', padding: '8px 0 12px', display: 'flex', width: 'max-content' }} ref={trackRef}>
-        {doubled.map((c, i) => {
-          const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
-          return (
-          <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
-            style={{ flexShrink: 0, background: active === c.id ? 'rgba(201,168,76,.14)' : 'rgba(240,237,232,.05)', border: active === c.id ? '1px solid rgba(201,168,76,.45)' : '1px solid rgba(240,237,232,.1)', borderRadius: 22, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.6)', padding: '7px 16px', margin: '0 4px', transition: 'all .25s', position: 'relative' }}>
-            {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{displayName || c.name}
-          </button>
-        )})}
-      </div>
+      {/* Row 1 — scrolls left → right */}
+      <TabRow cats={cats} active={active} onChange={onChange} lang={lang} direction="ltr" />
+
+      {/* thin gold separator between rows */}
+      <div style={{ height:1, margin:'0 16px', background:'linear-gradient(90deg,transparent,rgba(201,168,76,.12),transparent)' }}/>
+
+      {/* Row 2 — scrolls right → left */}
+      <TabRow cats={cats} active={active} onChange={onChange} lang={lang} direction="rtl" />
     </div>
   )
 }
@@ -256,7 +247,7 @@ function Contact({ lang }: { lang: string }) {
   return (
     <section style={{ padding:'40px 18px 8px' }}>
       <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
-        <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.1em', color:'#C9A84C', whiteSpace:'nowrap' }}>{lang==='en'?'CONTACT US':lang==='ar'?'تواصل معنا':'B İ Z E   U L A Ş I N'}</span>
+        <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.1em', color:'#C9A84C', whiteSpace:'nowrap' }}>{lang==='en'?'CONTACT US':lang==='ar'?'تواصل معنا':'B İ Z E   U L A Ş I N'}</span>
         <span style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.4),transparent)' }}/>
       </div>
 
@@ -346,7 +337,7 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
         <div style={{ width:38, height:4, borderRadius:4, background:'rgba(240,237,232,.18)', margin:'10px auto 2px' }}/>
         <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
         <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', padding:'18px 22px 0' }}>
-          <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.08em', color:'#C9A84C' }}>{lang==='en'?'ORDER SUMMARY':lang==='ar'?'ملخص الطلب':'S İ P A R İ Ş   Ö Z E T İ'}</span>
+          <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.08em', color:'#C9A84C' }}>{lang==='en'?'ORDER SUMMARY':lang==='ar'?'ملخص الطلب':'S İ P A R İ Ş   Ö Z E T İ'}</span>
           <span style={{ fontSize:12, color:'rgba(240,237,232,.5)' }}>{count} {lang==='en'?'items':lang==='ar'?'عناصر':'ürün'}</span>
         </div>
         <div style={{ display:'flex', flexDirection:'column', padding:'16px 22px 2px' }}>
@@ -389,36 +380,12 @@ export default function MenuPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem('kahfe_lang') as 'tr'|'en'|'ar'
-    if (saved) {
-      setLang(saved)
-      setShowWelcome(false)
-    } else {
-      setShowWelcome(true)
-    }
+    if (saved) { setLang(saved); setShowWelcome(false) }
+    else setShowWelcome(true)
   }, [])
 
-  function selectLang(l: 'tr'|'en'|'ar') {
-    setLang(l)
-    localStorage.setItem('kahfe_lang', l)
-    setShowWelcome(false)
-  }
-
-  function changeLang(l: 'tr'|'en'|'ar') {
-    setLang(l)
-    localStorage.setItem('kahfe_lang', l)
-  }
-
-  function t(item: any, field: string) {
-    if (lang === 'en') return item[field+'_en'] || item[field] || ''
-    if (lang === 'ar') return item[field+'_ar'] || item[field] || ''
-    return item[field] || ''
-  }
-
-  function catName(cat: any) {
-    if (lang === 'en') return cat.name_en || cat.name
-    if (lang === 'ar') return cat.name_ar || cat.name
-    return cat.name
-  }
+  function selectLang(l: 'tr'|'en'|'ar') { setLang(l); localStorage.setItem('kahfe_lang', l); setShowWelcome(false) }
+  function changeLang(l: 'tr'|'en'|'ar') { setLang(l); localStorage.setItem('kahfe_lang', l) }
 
   useEffect(()=>{
     async function load() {
@@ -448,6 +415,12 @@ export default function MenuPage() {
   const lines  = useMemo(()=>Object.entries(cart).map(([id,qty])=>({...byId[id],qty})).filter(l=>l.id),[cart,byId])
   const openItem = openItemId?byId[openItemId]:null
 
+  const allCats = useMemo(()=>
+    recommendedItems.length > 0
+      ? [{id:'__recommended__', name:'Öne Çıkanlar', name_en:'Recommended', name_ar:'موصى به', icon:'⭐', order_index:-1, created_at:''} as Category, ...categories]
+      : categories
+  ,[recommendedItems, categories])
+
   if(loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#0D0D0D' }}>
       <div style={{ textAlign:'center' }}>
@@ -472,7 +445,6 @@ export default function MenuPage() {
         @keyframes sheetDown{from{transform:translateY(0);}to{transform:translateY(100%);}}
         @keyframes pulseScale{0%{transform:scale(1);}28%{transform:scale(1.035);}60%{transform:scale(.992);}100%{transform:scale(1);}}
         @keyframes heroGlow{0%{opacity:.55;transform:translate(-2%,-2%);}100%{opacity:.9;transform:translate(2%,2%);}}
-        @keyframes shimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
         @keyframes welcomeIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:scale(1);}}
         ::-webkit-scrollbar{display:none;}*{scrollbar-width:none;}
         .kahfe-bg{background-color:#0D0D0D;background-image:radial-gradient(circle,rgba(201,168,76,.055) 1px,transparent 1px);background-size:28px 28px;}
@@ -489,66 +461,37 @@ export default function MenuPage() {
       {showWelcome && (
         <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,.92)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, maxWidth:480, margin:'0 auto' }}>
           <div style={{ width:'100%', background:'#141414', borderRadius:24, overflow:'hidden', border:'1px solid rgba(201,168,76,.2)', boxShadow:'0 0 60px rgba(0,0,0,.8)', animation:'welcomeIn .5s cubic-bezier(.18,.84,.26,1) both' }}>
-
-            {/* top gold bar */}
             <div style={{ height:3, background:'linear-gradient(90deg,transparent,#C9A84C,#C0392B,#C9A84C,transparent)' }}/>
-
             <div style={{ padding:'32px 28px 28px', textAlign:'center' }}>
-
-              {/* logo */}
               <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:180, height:'auto', margin:'0 auto 20px', display:'block', filter:'drop-shadow(0 4px 16px rgba(201,168,76,.2))' }}/>
-
-              {/* divider */}
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
                 <span style={{ flex:1, height:1, background:'linear-gradient(90deg,transparent,rgba(201,168,76,.3))' }}/>
                 <span style={{ width:5, height:5, background:'#C0392B', transform:'rotate(45deg)', display:'block', flexShrink:0 }}/>
                 <span style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.3),transparent)' }}/>
               </div>
-
-              {/* welcome text - all 3 languages */}
               <div style={{ marginBottom:28 }}>
                 <p style={{ color:'#F0EDE8', fontFamily:'var(--serif)', fontSize:18, fontWeight:700, marginBottom:4 }}>Hoş Geldiniz</p>
                 <p style={{ color:'rgba(240,237,232,.5)', fontSize:12, letterSpacing:1 }}>Welcome &nbsp;|&nbsp; أهلاً وسهلاً</p>
               </div>
-
-              {/* language buttons */}
               <p style={{ color:'rgba(240,237,232,.4)', fontSize:11, letterSpacing:2, marginBottom:14, textTransform:'uppercase' }}>Choose your language</p>
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-
-                <button className="lang-pick-btn" onClick={() => selectLang('tr')}
-                  style={{ width:'100%', background:'linear-gradient(135deg,rgba(201,168,76,.12),rgba(201,168,76,.06))', border:'1px solid rgba(201,168,76,.3)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
-                  <span style={{ fontSize:22 }}>🇹🇷</span>
-                  <div style={{ textAlign:'center', flex:1 }}>
-                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>Türkçe</div>
-                    <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>Turkish</div>
-                  </div>
-                  <span style={{ color:'#C9A84C', fontSize:16 }}>›</span>
-                </button>
-
-                <button className="lang-pick-btn" onClick={() => selectLang('en')}
-                  style={{ width:'100%', background:'linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03))', border:'1px solid rgba(240,237,232,.1)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
-                  <span style={{ fontSize:22 }}>🇬🇧</span>
-                  <div style={{ textAlign:'center', flex:1 }}>
-                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>English</div>
-                    <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>English</div>
-                  </div>
-                  <span style={{ color:'#888', fontSize:16 }}>›</span>
-                </button>
-
-                <button className="lang-pick-btn" onClick={() => selectLang('ar')}
-                  style={{ width:'100%', background:'linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03))', border:'1px solid rgba(240,237,232,.1)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
-                  <span style={{ fontSize:22 }}>🇸🇦</span>
-                  <div style={{ textAlign:'center', flex:1 }}>
-                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>العربية</div>
-                    <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>Arabic</div>
-                  </div>
-                  <span style={{ color:'#888', fontSize:16 }}>›</span>
-                </button>
-
+                {[
+                  { code:'tr' as const, flag:'🇹🇷', label:'Türkçe', sub:'Turkish', gold: true },
+                  { code:'en' as const, flag:'🇬🇧', label:'English', sub:'English', gold: false },
+                  { code:'ar' as const, flag:'🇸🇦', label:'العربية', sub:'Arabic', gold: false },
+                ].map(({ code, flag, label, sub, gold }) => (
+                  <button key={code} className="lang-pick-btn" onClick={() => selectLang(code)}
+                    style={{ width:'100%', background: gold?'linear-gradient(135deg,rgba(201,168,76,.12),rgba(201,168,76,.06))':'linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.03))', border: gold?'1px solid rgba(201,168,76,.3)':'1px solid rgba(240,237,232,.1)', borderRadius:14, padding:'16px 20px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'all .2s' }}>
+                    <span style={{ fontSize:22 }}>{flag}</span>
+                    <div style={{ textAlign:'center', flex:1 }}>
+                      <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15 }}>{label}</div>
+                      <div style={{ color:'rgba(240,237,232,.4)', fontSize:11, marginTop:2 }}>{sub}</div>
+                    </div>
+                    <span style={{ color: gold?'#C9A84C':'#888', fontSize:16 }}>›</span>
+                  </button>
+                ))}
               </div>
             </div>
-
-            {/* bottom gold bar */}
             <div style={{ height:3, background:'linear-gradient(90deg,transparent,#C0392B,#C9A84C,transparent)' }}/>
           </div>
         </div>
@@ -556,7 +499,8 @@ export default function MenuPage() {
 
       <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
         <Hero lang={lang} onLangChange={changeLang}/>
-        <div className='gold-divider'/><TabBar cats={recommendedItems.length>0 ? [{id:'__recommended__', name:'Öne Çıkanlar', name_en:'Recommended', name_ar:'موصى به', icon:'⭐', order_index:-1, created_at:''} as Category, ...categories] : categories} active={activeCat} onChange={setActiveCat} lang={lang}/>
+        <div className='gold-divider'/>
+        <TabBar cats={allCats} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
           {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
