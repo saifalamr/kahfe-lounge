@@ -63,30 +63,11 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
 
       <div style={{ position:'relative', zIndex:1 }}>
 
-        {/* logo with friends flanking */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:14, animation:'logoIn .9s .1s both' }}>
-
-          {/* Left friend */}
-          <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
-            <img src="/friend1.jpg" alt=""
-              style={{ width:62, height:62, borderRadius:'50%', objectFit:'cover', objectPosition:'top', border:'2px solid rgba(201,168,76,.55)', boxShadow:'0 0 14px rgba(201,168,76,.18)' }} />
-            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Majed</span>
-          </div>
-
-          {/* Logo */}
-          <div style={{ position:'relative', flex:1, maxWidth:240 }}>
-            <div style={{ position:'absolute', inset:-12, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%)', pointerEvents:'none' }}/>
-            <img src="/kahfe-logo.png" alt="Kahfe Lounge"
-              style={{ width:'100%', height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 28px rgba(201,168,76,.22))' }} />
-          </div>
-
-          {/* Right friend */}
-          <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
-            <img src="/friend2.jpg" alt=""
-              style={{ width:62, height:62, borderRadius:'50%', objectFit:'cover', objectPosition:'top', border:'2px solid rgba(201,168,76,.55)', boxShadow:'0 0 14px rgba(201,168,76,.18)' }} />
-            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Mustafa</span>
-          </div>
-
+        {/* logo — larger and higher */}
+        <div style={{ position:'relative', display:'inline-block', animation:'logoIn .9s .1s both' }}>
+          <div style={{ position:'absolute', inset:-12, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%)', pointerEvents:'none' }}/>
+          <img src="/kahfe-logo.png" alt="Kahfe Lounge"
+            style={{ width:'92%', maxWidth:340, height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 28px rgba(201,168,76,.22))' }} />
         </div>
 
         {/* elegant wide divider */}
@@ -205,27 +186,39 @@ function TabRow({
   )
 }
 
-/* ── Double tab bar: top row LTR, bottom row RTL ── */
-function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: string; onChange: (id: string) => void; lang: string }) {
+/* ── Double tab bar: recommended static on top, then split rows ── */
+function TabBar({ cats, recCat, active, onChange, lang }: { cats: Category[]; recCat: Category | null; active: string; onChange: (id: string) => void; lang: string }) {
+  // Split regular cats into two halves
+  const half = Math.ceil(cats.length / 2)
+  const row1 = cats.slice(0, half)
+  const row2 = cats.slice(half)
+
   return (
     <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(13,13,13,.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(240,237,232,.06)' }}>
-      {/* hint line */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'7px 20px 2px' }}>
-        <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, transparent, rgba(201,168,76,.2))' }}/>
-        <span style={{ fontSize:9.5, fontWeight:600, letterSpacing:'0.18em', color:'rgba(201,168,76,.45)', whiteSpace:'nowrap', textTransform:'uppercase' }}>
-          {lang==='en' ? '✦ Tap a category ✦' : lang==='ar' ? '✦ اختر فئة ✦' : '✦ Kategori seç ✦'}
-        </span>
-        <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, rgba(201,168,76,.2), transparent)' }}/>
-      </div>
 
-      {/* Row 1 — scrolls left → right */}
-      <TabRow cats={cats} active={active} onChange={onChange} lang={lang} direction="ltr" />
+      {/* ── Recommended static bar ── */}
+      {recCat && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'8px 16px 6px', gap:8 }}>
+          <span style={{ flex:1, height:1, background:'linear-gradient(90deg,transparent,rgba(201,168,76,.2))' }}/>
+          <button onClick={() => onChange(recCat.id)}
+            style={{ background: active===recCat.id ? 'rgba(201,168,76,.18)' : 'rgba(201,168,76,.07)', border: active===recCat.id ? '1px solid rgba(201,168,76,.6)' : '1px solid rgba(201,168,76,.25)', borderRadius:22, padding:'7px 22px', color: active===recCat.id ? '#C9A84C' : 'rgba(201,168,76,.7)', fontSize:13, fontWeight:700, cursor:'pointer', letterSpacing:'.04em', whiteSpace:'nowrap', transition:'all .25s' }}>
+            ⭐ {lang==='en'?'Recommended':lang==='ar'?'موصى به':'Öne Çıkanlar'}
+          </button>
+          <span style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.2),transparent)' }}/>
+        </div>
+      )}
 
-      {/* thin gold separator between rows */}
+      {/* thin separator */}
+      <div style={{ height:1, margin:'0 16px', background:'linear-gradient(90deg,transparent,rgba(201,168,76,.1),transparent)' }}/>
+
+      {/* Row 1 — first half, scrolls LTR */}
+      <TabRow cats={row1} active={active} onChange={onChange} lang={lang} direction="ltr" />
+
+      {/* thin gold separator */}
       <div style={{ height:1, margin:'0 16px', background:'linear-gradient(90deg,transparent,rgba(201,168,76,.12),transparent)' }}/>
 
-      {/* Row 2 — scrolls right → left */}
-      <TabRow cats={cats} active={active} onChange={onChange} lang={lang} direction="rtl" />
+      {/* Row 2 — second half, scrolls RTL */}
+      <TabRow cats={row2} active={active} onChange={onChange} lang={lang} direction="rtl" />
     </div>
   )
 }
@@ -434,11 +427,11 @@ export default function MenuPage() {
   const lines  = useMemo(()=>Object.entries(cart).map(([id,qty])=>({...byId[id],qty})).filter(l=>l.id),[cart,byId])
   const openItem = openItemId?byId[openItemId]:null
 
-  const allCats = useMemo(()=>
+  const recCat: Category | null = useMemo(()=>
     recommendedItems.length > 0
-      ? [{id:'__recommended__', name:'Öne Çıkanlar', name_en:'Recommended', name_ar:'موصى به', icon:'⭐', order_index:-1, created_at:''} as Category, ...categories]
-      : categories
-  ,[recommendedItems, categories])
+      ? {id:'__recommended__', name:'Öne Çıkanlar', name_en:'Recommended', name_ar:'موصى به', icon:'⭐', order_index:-1, created_at:''} as Category
+      : null
+  ,[recommendedItems])
 
   if(loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', background:'#0D0D0D' }}>
@@ -519,7 +512,7 @@ export default function MenuPage() {
       <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
         <Hero lang={lang} onLangChange={changeLang}/>
         <div className='gold-divider'/>
-        <TabBar cats={allCats} active={activeCat} onChange={setActiveCat} lang={lang}/>
+        <TabBar cats={categories} recCat={recCat} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
           {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
