@@ -196,7 +196,17 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}>
-      <div dir="ltr" style={{ position: 'relative', padding: '11px 0 13px', display: 'flex', width: 'max-content' }} ref={trackRef}>
+
+      {/* hint line */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'7px 20px 0' }}>
+        <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, transparent, rgba(201,168,76,.2))' }}/>
+        <span style={{ fontSize:9.5, fontWeight:600, letterSpacing:'0.18em', color:'rgba(201,168,76,.45)', whiteSpace:'nowrap', textTransform:'uppercase' }}>
+          {lang==='en' ? '✦ Swipe to explore categories ✦' : lang==='ar' ? '✦ اسحب لاستعراض الفئات ✦' : '✦ Kaydır & kategori seç ✦'}
+        </span>
+        <span style={{ flex:1, height:'1px', background:'linear-gradient(90deg, rgba(201,168,76,.2), transparent)' }}/>
+      </div>
+
+      <div dir="ltr" style={{ position: 'relative', padding: '8px 0 12px', display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => {
           const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
           return (
