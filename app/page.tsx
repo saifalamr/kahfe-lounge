@@ -173,7 +173,9 @@ function TabRow({
       onTouchEnd={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}>
       <div dir="ltr" style={{ display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => {
-          const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
+          const displayName = CAT_TRANSLATIONS[c.name]
+            ? (lang==='en' ? (c.name_en || CAT_TRANSLATIONS[c.name].name_en) : lang==='ar' ? (c.name_ar || CAT_TRANSLATIONS[c.name].name_ar) : c.name)
+            : (lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name)
           return (
             <button key={`${c.id}-${i}`} onClick={() => handleClick(c.id)}
               style={{ flexShrink: 0, background: active === c.id ? 'rgba(201,168,76,.14)' : 'rgba(240,237,232,.05)', border: active === c.id ? '1px solid rgba(201,168,76,.45)' : '1px solid rgba(240,237,232,.1)', borderRadius: 22, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.6)', padding: '7px 16px', margin: '0 4px', transition: 'all .25s' }}>
@@ -385,6 +387,21 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
       </div>
     </div>
   )
+}
+
+// Translation overrides for categories whose DB name_en/name_ar may be missing
+const CAT_TRANSLATIONS: Record<string, { name_en: string; name_ar: string }> = {
+  'Sandviçler':               { name_en: 'Sandwiches',           name_ar: 'شطائر' },
+  'Espresso Bazlı Soğuklar':  { name_en: 'Cold Espresso Drinks', name_ar: 'مشروبات الإسبريسو الباردة' },
+  'Espresso Bazlı Sıcaklar':  { name_en: 'Hot Espresso Drinks',  name_ar: 'مشروبات الإسبريسو الساخنة' },
+}
+
+function getCatName(cat: Category, lang: string): string {
+  if (lang === 'tr') return cat.name
+  const override = CAT_TRANSLATIONS[cat.name]
+  if (lang === 'en') return cat.name_en || override?.name_en || cat.name
+  if (lang === 'ar') return cat.name_ar || override?.name_ar || cat.name
+  return cat.name
 }
 
 export default function MenuPage() {
