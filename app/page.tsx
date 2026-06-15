@@ -173,12 +173,7 @@ function TabRow({
       onTouchEnd={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}>
       <div dir="ltr" style={{ display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => {
-          const _ov = CAT_TRANSLATIONS[c.name]
-          const displayName = lang==='en'
-            ? (_ov ? (_ov.name_en) : (c.name_en||c.name))
-            : lang==='ar'
-            ? (_ov ? (_ov.name_ar) : (c.name_ar||c.name))
-            : c.name
+          const displayName = getCatName(c, lang)
           return (
             <button key={`${c.id}-${i}`} onClick={() => handleClick(c.id)}
               style={{ flexShrink: 0, background: active === c.id ? 'rgba(201,168,76,.14)' : 'rgba(240,237,232,.05)', border: active === c.id ? '1px solid rgba(201,168,76,.45)' : '1px solid rgba(240,237,232,.1)', borderRadius: 22, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.6)', padding: '7px 16px', margin: '0 4px', transition: 'all .25s' }}>
@@ -392,18 +387,22 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
   )
 }
 
-// Translation overrides for categories whose DB name_en/name_ar may be missing
-const CAT_TRANSLATIONS: Record<string, { name_en: string; name_ar: string }> = {
-  'Sandviçler':               { name_en: 'Sandwiches',           name_ar: 'شطائر' },
-  'Espresso Bazlı Soğuklar':  { name_en: 'Cold Espresso Drinks', name_ar: 'مشروبات الإسبريسو الباردة' },
-  'Espresso Bazlı Sıcaklar':  { name_en: 'Hot Espresso Drinks',  name_ar: 'مشروبات الإسبريسو الساخنة' },
-}
+// Translation overrides — matched by normalized lowercase to avoid typo issues
+const CAT_TR_MAP: { match: RegExp; name_en: string; name_ar: string }[] = [
+  { match: /sandvi/i,  name_en: 'Sandwiches',           name_ar: 'شطائر' },
+  { match: /so.uk/i,   name_en: 'Cold Espresso Drinks', name_ar: 'مشروبات الإسبريسو الباردة' },
+  { match: /s.cak/i,   name_en: 'Hot Espresso Drinks',  name_ar: 'مشروبات الإسبريسو الساخنة' },
+]
 
 function getCatName(cat: Category, lang: string): string {
   if (lang === 'tr') return cat.name
-  const override = CAT_TRANSLATIONS[cat.name]
-  if (lang === 'en') return cat.name_en || override?.name_en || cat.name
-  if (lang === 'ar') return cat.name_ar || override?.name_ar || cat.name
+  // If DB already has translation, use it
+  if (lang === 'en' && cat.name_en) return cat.name_en
+  if (lang === 'ar' && cat.name_ar) return cat.name_ar
+  // Fallback: regex match
+  const ov = CAT_TR_MAP.find(r => r.match.test(cat.name))
+  if (lang === 'en') return ov?.name_en || cat.name
+  if (lang === 'ar') return ov?.name_ar || cat.name
   return cat.name
 }
 
