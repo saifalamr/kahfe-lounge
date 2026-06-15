@@ -201,9 +201,8 @@ function TabBar({ cats, active, onChange, lang }: { cats: Category[]; active: st
           const displayName = lang==='en' ? (c.name_en||c.name) : lang==='ar' ? (c.name_ar||c.name) : c.name
           return (
           <button key={`${c.id}-${i}`} data-cat={c.id} onClick={() => handleClick(c.id)}
-            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.42)', padding: '6px 14px', transition: 'color .25s', position: 'relative' }}>
+            style={{ flexShrink: 0, background: active === c.id ? 'rgba(201,168,76,.14)' : 'rgba(240,237,232,.05)', border: active === c.id ? '1px solid rgba(201,168,76,.45)' : '1px solid rgba(240,237,232,.1)', borderRadius: 22, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600, letterSpacing: '.02em', color: active === c.id ? '#C9A84C' : 'rgba(240,237,232,.6)', padding: '7px 16px', margin: '0 4px', transition: 'all .25s', position: 'relative' }}>
             {c.icon && <span style={{ marginRight: 4 }}>{c.icon}</span>}{displayName || c.name}
-            {active === c.id && <span style={{ position: 'absolute', bottom: -4, left: '14px', right: '14px', height: 2, borderRadius: 2, background: '#C9A84C', boxShadow: '0 0 8px rgba(201,168,76,.45)', display: 'block' }} />}
           </button>
         )})}
       </div>
