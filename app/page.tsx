@@ -63,11 +63,30 @@ function Hero({ lang, onLangChange }: { lang: string; onLangChange: (l: 'tr'|'en
 
       <div style={{ position:'relative', zIndex:1 }}>
 
-        {/* logo — larger and higher */}
-        <div style={{ position:'relative', display:'inline-block', animation:'logoIn .9s .1s both' }}>
-          <div style={{ position:'absolute', inset:-12, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%)', pointerEvents:'none' }}/>
-          <img src="/kahfe-logo.png" alt="Kahfe Lounge"
-            style={{ width:'92%', maxWidth:340, height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 28px rgba(201,168,76,.22))' }} />
+        {/* logo with friends flanking */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:14, animation:'logoIn .9s .1s both' }}>
+
+          {/* Left friend */}
+          <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+            <img src="/friend1.jpg" alt=""
+              style={{ width:62, height:62, borderRadius:'50%', objectFit:'cover', objectPosition:'top', border:'2px solid rgba(201,168,76,.55)', boxShadow:'0 0 14px rgba(201,168,76,.18)' }} />
+            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Asil</span>
+          </div>
+
+          {/* Logo */}
+          <div style={{ position:'relative', flex:1, maxWidth:240 }}>
+            <div style={{ position:'absolute', inset:-12, borderRadius:'50%', background:'radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%)', pointerEvents:'none' }}/>
+            <img src="/kahfe-logo.png" alt="Kahfe Lounge"
+              style={{ width:'100%', height:'auto', display:'block', margin:'0 auto', filter:'drop-shadow(0 4px 28px rgba(201,168,76,.22))' }} />
+          </div>
+
+          {/* Right friend */}
+          <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+            <img src="/friend2.jpg" alt=""
+              style={{ width:62, height:62, borderRadius:'50%', objectFit:'cover', objectPosition:'top', border:'2px solid rgba(201,168,76,.55)', boxShadow:'0 0 14px rgba(201,168,76,.18)' }} />
+            <span style={{ fontSize:9, letterSpacing:'.12em', color:'rgba(201,168,76,.5)', textTransform:'uppercase' }}>Waleed</span>
+          </div>
+
         </div>
 
         {/* elegant wide divider */}
