@@ -127,6 +127,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [filterCat, setFilterCat] = useState('')
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [bulkTargetCat, setBulkTargetCat] = useState('')
+  const [bulkMode, setBulkMode] = useState(false)
 
   // Category form
   const [catName, setCatName] = useState('')
@@ -225,6 +228,27 @@ export default function AdminPage() {
     if (!confirm('Bu ürünü silmek istediğinizden emin misiniz?')) return
     await supabase.from('menu_items').delete().eq('id', id)
     showMsg('Ürün silindi'); await loadData()
+  }
+
+  async function bulkMove() {
+    if (!bulkTargetCat || selectedItems.size === 0) { showMsg('Hedef kategori ve ürün seçin'); return }
+    setLoading(true)
+    const ids = Array.from(selectedItems)
+    await Promise.all(ids.map(id => supabase.from('menu_items').update({ category_id: bulkTargetCat }).eq('id', id)))
+    showMsg(`✓ ${ids.length} ürün taşındı`)
+    setSelectedItems(new Set())
+    setBulkTargetCat('')
+    setBulkMode(false)
+    await loadData()
+    setLoading(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedItems(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
   }
 
   async function toggleAvail(item: MenuItem) {
@@ -421,20 +445,53 @@ export default function AdminPage() {
             </div>
 
             {/* Filter */}
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ ...s.input, marginBottom: 14 }}>
+            <select value={filterCat} onChange={e => { setFilterCat(e.target.value); setSelectedItems(new Set()) }} style={{ ...s.input, marginBottom: 10 }}>
               <option value="">Tüm Kategoriler ({items.length})</option>
               {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name} ({items.filter(i => i.category_id === cat.id).length})</option>)}
             </select>
 
-            <div style={{ color: '#888', fontSize: 12, marginBottom: 12, letterSpacing: 1 }}>
-              {items.filter(i => !filterCat || i.category_id === filterCat).length} ÜRÜN GÖSTERİLİYOR
+            {/* Bulk move toggle */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ color: '#888', fontSize: 12, letterSpacing: 1 }}>
+                {items.filter(i => !filterCat || i.category_id === filterCat).length} ÜRÜN
+                {selectedItems.size > 0 && <span style={{ color: '#C9A84C', marginLeft: 8 }}>· {selectedItems.size} seçildi</span>}
+              </div>
+              <button onClick={() => { setBulkMode(!bulkMode); setSelectedItems(new Set()) }}
+                style={{ background: bulkMode ? 'rgba(201,168,76,.15)' : '#2A2A2A', border: bulkMode ? '1px solid rgba(201,168,76,.4)' : 'none', borderRadius: 8, padding: '6px 12px', color: bulkMode ? '#C9A84C' : '#888', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                {bulkMode ? '✕ İptal' : '↔ Toplu Taşı'}
+              </button>
             </div>
+
+            {/* Bulk move action bar */}
+            {bulkMode && selectedItems.size > 0 && (
+              <div style={{ background: '#1A1A1A', border: '1px solid rgba(201,168,76,.3)', borderRadius: 14, padding: 14, marginBottom: 14 }}>
+                <div style={{ color: '#C9A84C', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
+                  {selectedItems.size} ürünü taşı →
+                </div>
+                <select value={bulkTargetCat} onChange={e => setBulkTargetCat(e.target.value)} style={{ ...s.input, marginBottom: 10 }}>
+                  <option value="">Hedef kategori seçin...</option>
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>)}
+                </select>
+                <button onClick={bulkMove} disabled={loading || !bulkTargetCat}
+                  style={{ ...s.btn, background: bulkTargetCat ? '#C0392B' : '#2A2A2A', color: bulkTargetCat ? '#fff' : '#555' }}>
+                  {loading ? 'Taşınıyor...' : `${selectedItems.size} Ürünü Taşı`}
+                </button>
+              </div>
+            )}
 
             {items.filter(i => !filterCat || i.category_id === filterCat).map(item => {
               const cat = categories.find(c => c.id === item.category_id)
+              const isSelected = selectedItems.has(item.id)
               return (
-                <div key={item.id} style={{ ...s.card, opacity: item.available ? 1 : 0.5 }}>
+                <div key={item.id} onClick={() => bulkMode && toggleSelect(item.id)}
+                  style={{ ...s.card, opacity: item.available ? 1 : 0.5, border: isSelected ? '1px solid #C9A84C' : '1px solid #2A2A2A', cursor: bulkMode ? 'pointer' : 'default', background: isSelected ? 'rgba(201,168,76,.06)' : '#1A1A1A' }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {/* Bulk mode checkbox */}
+                    {bulkMode && (
+                      <div style={{ width: 24, height: 24, borderRadius: 6, border: isSelected ? 'none' : '2px solid #3A3A3A', background: isSelected ? '#C9A84C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>
+                        {isSelected && '✓'}
+                      </div>
+                    )}
                     <div style={{ width: 60, height: 60, borderRadius: 10, overflow: 'hidden', background: '#2A2A2A', flexShrink: 0 }}>
                       {item.image_url
                         ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -445,11 +502,13 @@ export default function AdminPage() {
                       <div style={{ color: '#888', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}</div>
                       <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 14 }}>{item.price} ₺</div>
                     </div>
+                    {!bulkMode && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <button onClick={() => startEditItem(item)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
                       <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: item.recommended ? '#C9A84C' : '#888', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
                       <button onClick={() => deleteItem(item.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                     </div>
+                    )}
                   </div>
                 </div>
               )
