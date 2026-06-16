@@ -387,22 +387,21 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
   )
 }
 
-// Translation overrides — matched by normalized lowercase to avoid typo issues
+// Translation overrides — always applied, regex-matched, DB value ignored if present
 const CAT_TR_MAP: { match: RegExp; name_en: string; name_ar: string }[] = [
-  { match: /sandvi/i,  name_en: 'Sandwiches',           name_ar: 'شطائر' },
-  { match: /so.uk/i,   name_en: 'Cold Espresso Drinks', name_ar: 'مشروبات الإسبريسو الباردة' },
-  { match: /s.cak/i,   name_en: 'Hot Espresso Drinks',  name_ar: 'مشروبات الإسبريسو الساخنة' },
+  { match: /sandvi/i,                    name_en: 'Sandwiches',           name_ar: 'شطائر' },
+  { match: /so(ğ|g)uk/i,            name_en: 'Cold Espresso Drinks', name_ar: 'مشروبات الإسبريسو الباردة' },
+  { match: /s(ı|i)cak/i,            name_en: 'Hot Espresso Drinks',  name_ar: 'مشروبات الإسبريسو الساخنة' },
 ]
 
 function getCatName(cat: Category, lang: string): string {
   if (lang === 'tr') return cat.name
-  // If DB already has translation, use it
-  if (lang === 'en' && cat.name_en) return cat.name_en
-  if (lang === 'ar' && cat.name_ar) return cat.name_ar
-  // Fallback: regex match
+  // Always try override first (regex on Turkish name)
   const ov = CAT_TR_MAP.find(r => r.match.test(cat.name))
-  if (lang === 'en') return ov?.name_en || cat.name
-  if (lang === 'ar') return ov?.name_ar || cat.name
+  if (ov) return lang === 'en' ? ov.name_en : ov.name_ar
+  // Fall back to DB value
+  if (lang === 'en') return cat.name_en || cat.name
+  if (lang === 'ar') return cat.name_ar || cat.name
   return cat.name
 }
 
