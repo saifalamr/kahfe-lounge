@@ -509,12 +509,24 @@ export default function MenuPage() {
       const orderNum = (todayCount || 0) + 1
       setOrderNumber(orderNum)
 
+      // Find this table's currently open tab, or open a new one
+      const { data: existingTab } = await supabase.from('tabs')
+        .select('id').eq('table_name', mesa).eq('status', 'open').maybeSingle()
+      let tabId = existingTab?.id
+      if (!tabId) {
+        const { data: newTab } = await supabase.from('tabs')
+          .insert({ table_name: mesa, status: 'open' })
+          .select('id').single()
+        tabId = newTab?.id
+      }
+
       await supabase.from('orders').insert({
         table_name: mesa,
         items: orderItems,
         total: total,
         status: 'pending',
-        note: orderNote.trim() || null
+        note: orderNote.trim() || null,
+        tab_id: tabId
       })
       await sendTelegramNotification(mesa, orderItems, total, orderNote, orderNum)
       setOrderSent(true)

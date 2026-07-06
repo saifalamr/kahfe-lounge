@@ -139,6 +139,7 @@ export default function AdminPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
         setNewOrderAlert(true)
+        loadTableMapData()
         // Play beep sound
         try {
           const ctx = new AudioContext()
@@ -150,7 +151,11 @@ export default function AdminPage() {
           setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
         } catch(e) {}
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadTableMapData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => loadTableMapData())
       .subscribe()
+
+    loadTableMapData()
 
     return () => { supabase.removeChannel(channel) }
   }, [auth])
@@ -169,6 +174,64 @@ export default function AdminPage() {
   const [tab, setTab] = useState<'categories' | 'items' | 'orders'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'map'|'list'>('map')
+  const [openTabs, setOpenTabs] = useState<any[]>([])
+  const [tabOrders, setTabOrders] = useState<any[]>([])
+  const [activeTableModal, setActiveTableModal] = useState<string | null>(null)
+
+  const ALL_TABLES = [
+    ...Array.from({ length: 11 }, (_, i) => `MASA-${i + 1}`),
+    ...Array.from({ length: 3 }, (_, i) => `KİTAPLIK-${i + 1}`),
+    ...Array.from({ length: 4 }, (_, i) => `OKEY-${i + 1}`),
+    ...Array.from({ length: 2 }, (_, i) => `KAHFE-${i + 1}`),
+    'VİP-ODA',
+  ]
+
+  // Table map state is intentionally independent from the today/week/month
+  // stats filter and any Sıfırla reset — an occupied table must never
+  // disappear from the map just because the manager reset the daily stats.
+  async function loadTableMapData() {
+    const { data: tabsData } = await supabase.from('tabs').select('*').eq('status', 'open')
+    setOpenTabs(tabsData || [])
+    if (tabsData && tabsData.length > 0) {
+      const tabIds = tabsData.map((t: any) => t.id)
+      const { data: ordersData } = await supabase.from('orders').select('*').in('tab_id', tabIds).order('created_at', { ascending: true })
+      setTabOrders(ordersData || [])
+    } else {
+      setTabOrders([])
+    }
+  }
+
+  function getTableInfo(tableName: string) {
+    const openTab = openTabs.find((t: any) => t.table_name === tableName)
+    if (!openTab) return { status: 'empty' as const, tabData: null, orders: [] as any[] }
+    const orders = tabOrders.filter((o: any) => o.tab_id === openTab.id)
+    const active = orders.filter((o: any) => o.status !== 'served' && o.status !== 'dismissed')
+    let status: 'pending'|'preparing'|'ready'|'bill'|'occupied' = 'occupied'
+    if (active.some((o: any) => o.status === 'pending')) status = 'pending'
+    else if (active.some((o: any) => o.status === 'accepted')) status = 'preparing'
+    else if (active.some((o: any) => o.status === 'ready')) status = 'ready'
+    else if (openTab.bill_requested) status = 'bill'
+    return { status, tabData: openTab, orders }
+  }
+
+  async function updateOrderStatus(id: string, status: string) {
+    await supabase.from('orders').update({ status }).eq('id', id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    await Promise.all([loadOrders(dateFilter), loadTableMapData()])
+  }
+
+  async function requestBill(tabId: string) {
+    await supabase.from('tabs').update({ bill_requested: true }).eq('id', tabId)
+    await loadTableMapData()
+  }
+
+  async function closeTable(tabId: string) {
+    if (!confirm('Masayı kapatmak istediğinizden emin misiniz?\n\nBu, ödeme alındığını manuel olarak işaretler (henüz tam ödeme/adisyon sistemi yok). Masa boşa çıkacak.')) return
+    await supabase.from('tabs').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', tabId)
+    setActiveTableModal(null)
+    await loadTableMapData()
+  }
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
   const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
 
@@ -728,6 +791,135 @@ export default function AdminPage() {
               </div>
             )}
 
+            {/* Table drilldown modal - tap a table on the map */}
+            {activeTableModal && (() => {
+              const info = getTableInfo(activeTableModal)
+              const activeOrders = info.orders.filter((o:any) => o.status !== 'dismissed')
+              const tabTotal = activeOrders.reduce((s:number,o:any)=>s+Number(o.total),0)
+              return (
+                <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setActiveTableModal(null)}>
+                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                    <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                      <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>🪑 {activeTableModal}</div>
+                      <button onClick={() => setActiveTableModal(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                    </div>
+                    <div style={{ padding:'16px 20px' }}>
+                      {activeOrders.length === 0 && (
+                        <div style={{ textAlign:'center', color:'#888', padding:'30px 0' }}>Bu masa şu an boş.</div>
+                      )}
+                      {activeOrders.map((order:any) => {
+                        const statusColor = order.status==='pending'?'#C0392B':order.status==='accepted'?'#f39c12':order.status==='ready'?'#27ae60':'#888'
+                        const statusLabel = order.status==='pending'?'Bekliyor':order.status==='accepted'?'Hazırlanıyor':order.status==='ready'?'Hazır':'Teslim Edildi'
+                        return (
+                          <div key={order.id} style={{ background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                              <span style={{ background:statusColor, color:'#fff', borderRadius:6, padding:'3px 8px', fontSize:10, fontWeight:800 }}>{statusLabel}</span>
+                              <span style={{ color:'#888', fontSize:11 }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                            </div>
+                            {order.items?.map((item:any, i:number) => (
+                              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'rgba(240,237,232,.7)', padding:'3px 0' }}>
+                                <span>{item.quantity}x {item.name}</span>
+                                <span style={{ color:'#C9A84C' }}>{item.subtotal} ₺</span>
+                              </div>
+                            ))}
+                            {order.note && (
+                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius:8, fontSize:12, color:'rgba(240,237,232,.7)' }}>📝 {order.note}</div>
+                            )}
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
+                              <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>{order.total} ₺</span>
+                              <div style={{ display:'flex', gap:6 }}>
+                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'accepted')} style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Kabul</button>}
+                                {order.status === 'accepted' && <button onClick={() => updateOrderStatus(order.id, 'ready')} style={{ background:'#f39c12', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Hazır</button>}
+                                {order.status === 'ready' && <button onClick={() => updateOrderStatus(order.id, 'served')} style={{ background:'#2980b9', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Teslim</button>}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {activeOrders.length > 0 && (
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 2px', marginTop:6, marginBottom:16 }}>
+                          <span style={{ color:'#888', fontSize:12, fontWeight:700 }}>MASA TOPLAMI</span>
+                          <span style={{ color:'#C9A84C', fontWeight:800, fontSize:18 }}>{tabTotal.toFixed(0)} ₺</span>
+                        </div>
+                      )}
+
+                      {info.tabData && (
+                        <div style={{ display:'flex', gap:8 }}>
+                          {!info.tabData.bill_requested && (
+                            <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, background:'rgba(52,152,219,.15)', border:'1px solid rgba(52,152,219,.4)', borderRadius:10, padding:'10px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:700 }}>🧾 Hesap İstendi</button>
+                          )}
+                          {isManager && (
+                            <button onClick={() => closeTable(info.tabData.id)} style={{ flex:1, background:'rgba(192,57,43,.15)', border:'1px solid rgba(192,57,43,.4)', borderRadius:10, padding:'10px', color:'#e74c3c', fontSize:12, cursor:'pointer', fontWeight:700 }}>Masayı Kapat</button>
+                          )}
+                        </div>
+                      )}
+                      {isManager && info.tabData && (
+                        <div style={{ color:'#666', fontSize:10, marginTop:10, textAlign:'center' }}>Not: Ödeme takibi henüz yok — bu buton masayı manuel olarak boşaltır.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* View toggle - table map vs flat list, both roles see this */}
+            <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+              <button onClick={() => setViewMode('map')}
+                style={{ flex:1, background: viewMode==='map' ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: viewMode==='map' ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'9px 4px', color: viewMode==='map' ? '#C9A84C' : '#888', fontWeight:700, fontSize:12, cursor:'pointer' }}>🗺️ Masa Haritası</button>
+              <button onClick={() => setViewMode('list')}
+                style={{ flex:1, background: viewMode==='list' ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: viewMode==='list' ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'9px 4px', color: viewMode==='list' ? '#C9A84C' : '#888', fontWeight:700, fontSize:12, cursor:'pointer' }}>📋 Liste</button>
+            </div>
+
+            {viewMode === 'map' && (
+              <div style={{ marginBottom: 20 }}>
+                {/* Legend */}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, fontSize:10, color:'#888' }}>
+                  <span>🔴 Sipariş Bekliyor</span>
+                  <span>🟠 Hazırlanıyor</span>
+                  <span>🟢 Hazır</span>
+                  <span>🔵 Hesap İstendi</span>
+                  <span>🟡 Dolu</span>
+                  <span>⚪ Boş</span>
+                </div>
+                {[
+                  { label: 'MASALAR', tables: ALL_TABLES.filter(t => t.startsWith('MASA')) },
+                  { label: 'KİTAPLIK', tables: ALL_TABLES.filter(t => t.startsWith('KİTAPLIK')) },
+                  { label: 'OKEY', tables: ALL_TABLES.filter(t => t.startsWith('OKEY')) },
+                  { label: 'KAHFE', tables: ALL_TABLES.filter(t => t.startsWith('KAHFE')) },
+                  { label: 'VİP', tables: ALL_TABLES.filter(t => t.startsWith('VİP')) },
+                ].map(group => (
+                  <div key={group.label} style={{ marginBottom: 18 }}>
+                    <div style={{ color:'#888', fontSize:11, letterSpacing:2, marginBottom:8, fontWeight:700 }}>{group.label}</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(84px, 1fr))', gap:8 }}>
+                      {group.tables.map(tableName => {
+                        const info = getTableInfo(tableName)
+                        const palette: Record<string, { bg:string, border:string, text:string, dot:string }> = {
+                          empty:     { bg:'#1A1A1A', border:'#2A2A2A', text:'#555', dot:'⚪' },
+                          occupied:  { bg:'rgba(201,168,76,.10)', border:'rgba(201,168,76,.3)', text:'#C9A84C', dot:'🟡' },
+                          pending:   { bg:'rgba(192,57,43,.15)', border:'#C0392B', text:'#e74c3c', dot:'🔴' },
+                          preparing: { bg:'rgba(243,156,18,.15)', border:'#f39c12', text:'#f39c12', dot:'🟠' },
+                          ready:     { bg:'rgba(39,174,96,.15)', border:'#27ae60', text:'#27ae60', dot:'🟢' },
+                          bill:      { bg:'rgba(52,152,219,.15)', border:'#3498db', text:'#3498db', dot:'🔵' },
+                        }
+                        const p = palette[info.status]
+                        const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
+                        return (
+                          <button key={tableName} onClick={() => setActiveTableModal(tableName)}
+                            style={{ background:p.bg, border:`1.5px solid ${p.border}`, borderRadius:12, padding:'10px 6px', cursor:'pointer', textAlign:'center', minHeight:64 }}>
+                            <div style={{ fontSize:16 }}>{p.dot}</div>
+                            <div style={{ color:p.text, fontWeight:700, fontSize:11, marginTop:2 }}>{tableName.replace(/^(MASA|KİTAPLIK|OKEY|KAHFE)-/, '')}</div>
+                            {info.status !== 'empty' && <div style={{ color:'#888', fontSize:9, marginTop:2 }}>{itemCount} sipariş</div>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {viewMode === 'list' && (<>
             {/* Date filter - week/month view is manager-only */}
             {isManager && (
               <div style={{ display:'flex', gap:6, marginBottom:14 }}>
@@ -808,15 +1000,15 @@ export default function AdminPage() {
                     <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>TOPLAM: {order.total} ₺</span>
                     <div style={{ display:'flex', gap:6 }}>
                       {order.status === 'pending' && (
-                        <button onClick={async()=>{ await supabase.from('orders').update({status:'accepted'}).eq('id',order.id); loadOrders(); setNotifications(prev=>prev.filter(n=>n.id!==order.id)) }}
+                        <button onClick={() => updateOrderStatus(order.id, 'accepted')}
                           style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Kabul</button>
                       )}
                       {order.status === 'accepted' && (
-                        <button onClick={async()=>{ await supabase.from('orders').update({status:'ready'}).eq('id',order.id); loadOrders() }}
+                        <button onClick={() => updateOrderStatus(order.id, 'ready')}
                           style={{ background:'#f39c12', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Hazır</button>
                       )}
                       {order.status === 'ready' && (
-                        <button onClick={async()=>{ await supabase.from('orders').update({status:'served'}).eq('id',order.id); loadOrders() }}
+                        <button onClick={() => updateOrderStatus(order.id, 'served')}
                           style={{ background:'#2980b9', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Teslim</button>
                       )}
                     </div>
@@ -824,6 +1016,7 @@ export default function AdminPage() {
                 </div>
               )
             })}
+            </>)}
           </div>
         )}
 
