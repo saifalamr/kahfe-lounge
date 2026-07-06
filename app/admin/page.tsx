@@ -163,7 +163,20 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [tab, setTab] = useState<'categories' | 'items'>('categories')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders'>('orders')
+  const [allOrders, setAllOrders] = useState<any[]>([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
+
+  async function loadOrders() {
+    setOrdersLoading(true)
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase.from('orders').select('*')
+      .gte('created_at', today).order('created_at', { ascending: false })
+    setAllOrders(data || [])
+    setOrdersLoading(false)
+  }
+
+  useEffect(() => { if (auth) loadOrders() }, [auth])
   const [categories, setCategories] = useState<Category[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -427,14 +440,99 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A' }}>
-          {(['categories', 'items'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: 14, background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C0392B' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#888', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-              {t === 'categories' ? 'Kategoriler' : 'Ürünler'}
+          {(['orders', 'categories', 'items'] as const).map(t => (
+            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders() }}
+              style={{ flex: 1, padding: '12px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C0392B' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer', position: 'relative' }}>
+              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : 'Siparişler'}
+              {t === 'orders' && notifications.length > 0 && (
+                <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
+              )}
             </button>
           ))}
         </div>
 
         {/* CATEGORIES */}
+        {/* ORDERS TAB */}
+        {tab === 'orders' && (
+          <div style={{ padding: '16px 20px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+              <div style={{ color:'#888', fontSize:12, letterSpacing:1 }}>BUGÜNÜN SİPARİŞLERİ ({allOrders.length})</div>
+              <button onClick={loadOrders} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 12px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>↻ Yenile</button>
+            </div>
+
+            {/* Summary bar */}
+            {allOrders.length > 0 && (
+              <div style={{ background:'#1A1A1A', border:'1px solid rgba(201,168,76,.2)', borderRadius:14, padding:'14px 16px', marginBottom:16, display:'flex', justifyContent:'space-around' }}>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.length}</div>
+                  <div style={{ color:'#888', fontSize:11 }}>Toplam Sipariş</div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.filter(o=>o.status==='pending').length}</div>
+                  <div style={{ color:'#888', fontSize:11 }}>Bekliyor</div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.reduce((s:number,o:any)=>s+Number(o.total),0).toFixed(0)} ₺</div>
+                  <div style={{ color:'#888', fontSize:11 }}>Ciro</div>
+                </div>
+              </div>
+            )}
+
+            {ordersLoading && <div style={{ textAlign:'center', color:'#888', padding:40 }}>Yükleniyor...</div>}
+
+            {!ordersLoading && allOrders.length === 0 && (
+              <div style={{ textAlign:'center', color:'#888', padding:40 }}>Bugün henüz sipariş yok</div>
+            )}
+
+            {allOrders.map((order:any) => {
+              const statusColor = order.status==='pending'?'#C0392B':order.status==='accepted'?'#f39c12':order.status==='ready'?'#27ae60':'#888'
+              const statusLabel = order.status==='pending'?'Bekliyor':order.status==='accepted'?'Hazırlanıyor':order.status==='ready'?'Hazır':order.status==='served'?'Teslim Edildi':'Kapatıldı'
+              return (
+                <div key={order.id} style={{ background:'#1A1A1A', border:`1px solid ${order.status==='pending'?'rgba(192,57,43,.4)':'#2A2A2A'}`, borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ background:statusColor, color:'#fff', borderRadius:6, padding:'3px 8px', fontSize:10, fontWeight:800 }}>{statusLabel}</span>
+                      <span style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>🪑 {order.table_name}</span>
+                    </div>
+                    <span style={{ color:'#888', fontSize:11 }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                  </div>
+
+                  {order.items?.map((item:any, i:number) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'rgba(240,237,232,.7)', padding:'3px 0', borderBottom:'1px solid rgba(240,237,232,.05)' }}>
+                      <span>{item.quantity}x {item.name}</span>
+                      <span style={{ color:'#C9A84C' }}>{item.subtotal} ₺</span>
+                    </div>
+                  ))}
+
+                  {order.note && (
+                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius:8, fontSize:12, color:'rgba(240,237,232,.7)' }}>
+                      📝 {order.note}
+                    </div>
+                  )}
+
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
+                    <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>TOPLAM: {order.total} ₺</span>
+                    <div style={{ display:'flex', gap:6 }}>
+                      {order.status === 'pending' && (
+                        <button onClick={async()=>{ await supabase.from('orders').update({status:'accepted'}).eq('id',order.id); loadOrders(); setNotifications(prev=>prev.filter(n=>n.id!==order.id)) }}
+                          style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Kabul</button>
+                      )}
+                      {order.status === 'accepted' && (
+                        <button onClick={async()=>{ await supabase.from('orders').update({status:'ready'}).eq('id',order.id); loadOrders() }}
+                          style={{ background:'#f39c12', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Hazır</button>
+                      )}
+                      {order.status === 'ready' && (
+                        <button onClick={async()=>{ await supabase.from('orders').update({status:'served'}).eq('id',order.id); loadOrders() }}
+                          style={{ background:'#2980b9', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Teslim</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         {tab === 'categories' && (
           <div style={s.section}>
             <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
