@@ -172,34 +172,33 @@ export default function AdminPage() {
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
   const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
 
-  // Persisted "reset point" for today, so Sıfırla survives tab switches / reloads
-  function todayKey() {
-    return `kahfe_reset_${new Date().toISOString().split('T')[0]}`
+  // Reset markers are stored in Supabase (table: reset_markers) so a reset
+  // made on one device is instantly reflected on every other device.
+  async function getResetMarker(scope: 'today'|'week'|'month'): Promise<string | null> {
+    const { data } = await supabase.from('reset_markers').select('reset_at').eq('key', scope).maybeSingle()
+    return data?.reset_at || null
   }
-  function getTodayFrom() {
-    const key = todayKey()
-    // clean up any stale reset markers from previous days
-    Object.keys(localStorage).forEach(k => { if (k.startsWith('kahfe_reset_') && k !== key) localStorage.removeItem(k) })
-    return localStorage.getItem(key) || new Date().toISOString().split('T')[0]
+
+  function baseFromForFilter(filter: 'today'|'week'|'month') {
+    const now = new Date()
+    if (filter === 'today') return now.toISOString().split('T')[0]
+    if (filter === 'week') { const d = new Date(now); d.setDate(d.getDate() - 7); return d.toISOString() }
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   }
 
   async function loadOrders(filter: 'today'|'week'|'month' = dateFilter) {
     setOrdersLoading(true)
-    const now = new Date()
-    let fromDate = ''
-    if (filter === 'today') {
-      fromDate = getTodayFrom()
-    } else if (filter === 'week') {
-      const d = new Date(now); d.setDate(d.getDate() - 7)
-      fromDate = d.toISOString()
-    } else {
-      fromDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    }
+    const baseFrom = baseFromForFilter(filter)
+    const marker = await getResetMarker(filter)
+    // Only honor the marker if it falls within the current window (e.g. a
+    // "today" reset from three days ago shouldn't suppress today's orders)
+    const fromDate = (marker && marker > baseFrom) ? marker : baseFrom
     const { data } = await supabase.from('orders').select('*')
       .gte('created_at', fromDate).order('created_at', { ascending: false })
     setAllOrders(data || [])
     setOrdersLoading(false)
   }
+
 
   async function generateMonthlyReport() {
     const now = new Date()
@@ -255,6 +254,59 @@ export default function AdminPage() {
 
     showMsg(`✓ ${month} ${year} raporu kaydedildi!`)
     setShowMonthlyReport({ month, year, totalOrders: monthOrders.length, totalRevenue, topItems, topTables, dayMap })
+  }
+
+  function exportOrdersPDF() {
+    const win = window.open('', '_blank', 'width=900,height=900')
+    if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+    const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : 'Bu Ay'
+    const totalRevenue = allOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+    const pending = allOrders.filter((o: any) => o.status === 'pending').length
+    const statusLabel = (st: string) => st==='pending'?'Bekliyor':st==='accepted'?'Hazırlanıyor':st==='ready'?'Hazır':st==='served'?'Teslim Edildi':'Kapatıldı'
+    const rows = allOrders.map((o: any, i: number) => {
+      const itemsText = (o.items || []).map((it: any) => `${it.quantity}x ${it.name}`).join(', ')
+      return `<tr><td>${i + 1}</td><td>🪑 ${o.table_name}</td><td>${new Date(o.created_at).toLocaleString('tr-TR')}</td><td>${itemsText}</td><td>${statusLabel(o.status)}</td><td style="text-align:right">${o.total} ₺</td></tr>`
+    }).join('')
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="utf-8" />
+        <title>Kahfe Lounge - ${label} Raporu</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; color:#1A1A1A; padding: 36px; }
+          .brand { font-size: 12px; letter-spacing: 3px; color:#8a6d1f; font-weight:700; }
+          h1 { font-size: 22px; margin: 4px 0 20px; }
+          .stats { display:flex; gap:16px; margin-bottom: 24px; }
+          .stat { flex:1; border:1px solid #ddd; border-radius:10px; padding:14px; text-align:center; }
+          .stat .num { font-size: 22px; font-weight:800; }
+          .stat .label { font-size: 11px; color:#888; margin-top:4px; }
+          table { width:100%; border-collapse:collapse; margin-top:10px; }
+          th, td { padding:7px 8px; border-bottom:1px solid #eee; font-size:11px; text-align:left; }
+          th { color:#888; text-transform:uppercase; font-size:10px; }
+          @media print { .no-print { display:none; } }
+        </style>
+      </head>
+      <body>
+        <div class="brand">KAHFE LOUNGE</div>
+        <h1>${label} Raporu — ${new Date().toLocaleDateString('tr-TR')}</h1>
+        <div class="stats">
+          <div class="stat"><div class="num">${allOrders.length}</div><div class="label">Toplam Sipariş</div></div>
+          <div class="stat"><div class="num">${pending}</div><div class="label">Bekliyor</div></div>
+          <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Ciro</div></div>
+        </div>
+        <table>
+          <tr><th>#</th><th>Masa</th><th>Saat</th><th>Ürünler</th><th>Durum</th><th style="text-align:right">Toplam</th></tr>
+          ${rows || '<tr><td colspan="6">Bu aralıkta sipariş yok</td></tr>'}
+        </table>
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `)
+    win.document.close()
   }
 
   function exportMonthlyReportPDF(report: any) {
@@ -314,12 +366,17 @@ export default function AdminPage() {
     win.document.close()
   }
 
-  async function resetDailyStats() {
-    if (!confirm('Bugünün istatistiklerini sıfırlamak istediğinizden emin misiniz?\n\nSiparişler silinmez, sadece bu andan itibaren sayılmaya başlanır. Sekmeden çıkıp geri dönseniz veya sayfayı yenileseniz bile sıfırlanmış kalır.')) return
-    localStorage.setItem(todayKey(), new Date().toISOString())
-    setDateFilter('today')
-    await loadOrders('today')
-    alert('✓ İstatistikler sıfırlandı.\n\nEski siparişler silinmedi, sadece bu andan sonraki siparişler sayılacak. Bu sıfırlama bu tarayıcıda kalıcıdır.')
+  async function resetStats(scope: 'today'|'week'|'month') {
+    const label = scope === 'today' ? 'bugünkü' : scope === 'week' ? 'bu haftaki' : 'bu ayki'
+    if (!confirm(`${label.charAt(0).toUpperCase()+label.slice(1)} istatistikleri sıfırlamak istediğinizden emin misiniz?\n\nSiparişler silinmez, sadece bu andan itibaren sayılmaya başlanır. Bu sıfırlama tüm cihazlarda (telefon, bilgisayar, POS) geçerli olacaktır.`)) return
+    const nowIso = new Date().toISOString()
+    const { error } = await supabase.from('reset_markers').upsert({ key: scope, reset_at: nowIso, updated_at: nowIso })
+    if (error) {
+      alert('✗ Sıfırlama başarısız oldu.\n\n' + error.message + '\n\nreset_markers tablosunun Supabase\'de oluşturulduğundan emin olun.')
+      return
+    }
+    await loadOrders(scope)
+    alert(`✓ ${label.charAt(0).toUpperCase()+label.slice(1)} istatistikler sıfırlandı.\n\nEski siparişler silinmedi, sadece bu andan sonraki siparişler sayılacak. Bu sıfırlama tüm cihazlarda geçerlidir.`)
   }
 
   useEffect(() => { if (auth) loadOrders() }, [auth])
@@ -669,7 +726,8 @@ export default function AdminPage() {
                 <button onClick={() => loadOrders()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>↻</button>
                 {isManager && (
                   <>
-                    <button onClick={resetDailyStats} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
+                    <button onClick={() => resetStats(dateFilter)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
+                    <button onClick={() => exportOrdersPDF()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>📄 PDF</button>
                     <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700 }}>📊 Aylık Rapor</button>
                   </>
                 )}
