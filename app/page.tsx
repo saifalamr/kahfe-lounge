@@ -349,7 +349,7 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:Men
   )
 }
 
-function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string }) {
+function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
@@ -378,10 +378,40 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang }: { li
           <span style={{ fontSize:13, textTransform:'uppercase', letterSpacing:'.1em', color:'rgba(240,237,232,.5)' }}>{lang==='en'?'TOTAL':lang==='ar'?'المجموع':'Toplam'}</span>
           <span style={{ fontFamily:'var(--sans)', fontWeight:700, fontSize:25, color:'#C9A84C' }}>{fmt(total)}</span>
         </div>
-        <div style={{ margin:'14px 22px 0', border:'1px solid rgba(201,168,76,.3)', borderRadius:14, padding:'14px 16px', background:'rgba(201,168,76,.04)', display:'flex', flexDirection:'column', gap:5 }}>
-          <span style={{ color:'#C9A84C', fontWeight:700, fontSize:12.5, textTransform:'uppercase', letterSpacing:'.08em' }}>{lang==='en'?'Show Waiter':lang==='ar'?'أرِ النادل':'Garsona Göster'}</span>
-          <span style={{ fontSize:12.5, color:'rgba(240,237,232,.62)', lineHeight:1.5 }}>{lang==='en'?'Show this screen to the waiter. Your order will be brought to your table.':lang==='ar'?'أرِ هذه الشاشة للنادل. سيُحضر طلبك إلى طاولتك.':'Bu ekranı görevliye gösterin. Siparişiniz masanıza getirilecektir.'}</span>
-        </div>
+        {/* Table name */}
+        {tableName && (
+          <div style={{ margin:'0 22px', padding:'10px 14px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.2)', borderRadius:12, display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:16 }}>🪑</span>
+            <span style={{ color:'rgba(240,237,232,.6)', fontSize:13 }}>{lang==='en'?'Table':lang==='ar'?'الطاولة':'Masa'}:</span>
+            <span style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>{tableName}</span>
+          </div>
+        )}
+
+        {/* Success state */}
+        {sent ? (
+          <div style={{ margin:'14px 22px 0', background:'rgba(39,174,96,.1)', border:'1px solid rgba(39,174,96,.4)', borderRadius:14, padding:'20px', textAlign:'center' }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>✅</div>
+            <div style={{ color:'#27ae60', fontWeight:800, fontSize:16, marginBottom:4 }}>
+              {lang==='en'?'Order Sent!':lang==='ar'?'تم إرسال الطلب!':'Sipariş Gönderildi!'}
+            </div>
+            <div style={{ color:'rgba(240,237,232,.6)', fontSize:13 }}>
+              {lang==='en'?'Your waiter will be with you shortly.':lang==='ar'?'سيأتي النادل إليك قريباً.':'Garsonunuz kısa sürede gelecek.'}
+            </div>
+          </div>
+        ) : (
+          <div style={{ margin:'14px 22px 0', display:'flex', flexDirection:'column', gap:10 }}>
+            <button onClick={onSubmit} disabled={sending}
+              style={{ width:'100%', background: sending ? '#2A2A2A' : '#C0392B', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:800, fontSize:16, cursor: sending ? 'not-allowed' : 'pointer', boxShadow: sending ? 'none' : '0 8px 24px rgba(192,57,43,.35)', transition:'all .2s' }}>
+              {sending
+                ? (lang==='en'?'Sending...':lang==='ar'?'جارٍ الإرسال...':'Gönderiliyor...')
+                : (lang==='en'?'✓ Confirm Order':lang==='ar'?'✓ تأكيد الطلب':'✓ Siparişi Onayla')
+              }
+            </button>
+            <div style={{ textAlign:'center', fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.5px' }}>
+              {lang==='en'?'Your waiter will come to confirm':lang==='ar'?'سيأتي النادل للتأكيد':'Garsonunuz onaylamak için gelecek'}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -414,6 +444,43 @@ export default function MenuPage() {
   const [openItemId, setOpenItemId] = useState<string|null>(null)
   const [showOrder, setShowOrder] = useState(false)
   const [pulseKey, setPulseKey] = useState(0)
+  const [tableName, setTableName] = useState('')
+  const [orderSent, setOrderSent] = useState(false)
+  const [sendingOrder, setSendingOrder] = useState(false)
+
+  // Read table from URL ?masa=X
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const masa = params.get('masa')
+    if (masa) setTableName(decodeURIComponent(masa).toUpperCase())
+  }, [])
+
+  async function submitOrder() {
+    if (count === 0) return
+    setSendingOrder(true)
+    try {
+      const orderItems = lines.map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        name_en: l.name_en || l.name,
+        price: l.price,
+        quantity: l.qty,
+        subtotal: l.price * l.qty
+      }))
+      await supabase.from('orders').insert({
+        table_name: tableName || 'Bilinmiyor',
+        items: orderItems,
+        total: total,
+        status: 'pending'
+      })
+      setOrderSent(true)
+      setCart({})
+      setTimeout(() => { setOrderSent(false); setShowOrder(false) }, 3000)
+    } catch (e) {
+      console.error('Order error:', e)
+    }
+    setSendingOrder(false)
+  }
   const [lang, setLang] = useState<'tr'|'en'|'ar'>('tr')
   const [showWelcome, setShowWelcome] = useState(false)
 
@@ -576,6 +643,7 @@ export default function MenuPage() {
         )}
         {showOrder && count>0 && (
           <OrderSummary lines={lines as Line[]} total={total} count={count} lang={lang}
+            tableName={tableName} onSubmit={submitOrder} sending={sendingOrder} sent={orderSent}
             onClose={()=>setShowOrder(false)} onInc={inc} onDec={dec}/>
         )}
       </div>
