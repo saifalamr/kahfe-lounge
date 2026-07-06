@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 
 const ADMIN_PASSWORD = 'kahfe2024admin'
+const STAFF_PASSWORD = 'kahfe2024staff'
 
 /* ── Image Cropper Component ── */
 function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: Blob) => void; onCancel: () => void }) {
@@ -119,6 +120,8 @@ function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: B
 /* ── Main Admin Page ── */
 export default function AdminPage() {
   const [auth, setAuth] = useState(false)
+  const [role, setRole] = useState<'manager' | 'staff' | null>(null)
+  const isManager = role === 'manager'
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotif, setShowNotif] = useState(false)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
@@ -245,8 +248,9 @@ export default function AdminPage() {
 
   async function resetDailyStats() {
     if (!confirm('Bugünün istatistiklerini sıfırlamak istediğinizden emin misiniz?\n\nVeriler silinmez, sadece görünüm sıfırlanır.')) return
-    await loadOrders()
-    showMsg('İstatistikler yenilendi ✓')
+    setAllOrders([])
+    setOrdersLoading(false)
+    alert('✓ İstatistikler sıfırlandı.\n\nVeriler silinmedi, sadece görünüm sıfırlandı. Yenilemek için ↻ butonuna basabilirsiniz.')
   }
 
   useEffect(() => { if (auth) loadOrders() }, [auth])
@@ -281,9 +285,12 @@ export default function AdminPage() {
   const [existingImageUrl, setExistingImageUrl] = useState('')
 
   useEffect(() => {
-    const saved = localStorage.getItem('kahfe_admin')
-    if (saved === ADMIN_PASSWORD) setAuth(true)
+    const savedRole = localStorage.getItem('kahfe_admin_role')
+    if (savedRole === 'manager' || savedRole === 'staff') { setRole(savedRole); setAuth(true) }
   }, [])
+
+  // Staff can only ever see the orders tab
+  useEffect(() => { if (role === 'staff') setTab('orders') }, [role])
 
   useEffect(() => { if (auth) loadData() }, [auth])
 
@@ -297,8 +304,15 @@ export default function AdminPage() {
   }
 
   function login() {
-    if (pw === ADMIN_PASSWORD) { localStorage.setItem('kahfe_admin', pw); setAuth(true) }
-    else setPwError(true)
+    if (pw === ADMIN_PASSWORD) {
+      localStorage.setItem('kahfe_admin_role', 'manager')
+      setRole('manager'); setAuth(true)
+    } else if (pw === STAFF_PASSWORD) {
+      localStorage.setItem('kahfe_admin_role', 'staff')
+      setRole('staff'); setAuth(true)
+    } else {
+      setPwError(true)
+    }
   }
 
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
@@ -466,7 +480,7 @@ export default function AdminPage() {
                 <span style={{ position: 'absolute', top: -4, right: -4, background: '#C0392B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notifications.length}</span>
               )}
             </button>
-            <button onClick={() => { localStorage.removeItem('kahfe_admin'); setAuth(false) }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+            <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_admin'); setAuth(false); setRole(null) }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
           </div>
         </div>
 
@@ -513,7 +527,7 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A' }}>
-          {(['orders', 'categories', 'items'] as const).map(t => (
+          {(isManager ? (['orders', 'categories', 'items'] as const) : (['orders'] as const)).map(t => (
             <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter) }}
               style={{ flex: 1, padding: '12px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C0392B' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer', position: 'relative' }}>
               {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : 'Siparişler'}
@@ -529,8 +543,8 @@ export default function AdminPage() {
         {tab === 'orders' && (
           <div style={{ padding: '16px 20px' }}>
 
-            {/* Monthly report modal */}
-            {showMonthlyReport && (
+            {/* Monthly report modal - managers only */}
+            {isManager && showMonthlyReport && (
               <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowMonthlyReport(null)}>
                 <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -581,13 +595,17 @@ export default function AdminPage() {
               <div style={{ color:'#888', fontSize:12, letterSpacing:1 }}>{allOrders.length} SİPARİŞ</div>
               <div style={{ display:'flex', gap:6 }}>
                 <button onClick={() => loadOrders()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>↻</button>
-                <button onClick={resetDailyStats} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
-                <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700 }}>📊 Aylık Rapor</button>
+                {isManager && (
+                  <>
+                    <button onClick={resetDailyStats} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
+                    <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700 }}>📊 Aylık Rapor</button>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Summary bar */}
-            {allOrders.length > 0 && (
+            {/* Summary bar - revenue stats, managers only */}
+            {isManager && allOrders.length > 0 && (
               <div style={{ background:'#1A1A1A', border:'1px solid rgba(201,168,76,.2)', borderRadius:14, padding:'14px 16px', marginBottom:16, display:'flex', justifyContent:'space-around' }}>
                 <div style={{ textAlign:'center' }}>
                   <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.length}</div>
@@ -659,7 +677,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {tab === 'categories' && (
+        {isManager && tab === 'categories' && (
           <div style={s.section}>
             <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingCat ? 'KATEGORİ DÜZENLE' : 'YENİ KATEGORİ EKLE'}</div>
@@ -713,7 +731,7 @@ export default function AdminPage() {
         )}
 
         {/* ITEMS */}
-        {tab === 'items' && (
+        {isManager && tab === 'items' && (
           <div style={s.section}>
             <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingItem ? 'ÜRÜN DÜZENLE' : 'YENİ ÜRÜN EKLE'}</div>
