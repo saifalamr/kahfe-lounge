@@ -119,6 +119,48 @@ function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: B
 /* ── Main Admin Page ── */
 export default function AdminPage() {
   const [auth, setAuth] = useState(false)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [showNotif, setShowNotif] = useState(false)
+  const [newOrderAlert, setNewOrderAlert] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    if (!auth) return
+    // Load pending orders on mount
+    supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setNotifications(data) })
+
+    // Real-time subscription for new orders
+    const channel = supabase
+      .channel('orders-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        setNotifications(prev => [payload.new, ...prev])
+        setNewOrderAlert(true)
+        // Play beep sound
+        try {
+          const ctx = new AudioContext()
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.connect(gain); gain.connect(ctx.destination)
+          osc.frequency.value = 880; gain.gain.value = 0.3
+          osc.start(); osc.stop(ctx.currentTime + 0.15)
+          setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
+        } catch(e) {}
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [auth])
+
+  async function acceptOrder(id: string) {
+    await supabase.from('orders').update({ status: 'accepted' }).eq('id', id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
+  async function dismissOrder(id: string) {
+    await supabase.from('orders').update({ status: 'dismissed' }).eq('id', id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
   const [tab, setTab] = useState<'categories' | 'items'>('categories')
@@ -316,15 +358,71 @@ export default function AdminPage() {
       {showCropper && rawImageSrc && (
         <ImageCropper src={rawImageSrc} onCrop={handleCropDone} onCancel={() => setShowCropper(false)} />
       )}
-
-      <div style={s.page}>
+      <style>{`
+        @keyframes bellShake {
+          0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)}
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0D0D0D; color: #F0EDE8; font-family: 'Inter', sans-serif; }
+      `}</style>
+      <div style={{ background: '#0D0D0D', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 }}>
         <div style={s.header}>
           <div>
             <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3 }}>YÖNETİM</div>
             <div style={{ color: '#F0EDE8', fontSize: 18, fontWeight: 800 }}>KAHFE LOUNGE</div>
           </div>
-          <button onClick={() => { localStorage.removeItem('kahfe_admin'); setAuth(false) }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {/* Notification Bell */}
+            <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
+              style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : '#2A2A2A', border: newOrderAlert ? '1px solid #C0392B' : '1px solid #3A3A3A', borderRadius: 10, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
+              🔔
+              {notifications.length > 0 && (
+                <span style={{ position: 'absolute', top: -4, right: -4, background: '#C0392B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notifications.length}</span>
+              )}
+            </button>
+            <button onClick={() => { localStorage.removeItem('kahfe_admin'); setAuth(false) }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+          </div>
         </div>
+
+        {/* Notification Panel */}
+        {showNotif && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} onClick={() => setShowNotif(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, maxWidth: 480, margin: '0 auto', background: '#1A1A1A', borderRadius: '0 0 20px 20px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>🔔 YENİ SİPARİŞLER ({notifications.length})</span>
+                <button onClick={() => setShowNotif(false)} style={{ background: 'none', border: 'none', color: '#888', fontSize: 18, cursor: 'pointer' }}>✕</button>
+              </div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: 32, textAlign: 'center', color: '#888' }}>Bekleyen sipariş yok</div>
+              ) : notifications.map((order: any) => (
+                <div key={order.id} style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div>
+                      <span style={{ background: '#C0392B', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 800, marginRight: 8 }}>YENİ</span>
+                      <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 16 }}>🪑 {order.table_name}</span>
+                    </div>
+                    <span style={{ color: '#888', fontSize: 11 }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    {order.items.map((item: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#F0EDE8', padding: '3px 0', borderBottom: '1px solid rgba(240,237,232,.05)' }}>
+                        <span>{item.quantity}x {item.name}</span>
+                        <span style={{ color: '#C9A84C' }}>{item.subtotal} ₺</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(201,168,76,.2)' }}>
+                    <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>TOPLAM: {order.total} ₺</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => dismissOrder(order.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Kapat</button>
+                      <button onClick={() => acceptOrder(order.id)} style={{ background: '#27ae60', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>✓ Kabul Et</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
