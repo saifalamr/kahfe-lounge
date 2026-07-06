@@ -172,12 +172,23 @@ export default function AdminPage() {
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
   const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
 
+  // Persisted "reset point" for today, so Sıfırla survives tab switches / reloads
+  function todayKey() {
+    return `kahfe_reset_${new Date().toISOString().split('T')[0]}`
+  }
+  function getTodayFrom() {
+    const key = todayKey()
+    // clean up any stale reset markers from previous days
+    Object.keys(localStorage).forEach(k => { if (k.startsWith('kahfe_reset_') && k !== key) localStorage.removeItem(k) })
+    return localStorage.getItem(key) || new Date().toISOString().split('T')[0]
+  }
+
   async function loadOrders(filter: 'today'|'week'|'month' = dateFilter) {
     setOrdersLoading(true)
     const now = new Date()
     let fromDate = ''
     if (filter === 'today') {
-      fromDate = now.toISOString().split('T')[0]
+      fromDate = getTodayFrom()
     } else if (filter === 'week') {
       const d = new Date(now); d.setDate(d.getDate() - 7)
       fromDate = d.toISOString()
@@ -246,11 +257,69 @@ export default function AdminPage() {
     setShowMonthlyReport({ month, year, totalOrders: monthOrders.length, totalRevenue, topItems, topTables, dayMap })
   }
 
+  function exportMonthlyReportPDF(report: any) {
+    const win = window.open('', '_blank', 'width=800,height=900')
+    if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+    const itemRows = (report.topItems || []).slice(0, 10).map((item: any, i: number) => `
+      <tr><td>${i + 1}</td><td>${item.name}</td><td style="text-align:right">${item.count}</td><td style="text-align:right">${item.revenue} ₺</td></tr>
+    `).join('')
+    const tableRows = (report.topTables || []).slice(0, 10).map((t: any, i: number) => `
+      <tr><td>${i + 1}</td><td>${t.name}</td><td style="text-align:right">${t.revenue} ₺</td></tr>
+    `).join('')
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="utf-8" />
+        <title>Kahfe Lounge - ${report.month} ${report.year} Raporu</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; color:#1A1A1A; padding: 36px; }
+          .brand { font-size: 12px; letter-spacing: 3px; color:#8a6d1f; font-weight:700; }
+          h1 { font-size: 22px; margin: 4px 0 20px; }
+          .stats { display:flex; gap:16px; margin-bottom: 24px; }
+          .stat { flex:1; border:1px solid #ddd; border-radius:10px; padding:14px; text-align:center; }
+          .stat .num { font-size: 24px; font-weight:800; }
+          .stat .label { font-size: 11px; color:#888; margin-top:4px; }
+          h2 { font-size:14px; margin-top:28px; border-bottom:2px solid #C9A84C; padding-bottom:8px; }
+          table { width:100%; border-collapse:collapse; margin-top:10px; }
+          th, td { padding:7px 8px; border-bottom:1px solid #eee; font-size:12px; text-align:left; }
+          th { color:#888; text-transform:uppercase; font-size:10px; }
+          @media print { .no-print { display:none; } }
+        </style>
+      </head>
+      <body>
+        <div class="brand">KAHFE LOUNGE</div>
+        <h1>${report.month} ${report.year} Raporu</h1>
+        <div class="stats">
+          <div class="stat"><div class="num">${report.totalOrders}</div><div class="label">Toplam Sipariş</div></div>
+          <div class="stat"><div class="num">${Number(report.totalRevenue).toFixed(0)} ₺</div><div class="label">Toplam Ciro</div></div>
+        </div>
+        <h2>En Çok Satılan Ürünler</h2>
+        <table>
+          <tr><th>#</th><th>Ürün</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>
+          ${itemRows || '<tr><td colspan="4">Veri yok</td></tr>'}
+        </table>
+        <h2>En Yüksek Cirolu Masalar</h2>
+        <table>
+          <tr><th>#</th><th>Masa</th><th style="text-align:right">Ciro</th></tr>
+          ${tableRows || '<tr><td colspan="3">Veri yok</td></tr>'}
+        </table>
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `)
+    win.document.close()
+  }
+
   async function resetDailyStats() {
-    if (!confirm('Bugünün istatistiklerini sıfırlamak istediğinizden emin misiniz?\n\nVeriler silinmez, sadece görünüm sıfırlanır.')) return
-    setAllOrders([])
-    setOrdersLoading(false)
-    alert('✓ İstatistikler sıfırlandı.\n\nVeriler silinmedi, sadece görünüm sıfırlandı. Yenilemek için ↻ butonuna basabilirsiniz.')
+    if (!confirm('Bugünün istatistiklerini sıfırlamak istediğinizden emin misiniz?\n\nSiparişler silinmez, sadece bu andan itibaren sayılmaya başlanır. Sekmeden çıkıp geri dönseniz veya sayfayı yenileseniz bile sıfırlanmış kalır.')) return
+    localStorage.setItem(todayKey(), new Date().toISOString())
+    setDateFilter('today')
+    await loadOrders('today')
+    alert('✓ İstatistikler sıfırlandı.\n\nEski siparişler silinmedi, sadece bu andan sonraki siparişler sayılacak. Bu sıfırlama bu tarayıcıda kalıcıdır.')
   }
 
   useEffect(() => { if (auth) loadOrders() }, [auth])
@@ -547,9 +616,12 @@ export default function AdminPage() {
             {isManager && showMonthlyReport && (
               <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowMonthlyReport(null)}>
                 <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                  <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                     <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>📊 {showMonthlyReport.month} {showMonthlyReport.year} Raporu</div>
-                    <button onClick={() => setShowMonthlyReport(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => exportMonthlyReportPDF(showMonthlyReport)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
+                      <button onClick={() => setShowMonthlyReport(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                    </div>
                   </div>
                   <div style={{ padding:'16px 20px' }}>
                     <div style={{ display:'flex', gap:10, marginBottom:16 }}>
