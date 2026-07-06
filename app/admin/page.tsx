@@ -380,6 +380,23 @@ export default function AdminPage() {
   }
 
   useEffect(() => { if (auth) loadOrders() }, [auth])
+
+  // Keep the orders list itself live: react instantly to any new order or
+  // status change, plus a 20s polling safety net in case a realtime event
+  // is missed (flaky wifi, tab was backgrounded, etc). No manual refresh needed.
+  useEffect(() => {
+    if (!auth || tab !== 'orders') return
+
+    const liveChannel = supabase
+      .channel('orders-live-list')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => loadOrders(dateFilter))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders(dateFilter))
+      .subscribe()
+
+    const pollId = setInterval(() => loadOrders(dateFilter), 20000)
+
+    return () => { supabase.removeChannel(liveChannel); clearInterval(pollId) }
+  }, [auth, tab, dateFilter])
   const [categories, setCategories] = useState<Category[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -417,6 +434,7 @@ export default function AdminPage() {
 
   // Staff can only ever see the orders tab
   useEffect(() => { if (role === 'staff') setTab('orders') }, [role])
+  useEffect(() => { if (role === 'staff' && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
 
   useEffect(() => { if (auth) loadData() }, [auth])
 
@@ -710,15 +728,17 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Date filter */}
-            <div style={{ display:'flex', gap:6, marginBottom:14 }}>
-              {(['today','week','month'] as const).map(f => (
-                <button key={f} onClick={() => { setDateFilter(f); loadOrders(f) }}
-                  style={{ flex:1, background: dateFilter===f ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: dateFilter===f ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'8px 4px', color: dateFilter===f ? '#C9A84C' : '#888', fontWeight:700, fontSize:11, cursor:'pointer' }}>
-                  {f==='today'?'Bugün':f==='week'?'Bu Hafta':'Bu Ay'}
-                </button>
-              ))}
-            </div>
+            {/* Date filter - week/month view is manager-only */}
+            {isManager && (
+              <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+                {(['today','week','month'] as const).map(f => (
+                  <button key={f} onClick={() => { setDateFilter(f); loadOrders(f) }}
+                    style={{ flex:1, background: dateFilter===f ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: dateFilter===f ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'8px 4px', color: dateFilter===f ? '#C9A84C' : '#888', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                    {f==='today'?'Bugün':f==='week'?'Bu Hafta':'Bu Ay'}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:8 }}>
               <div style={{ color:'#888', fontSize:12, letterSpacing:1 }}>{allOrders.length} SİPARİŞ</div>
