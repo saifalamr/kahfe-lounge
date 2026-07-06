@@ -455,6 +455,21 @@ export default function MenuPage() {
     if (masa) setTableName(decodeURIComponent(masa).toUpperCase())
   }, [])
 
+  async function sendTelegramNotification(mesa: string, items: any[], total: number) {
+    const BOT_TOKEN = '8218906305:AAHy-4UAX3elRisvShV3stReePkQrlzTHWw'
+    const CHAT_ID = '1626976096'
+    const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    const itemLines = items.map(i => `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`).join('\n')
+    const message = `🔔 <b>YENİ SİPARİŞ!</b>\n\n🪑 <b>Masa:</b> ${mesa}\n🕐 <b>Saat:</b> ${now}\n\n${itemLines}\n\n💰 <b>TOPLAM: ${total} ₺</b>`
+    try {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'HTML' })
+      })
+    } catch (e) { console.log('Telegram notification failed:', e) }
+  }
+
   async function submitOrder() {
     if (count === 0) return
     setSendingOrder(true)
@@ -467,12 +482,15 @@ export default function MenuPage() {
         quantity: l.qty,
         subtotal: l.price * l.qty
       }))
+      const mesa = tableName || 'Bilinmiyor'
       await supabase.from('orders').insert({
-        table_name: tableName || 'Bilinmiyor',
+        table_name: mesa,
         items: orderItems,
         total: total,
         status: 'pending'
       })
+      // Send Telegram notification
+      await sendTelegramNotification(mesa, orderItems, total)
       setOrderSent(true)
       setCart({})
       setTimeout(() => { setOrderSent(false); setShowOrder(false) }, 3000)
