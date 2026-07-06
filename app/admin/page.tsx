@@ -166,14 +166,87 @@ export default function AdminPage() {
   const [tab, setTab] = useState<'categories' | 'items' | 'orders'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
+  const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
+  const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
 
-  async function loadOrders() {
+  async function loadOrders(filter: 'today'|'week'|'month' = dateFilter) {
     setOrdersLoading(true)
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    let fromDate = ''
+    if (filter === 'today') {
+      fromDate = now.toISOString().split('T')[0]
+    } else if (filter === 'week') {
+      const d = new Date(now); d.setDate(d.getDate() - 7)
+      fromDate = d.toISOString()
+    } else {
+      fromDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    }
     const { data } = await supabase.from('orders').select('*')
-      .gte('created_at', today).order('created_at', { ascending: false })
+      .gte('created_at', fromDate).order('created_at', { ascending: false })
     setAllOrders(data || [])
     setOrdersLoading(false)
+  }
+
+  async function generateMonthlyReport() {
+    const now = new Date()
+    const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+    const month = monthNames[now.getMonth()]
+    const year = now.getFullYear()
+    const firstDay = new Date(year, now.getMonth(), 1).toISOString()
+    const lastDay = new Date(year, now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+
+    const { data: monthOrders } = await supabase.from('orders').select('*')
+      .gte('created_at', firstDay).lte('created_at', lastDay)
+
+    if (!monthOrders || monthOrders.length === 0) {
+      showMsg('Bu ay hiç sipariş yok')
+      return
+    }
+
+    const totalRevenue = monthOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+
+    // Top items
+    const itemMap: Record<string, { name: string; count: number; revenue: number }> = {}
+    monthOrders.forEach((o: any) => {
+      o.items?.forEach((item: any) => {
+        if (!itemMap[item.name]) itemMap[item.name] = { name: item.name, count: 0, revenue: 0 }
+        itemMap[item.name].count += item.quantity
+        itemMap[item.name].revenue += item.subtotal
+      })
+    })
+    const topItems = Object.values(itemMap).sort((a, b) => b.count - a.count).slice(0, 10)
+
+    // Top tables
+    const tableMap: Record<string, number> = {}
+    monthOrders.forEach((o: any) => { tableMap[o.table_name] = (tableMap[o.table_name] || 0) + Number(o.total) })
+    const topTables = Object.entries(tableMap).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, rev]) => ({ name, revenue: rev }))
+
+    // Daily breakdown
+    const dayMap: Record<string, { orders: number; revenue: number }> = {}
+    monthOrders.forEach((o: any) => {
+      const day = o.created_at.split('T')[0]
+      if (!dayMap[day]) dayMap[day] = { orders: 0, revenue: 0 }
+      dayMap[day].orders++
+      dayMap[day].revenue += Number(o.total)
+    })
+
+    await supabase.from('monthly_reports').insert({
+      month, year,
+      total_orders: monthOrders.length,
+      total_revenue: totalRevenue,
+      top_items: topItems,
+      top_tables: topTables,
+      daily_breakdown: dayMap
+    })
+
+    showMsg(`✓ ${month} ${year} raporu kaydedildi!`)
+    setShowMonthlyReport({ month, year, totalOrders: monthOrders.length, totalRevenue, topItems, topTables, dayMap })
+  }
+
+  async function resetDailyStats() {
+    if (!confirm('Bugünün istatistiklerini sıfırlamak istediğinizden emin misiniz?\n\nVeriler silinmez, sadece görünüm sıfırlanır.')) return
+    await loadOrders()
+    showMsg('İstatistikler yenilendi ✓')
   }
 
   useEffect(() => { if (auth) loadOrders() }, [auth])
@@ -441,7 +514,7 @@ export default function AdminPage() {
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A' }}>
           {(['orders', 'categories', 'items'] as const).map(t => (
-            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders() }}
+            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter) }}
               style={{ flex: 1, padding: '12px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C0392B' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer', position: 'relative' }}>
               {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
@@ -455,9 +528,62 @@ export default function AdminPage() {
         {/* ORDERS TAB */}
         {tab === 'orders' && (
           <div style={{ padding: '16px 20px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-              <div style={{ color:'#888', fontSize:12, letterSpacing:1 }}>BUGÜNÜN SİPARİŞLERİ ({allOrders.length})</div>
-              <button onClick={loadOrders} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 12px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>↻ Yenile</button>
+
+            {/* Monthly report modal */}
+            {showMonthlyReport && (
+              <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowMonthlyReport(null)}>
+                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                  <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>📊 {showMonthlyReport.month} {showMonthlyReport.year} Raporu</div>
+                    <button onClick={() => setShowMonthlyReport(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                  </div>
+                  <div style={{ padding:'16px 20px' }}>
+                    <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+                      <div style={{ flex:1, background:'#1A1A1A', borderRadius:12, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
+                        <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{showMonthlyReport.totalOrders}</div>
+                        <div style={{ color:'#888', fontSize:11 }}>Sipariş</div>
+                      </div>
+                      <div style={{ flex:1, background:'#1A1A1A', borderRadius:12, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
+                        <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{Number(showMonthlyReport.totalRevenue).toFixed(0)} ₺</div>
+                        <div style={{ color:'#888', fontSize:11 }}>Ciro</div>
+                      </div>
+                    </div>
+                    <div style={{ color:'#888', fontSize:11, letterSpacing:1, marginBottom:10 }}>EN ÇOK SATILAN ÜRÜNLER</div>
+                    {showMonthlyReport.topItems?.slice(0,5).map((item:any, i:number) => (
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2A2A2A', fontSize:13 }}>
+                        <span style={{ color:'#F0EDE8' }}>#{i+1} {item.name}</span>
+                        <span style={{ color:'#C9A84C' }}>{item.count} adet · {item.revenue} ₺</span>
+                      </div>
+                    ))}
+                    <div style={{ color:'#888', fontSize:11, letterSpacing:1, margin:'16px 0 10px' }}>EN YÜKSEK CİROLU MASALAR</div>
+                    {showMonthlyReport.topTables?.slice(0,5).map((t:any, i:number) => (
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2A2A2A', fontSize:13 }}>
+                        <span style={{ color:'#F0EDE8' }}>#{i+1} {t.name}</span>
+                        <span style={{ color:'#C9A84C' }}>{t.revenue} ₺</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Date filter */}
+            <div style={{ display:'flex', gap:6, marginBottom:14 }}>
+              {(['today','week','month'] as const).map(f => (
+                <button key={f} onClick={() => { setDateFilter(f); loadOrders(f) }}
+                  style={{ flex:1, background: dateFilter===f ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: dateFilter===f ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'8px 4px', color: dateFilter===f ? '#C9A84C' : '#888', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                  {f==='today'?'Bugün':f==='week'?'Bu Hafta':'Bu Ay'}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:8 }}>
+              <div style={{ color:'#888', fontSize:12, letterSpacing:1 }}>{allOrders.length} SİPARİŞ</div>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={() => loadOrders()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>↻</button>
+                <button onClick={resetDailyStats} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
+                <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700 }}>📊 Aylık Rapor</button>
+              </div>
             </div>
 
             {/* Summary bar */}
