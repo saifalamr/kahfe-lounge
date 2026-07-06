@@ -457,7 +457,7 @@ export default function MenuPage() {
 
   async function sendTelegramNotification(mesa: string, items: any[], total: number) {
     const BOT_TOKEN = '8218906305:AAHy-4UAX3elRisvShV3stReePkQrlzTHWw'
-    const CHAT_ID = '1626976096'
+    const CHAT_ID = '-1462247620'
     const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
     const itemLines = items.map(i => `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`).join('\n')
     const message = `🔔 <b>YENİ SİPARİŞ!</b>\n\n🪑 <b>Masa:</b> ${mesa}\n🕐 <b>Saat:</b> ${now}\n\n${itemLines}\n\n💰 <b>TOPLAM: ${total} ₺</b>`
