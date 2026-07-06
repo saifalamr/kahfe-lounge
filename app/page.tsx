@@ -349,7 +349,7 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:Men
   )
 }
 
-function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean }) {
+function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent, orderNote, onNoteChange, orderNumber }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean; orderNote:string; onNoteChange:(v:string)=>void; orderNumber:number|null }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
@@ -394,12 +394,25 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
             <div style={{ color:'#27ae60', fontWeight:800, fontSize:16, marginBottom:4 }}>
               {lang==='en'?'Order Sent!':lang==='ar'?'تم إرسال الطلب!':'Sipariş Gönderildi!'}
             </div>
+            {orderNumber && <div style={{ color:'#C9A84C', fontWeight:700, fontSize:13, marginBottom:6 }}>#{orderNumber}</div>}
             <div style={{ color:'rgba(240,237,232,.6)', fontSize:13 }}>
               {lang==='en'?'Your waiter will be with you shortly.':lang==='ar'?'سيأتي النادل إليك قريباً.':'Garsonunuz kısa sürede gelecek.'}
             </div>
           </div>
         ) : (
           <div style={{ margin:'14px 22px 0', display:'flex', flexDirection:'column', gap:10 }}>
+            {/* Notes box */}
+            <div>
+              <label style={{ display:'block', color:'rgba(240,237,232,.5)', fontSize:11, letterSpacing:1, marginBottom:6, textTransform:'uppercase' }}>
+                {lang==='en'?'📝 Order Note (optional)':lang==='ar'?'📝 ملاحظة (اختياري)':'📝 Sipariş Notu (opsiyonel)'}
+              </label>
+              <textarea
+                value={orderNote}
+                onChange={e => onNoteChange(e.target.value)}
+                placeholder={lang==='en'?'e.g. Less sugar, extra hot...':lang==='ar'?'مثال: سكر قليل، ساخن جداً...':'örn. Az şeker, çok sıcak...'}
+                style={{ width:'100%', background:'rgba(240,237,232,.06)', border:'1px solid rgba(240,237,232,.15)', borderRadius:12, padding:'12px 14px', color:'#F0EDE8', fontSize:13, resize:'none', minHeight:70, fontFamily:'inherit', outline:'none' }}
+              />
+            </div>
             <button onClick={onSubmit} disabled={sending}
               style={{ width:'100%', background: sending ? '#2A2A2A' : '#C0392B', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:800, fontSize:16, cursor: sending ? 'not-allowed' : 'pointer', boxShadow: sending ? 'none' : '0 8px 24px rgba(192,57,43,.35)', transition:'all .2s' }}>
               {sending
@@ -447,6 +460,8 @@ export default function MenuPage() {
   const [tableName, setTableName] = useState('')
   const [orderSent, setOrderSent] = useState(false)
   const [sendingOrder, setSendingOrder] = useState(false)
+  const [orderNote, setOrderNote] = useState('')
+  const [orderNumber, setOrderNumber] = useState<number|null>(null)
 
   // Read table from URL ?masa=X
   useEffect(() => {
@@ -455,12 +470,13 @@ export default function MenuPage() {
     if (masa) setTableName(decodeURIComponent(masa).toUpperCase())
   }, [])
 
-  async function sendTelegramNotification(mesa: string, items: any[], total: number) {
+  async function sendTelegramNotification(mesa: string, items: any[], total: number, note: string, orderNum: number) {
     const BOT_TOKEN = '8218906305:AAHy-4UAX3elRisvShV3stReePkQrlzTHWw'
     const CHAT_IDS = ['1626976096', '1462247620']
     const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
     const itemLines = items.map(i => `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`).join('\n')
-    const message = `🔔 <b>YENİ SİPARİŞ!</b>\n\n🪑 <b>Masa:</b> ${mesa}\n🕐 <b>Saat:</b> ${now}\n\n${itemLines}\n\n💰 <b>TOPLAM: ${total} ₺</b>`
+    const noteSection = note.trim() ? `\n\n📝 <b>Not:</b> ${note.trim()}` : ''
+    const message = `🔔 <b>YENİ SİPARİŞ #${orderNum}!</b>\n\n🪑 <b>Masa:</b> ${mesa}\n🕐 <b>Saat:</b> ${now}\n\n${itemLines}${noteSection}\n\n💰 <b>TOPLAM: ${total} ₺</b>`
     try {
       await Promise.all(CHAT_IDS.map(chat_id =>
         fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -485,17 +501,26 @@ export default function MenuPage() {
         subtotal: l.price * l.qty
       }))
       const mesa = tableName || 'Bilinmiyor'
+      // Get order count for today to generate order number
+      const today = new Date().toISOString().split('T')[0]
+      const { count: todayCount } = await supabase.from('orders')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today)
+      const orderNum = (todayCount || 0) + 1
+      setOrderNumber(orderNum)
+
       await supabase.from('orders').insert({
         table_name: mesa,
         items: orderItems,
         total: total,
-        status: 'pending'
+        status: 'pending',
+        note: orderNote.trim() || null
       })
-      // Send Telegram notification
-      await sendTelegramNotification(mesa, orderItems, total)
+      await sendTelegramNotification(mesa, orderItems, total, orderNote, orderNum)
       setOrderSent(true)
       setCart({})
-      setTimeout(() => { setOrderSent(false); setShowOrder(false) }, 3000)
+      setOrderNote('')
+      setTimeout(() => { setOrderSent(false); setShowOrder(false) }, 4000)
     } catch (e) {
       console.error('Order error:', e)
     }
@@ -664,6 +689,7 @@ export default function MenuPage() {
         {showOrder && count>0 && (
           <OrderSummary lines={lines as Line[]} total={total} count={count} lang={lang}
             tableName={tableName} onSubmit={submitOrder} sending={sendingOrder} sent={orderSent}
+            orderNote={orderNote} onNoteChange={setOrderNote} orderNumber={orderNumber}
             onClose={()=>setShowOrder(false)} onInc={inc} onDec={dec}/>
         )}
       </div>
