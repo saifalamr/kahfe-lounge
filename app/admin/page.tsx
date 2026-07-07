@@ -2,8 +2,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 
-const ADMIN_PASSWORD = 'kahfe2024admin'
-const STAFF_PASSWORD = 'kahfe2024staff'
+const ADMIN_PASSWORD = '1234'
+const STAFF_PASSWORD = '5678'
 
 /* ── Image Cropper Component ── */
 function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: Blob) => void; onCancel: () => void }) {
