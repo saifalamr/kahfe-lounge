@@ -408,14 +408,10 @@ export default function AdminPage() {
       }
       const orderTotal = orderItems.reduce((s, i) => s + i.subtotal, 0)
 
-      let tabId = openTabs.find((t: any) => t.table_name === addOrderTable)?.id
-      if (!tabId) {
-        const { data: newTab, error: tabError } = await supabase.from('tabs').insert({ table_name: addOrderTable, status: 'open' }).select('id').single()
-        if (tabError || !newTab) {
-          alert('✗ Masa açılamadı.\n\n' + (tabError?.message || 'Bilinmeyen hata'))
-          return
-        }
-        tabId = newTab.id
+      const { data: tabId, error: tabError } = await supabase.rpc('get_or_create_open_tab', { p_table_name: addOrderTable })
+      if (tabError || !tabId) {
+        alert('✗ Masa açılamadı.\n\n' + (tabError?.message || 'Bilinmeyen hata'))
+        return
       }
 
       // Staff-entered orders go straight to "accepted" (Hazırlanıyor) —
@@ -459,6 +455,24 @@ export default function AdminPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   }
 
+  const [revenueSummary, setRevenueSummary] = useState({ revenue: 0, cash: 0, card: 0, count: 0 })
+
+  // Revenue should reflect money actually collected (closed/paid tabs),
+  // not every order placed — an order can be placed and still be open/unpaid.
+  async function getClosedTabsRevenue(fromDate: string, toDate?: string) {
+    let query = supabase.from('tabs').select('total,cash_amount,card_amount')
+      .eq('status', 'closed').gte('closed_at', fromDate)
+    if (toDate) query = query.lte('closed_at', toDate)
+    const { data } = await query
+    const tabs = data || []
+    return {
+      revenue: tabs.reduce((s: number, t: any) => s + Number(t.total), 0),
+      cash: tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0),
+      card: tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0),
+      count: tabs.length,
+    }
+  }
+
   async function loadOrders(filter: 'today'|'week'|'month' = dateFilter) {
     setOrdersLoading(true)
     const baseFrom = baseFromForFilter(filter)
@@ -466,9 +480,12 @@ export default function AdminPage() {
     // Only honor the marker if it falls within the current window (e.g. a
     // "today" reset from three days ago shouldn't suppress today's orders)
     const fromDate = (marker && marker > baseFrom) ? marker : baseFrom
-    const { data } = await supabase.from('orders').select('*')
-      .gte('created_at', fromDate).order('created_at', { ascending: false })
+    const [{ data }, revenue] = await Promise.all([
+      supabase.from('orders').select('*').gte('created_at', fromDate).order('created_at', { ascending: false }),
+      getClosedTabsRevenue(fromDate),
+    ])
     setAllOrders(data || [])
+    setRevenueSummary(revenue)
     setOrdersLoading(false)
   }
 
@@ -489,7 +506,8 @@ export default function AdminPage() {
       return
     }
 
-    const totalRevenue = monthOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+    const monthRevenue = await getClosedTabsRevenue(firstDay, lastDay)
+    const totalRevenue = monthRevenue.revenue
 
     // Top items
     const itemMap: Record<string, { name: string; count: number; revenue: number }> = {}
@@ -533,7 +551,7 @@ export default function AdminPage() {
     const win = window.open('', '_blank', 'width=900,height=900')
     if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
     const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : 'Bu Ay'
-    const totalRevenue = allOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+    const totalRevenue = revenueSummary.revenue
     const pending = allOrders.filter((o: any) => o.status === 'pending').length
     const statusLabel = (st: string) => st==='pending'?'Bekliyor':st==='accepted'?'Hazırlanıyor':st==='ready'?'Hazır':st==='served'?'Teslim Edildi':'Kapatıldı'
     const rows = allOrders.map((o: any, i: number) => {
@@ -567,8 +585,9 @@ export default function AdminPage() {
         <div class="stats">
           <div class="stat"><div class="num">${allOrders.length}</div><div class="label">Toplam Sipariş</div></div>
           <div class="stat"><div class="num">${pending}</div><div class="label">Bekliyor</div></div>
-          <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Ciro</div></div>
+          <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Ciro (Tahsil Edilen)</div></div>
         </div>
+        <div style="font-size:10px; color:#888; margin-bottom:10px;">Not: Ciro yalnızca ödemesi alınıp kapatılmış masaları sayar. Aşağıdaki liste, henüz ödenmemiş olanlar dahil bu aralıktaki tüm siparişleri gösterir.</div>
         <table>
           <tr><th>#</th><th>Masa</th><th>Saat</th><th>Ürünler</th><th>Durum</th><th style="text-align:right">Toplam</th></tr>
           ${rows || '<tr><td colspan="6">Bu aralıkta sipariş yok</td></tr>'}
@@ -811,7 +830,7 @@ export default function AdminPage() {
     const [{ data: cats }, { data: its }, { data: staffData }] = await Promise.all([
       supabase.from('categories').select('*').order('order_index'),
       supabase.from('menu_items').select('*').order('order_index'),
-      supabase.from('staff').select('*').order('created_at'),
+      supabase.rpc('list_staff'),
     ])
     setCategories(cats || [])
     setItems(its || [])
@@ -846,23 +865,20 @@ export default function AdminPage() {
       alert(`Bu PIN zaten ${dup.name} adlı personelde kullanılıyor. Başka bir PIN seçin.`)
       return
     }
-    if (editingStaffId) {
-      await supabase.from('staff').update({ name, pin }).eq('id', editingStaffId)
-    } else {
-      await supabase.from('staff').insert({ name, pin, active: true })
-    }
+    const { error } = await supabase.rpc('upsert_staff', { p_id: editingStaffId, p_name: name, p_pin: pin })
+    if (error) { alert('✗ Kaydedilemedi.\n\n' + error.message); return }
     resetStaffForm()
     await loadData()
   }
 
   async function toggleStaffActive(s: any) {
-    await supabase.from('staff').update({ active: !s.active }).eq('id', s.id)
+    await supabase.rpc('set_staff_active', { p_id: s.id, p_active: !s.active })
     await loadData()
   }
 
   async function deleteStaff(id: string) {
     if (!confirm('Bu personeli silmek istediğinizden emin misiniz?')) return
-    await supabase.from('staff').delete().eq('id', id)
+    await supabase.rpc('delete_staff', { p_id: id })
     await loadData()
   }
 
@@ -873,8 +889,8 @@ export default function AdminPage() {
       setRole('manager'); setStaffName('Yönetici'); setAuth(true)
       return
     }
-    // Individual staff PIN lookup
-    const { data: staffMatch } = await supabase.from('staff').select('*').eq('pin', pw).eq('active', true).maybeSingle()
+    // Individual staff PIN lookup — via RPC so PINs are never fetchable in bulk
+    const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
     if (staffMatch) {
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', staffMatch.name)
@@ -1488,8 +1504,8 @@ export default function AdminPage() {
                   <div style={{ color:'#888', fontSize:11 }}>Bekliyor</div>
                 </div>
                 <div style={{ textAlign:'center' }}>
-                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.reduce((s:number,o:any)=>s+Number(o.total),0).toFixed(0)} ₺</div>
-                  <div style={{ color:'#888', fontSize:11 }}>Ciro</div>
+                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{revenueSummary.revenue.toFixed(0)} ₺</div>
+                  <div style={{ color:'#888', fontSize:11 }}>Ciro (Tahsil Edilen)</div>
                 </div>
               </div>
             )}

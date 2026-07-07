@@ -509,16 +509,10 @@ export default function MenuPage() {
       const orderNum = (todayCount || 0) + 1
       setOrderNumber(orderNum)
 
-      // Find this table's currently open tab, or open a new one
-      const { data: existingTab } = await supabase.from('tabs')
-        .select('id').eq('table_name', mesa).eq('status', 'open').maybeSingle()
-      let tabId = existingTab?.id
-      if (!tabId) {
-        const { data: newTab } = await supabase.from('tabs')
-          .insert({ table_name: mesa, status: 'open' })
-          .select('id').single()
-        tabId = newTab?.id
-      }
+      // Find this table's currently open tab, or open a new one — done
+      // atomically server-side so two simultaneous orders can't create
+      // two separate open tabs for the same table
+      const { data: tabId } = await supabase.rpc('get_or_create_open_tab', { p_table_name: mesa })
 
       await supabase.from('orders').insert({
         table_name: mesa,
