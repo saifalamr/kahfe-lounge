@@ -226,11 +226,97 @@ export default function AdminPage() {
     await loadTableMapData()
   }
 
-  async function closeTable(tabId: string) {
-    if (!confirm('Masayı kapatmak istediğinizden emin misiniz?\n\nBu, ödeme alındığını manuel olarak işaretler (henüz tam ödeme/adisyon sistemi yok). Masa boşa çıkacak.')) return
-    await supabase.from('tabs').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', tabId)
+  // Payment & closing a tab
+  const [paymentTab, setPaymentTab] = useState<{ id: string, table_name: string, total: number, orders: any[] } | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'>('cash')
+  const [splitCash, setSplitCash] = useState('')
+  const [splitCard, setSplitCard] = useState('')
+
+  function openPayment(tabData: any, total: number, orders: any[]) {
+    setPaymentTab({ id: tabData.id, table_name: tabData.table_name, total, orders })
+    setPaymentMethod('cash')
+    setSplitCash(total.toFixed(0))
+    setSplitCard('0')
+  }
+
+  function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed', orders: any[] }) {
+    const win = window.open('', '_blank', 'width=420,height=700')
+    if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+    const itemRows = (info.orders || []).flatMap((o: any) => o.items || []).map((it: any) =>
+      `<tr><td>${it.quantity}x ${it.name}</td><td style="text-align:right">${it.subtotal} ₺</td></tr>`
+    ).join('')
+    const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : 'Karma (Nakit + Kart)'
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="utf-8" />
+        <title>Kahfe Lounge - Fiş - ${info.table_name}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; color:#111; padding: 20px; width:280px; margin:0 auto; }
+          .center { text-align:center; }
+          h1 { font-size:16px; margin:4px 0; }
+          .line { border-top:1px dashed #333; margin:10px 0; }
+          table { width:100%; border-collapse:collapse; font-size:12px; }
+          td { padding:3px 0; }
+          .total-row td { font-weight:bold; font-size:14px; padding-top:8px; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <h1>KAHFE LOUNGE</h1>
+          <div style="font-size:11px;">${new Date().toLocaleString('tr-TR')}</div>
+          <div style="font-size:12px; margin-top:6px;">Masa: <b>${info.table_name}</b></div>
+        </div>
+        <div class="line"></div>
+        <table>
+          ${itemRows}
+        </table>
+        <div class="line"></div>
+        <table>
+          <tr class="total-row"><td>TOPLAM</td><td style="text-align:right">${info.total.toFixed(0)} ₺</td></tr>
+        </table>
+        <div class="line"></div>
+        <div style="font-size:12px;">
+          Ödeme: <b>${methodLabel}</b><br/>
+          ${info.method === 'mixed' ? `Nakit: ${info.cash.toFixed(0)} ₺<br/>Kart: ${info.card.toFixed(0)} ₺` : ''}
+        </div>
+        <div class="line"></div>
+        <div class="center" style="font-size:11px; margin-top:10px;">Bizi tercih ettiğiniz için teşekkürler!</div>
+        <script>window.onload = function(){ window.print(); };</script>
+      </body>
+      </html>
+    `)
+    win.document.close()
+  }
+
+  async function confirmPayment() {
+    if (!paymentTab) return
+    let cash = 0, card = 0
+    if (paymentMethod === 'cash') cash = paymentTab.total
+    else if (paymentMethod === 'card') card = paymentTab.total
+    else {
+      cash = parseFloat(splitCash) || 0
+      card = parseFloat(splitCard) || 0
+      if (Math.abs((cash + card) - paymentTab.total) > 0.5) {
+        alert(`Nakit + Kart tutarı masa toplamıyla eşleşmiyor.\n\nMasa toplamı: ${paymentTab.total.toFixed(0)} ₺\nGirilen: ${(cash + card).toFixed(0)} ₺`)
+        return
+      }
+    }
+    await supabase.from('tabs').update({
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      payment_method: paymentMethod,
+      cash_amount: cash,
+      card_amount: card,
+      total: paymentTab.total,
+    }).eq('id', paymentTab.id)
+
+    const receiptInfo = { table_name: paymentTab.table_name, total: paymentTab.total, cash, card, method: paymentMethod, orders: paymentTab.orders }
+    setPaymentTab(null)
     setActiveTableModal(null)
     await loadTableMapData()
+    printReceipt(receiptInfo)
   }
 
   // Staff-entered orders (walk-ins, phone orders, waiter taking a verbal order)
@@ -908,13 +994,10 @@ export default function AdminPage() {
                           {!info.tabData.bill_requested && (
                             <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, background:'rgba(52,152,219,.15)', border:'1px solid rgba(52,152,219,.4)', borderRadius:10, padding:'10px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:700 }}>🧾 Hesap İstendi</button>
                           )}
-                          {isManager && (
-                            <button onClick={() => closeTable(info.tabData.id)} style={{ flex:1, background:'rgba(192,57,43,.15)', border:'1px solid rgba(192,57,43,.4)', borderRadius:10, padding:'10px', color:'#e74c3c', fontSize:12, cursor:'pointer', fontWeight:700 }}>Masayı Kapat</button>
+                          {activeOrders.length > 0 && (
+                            <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, background:'rgba(39,174,96,.15)', border:'1px solid rgba(39,174,96,.4)', borderRadius:10, padding:'10px', color:'#27ae60', fontSize:12, cursor:'pointer', fontWeight:700 }}>💳 Ödeme Al</button>
                           )}
                         </div>
-                      )}
-                      {isManager && info.tabData && (
-                        <div style={{ color:'#666', fontSize:10, marginTop:10, textAlign:'center' }}>Not: Ödeme takibi henüz yok — bu buton masayı manuel olarak boşaltır.</div>
                       )}
                     </div>
                   </div>
@@ -971,6 +1054,54 @@ export default function AdminPage() {
                   </div>
                   <button onClick={submitStaffOrder} disabled={staffCartCount===0}
                     style={{ background: staffCartCount===0 ? '#2A2A2A' : '#27ae60', border:'none', borderRadius:12, padding:'14px 24px', color: staffCartCount===0 ? '#666' : '#fff', fontSize:14, fontWeight:800, cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>Siparişi Gönder</button>
+                </div>
+              </div>
+            )}
+
+            {/* Payment modal - choose method, optionally split, close the tab */}
+            {paymentTab && (
+              <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setPaymentTab(null)}>
+                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
+                  <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ color:'#27ae60', fontWeight:800, fontSize:16 }}>💳 {paymentTab.table_name} — Ödeme Al</div>
+                    <button onClick={() => setPaymentTab(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                  </div>
+                  <div style={{ padding:'20px' }}>
+                    <div style={{ textAlign:'center', marginBottom:20 }}>
+                      <div style={{ color:'#888', fontSize:11 }}>ÖDENECEK TUTAR</div>
+                      <div style={{ color:'#C9A84C', fontWeight:800, fontSize:32 }}>{paymentTab.total.toFixed(0)} ₺</div>
+                    </div>
+
+                    <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                      {(['cash','card','mixed'] as const).map(m => (
+                        <button key={m} onClick={() => setPaymentMethod(m)}
+                          style={{ flex:1, background: paymentMethod===m ? 'rgba(39,174,96,.15)' : '#1A1A1A', border: paymentMethod===m ? '1px solid rgba(39,174,96,.5)' : '1px solid #2A2A2A', borderRadius:10, padding:'12px 4px', color: paymentMethod===m ? '#27ae60' : '#888', fontWeight:700, fontSize:12, cursor:'pointer' }}>
+                          {m==='cash' ? '💵 Nakit' : m==='card' ? '💳 Kart' : '🔀 Karma'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {paymentMethod === 'mixed' && (
+                      <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+                        <div style={{ flex:1 }}>
+                          <label style={{ color:'#888', fontSize:11, display:'block', marginBottom:6 }}>NAKİT (₺)</label>
+                          <input type="number" value={splitCash} onChange={e => setSplitCash(e.target.value)}
+                            style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:10, padding:'10px', color:'#F0EDE8', fontSize:15 }} />
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <label style={{ color:'#888', fontSize:11, display:'block', marginBottom:6 }}>KART (₺)</label>
+                          <input type="number" value={splitCard} onChange={e => setSplitCard(e.target.value)}
+                            style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:10, padding:'10px', color:'#F0EDE8', fontSize:15 }} />
+                        </div>
+                      </div>
+                    )}
+
+                    <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: paymentTab.total, cash: paymentMethod==='cash'?paymentTab.total:(parseFloat(splitCash)||0), card: paymentMethod==='card'?paymentTab.total:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders })}
+                      style={{ width:'100%', background:'#2A2A2A', border:'none', borderRadius:10, padding:'12px', color:'#C9A84C', fontSize:13, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
+
+                    <button onClick={confirmPayment}
+                      style={{ width:'100%', background:'#27ae60', border:'none', borderRadius:10, padding:'14px', color:'#fff', fontSize:14, cursor:'pointer', fontWeight:800 }}>✓ Ödemeyi Onayla ve Masayı Kapat</button>
+                  </div>
                 </div>
               </div>
             )}
