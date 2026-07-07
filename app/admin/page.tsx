@@ -364,6 +364,7 @@ export default function AdminPage() {
   }
 
   // Staff-entered orders (walk-ins, phone orders, waiter taking a verbal order)
+  const [items, setItems] = useState<MenuItem[]>([])
   const [addOrderTable, setAddOrderTable] = useState<string | null>(null)
   const [staffCart, setStaffCart] = useState<Record<string, number>>({})
   const [staffCategoryFilter, setStaffCategoryFilter] = useState<string | null>(null)
@@ -766,7 +767,6 @@ export default function AdminPage() {
   const [staffFormName, setStaffFormName] = useState('')
   const [staffFormPin, setStaffFormPin] = useState('')
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
-  const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [filterCat, setFilterCat] = useState('')
