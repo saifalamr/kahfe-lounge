@@ -232,6 +232,63 @@ export default function AdminPage() {
     setActiveTableModal(null)
     await loadTableMapData()
   }
+
+  // Staff-entered orders (walk-ins, phone orders, waiter taking a verbal order)
+  const [addOrderTable, setAddOrderTable] = useState<string | null>(null)
+  const [staffCart, setStaffCart] = useState<Record<string, number>>({})
+  const [staffCategoryFilter, setStaffCategoryFilter] = useState<string | null>(null)
+
+  function openAddOrder(tableName: string) {
+    setAddOrderTable(tableName)
+    setStaffCart({})
+    setStaffCategoryFilter(null)
+  }
+
+  function adjustStaffCart(itemId: string, delta: number) {
+    setStaffCart(prev => {
+      const next = { ...prev }
+      const newQty = (next[itemId] || 0) + delta
+      if (newQty <= 0) delete next[itemId]
+      else next[itemId] = newQty
+      return next
+    })
+  }
+
+  const staffCartCount = Object.values(staffCart).reduce((s, q) => s + q, 0)
+  const staffCartTotal = Object.entries(staffCart).reduce((s, [id, qty]) => {
+    const item = items.find(i => i.id === id)
+    return s + (item ? item.price * qty : 0)
+  }, 0)
+
+  async function submitStaffOrder() {
+    if (!addOrderTable || staffCartCount === 0) return
+    const orderItems = Object.entries(staffCart).map(([id, qty]) => {
+      const item = items.find(i => i.id === id)!
+      return { id: item.id, name: item.name, name_en: item.name_en || item.name, price: item.price, quantity: qty, subtotal: item.price * qty }
+    })
+    const orderTotal = orderItems.reduce((s, i) => s + i.subtotal, 0)
+
+    let tabId = openTabs.find((t: any) => t.table_name === addOrderTable)?.id
+    if (!tabId) {
+      const { data: newTab } = await supabase.from('tabs').insert({ table_name: addOrderTable, status: 'open' }).select('id').single()
+      tabId = newTab?.id
+    }
+
+    // Staff-entered orders go straight to "accepted" (Hazırlanıyor) —
+    // there's no need for a Kabul step on an order staff just typed in themselves
+    await supabase.from('orders').insert({
+      table_name: addOrderTable,
+      items: orderItems,
+      total: orderTotal,
+      status: 'accepted',
+      note: null,
+      tab_id: tabId
+    })
+
+    await loadTableMapData()
+    setAddOrderTable(null)
+    setStaffCart({})
+  }
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
   const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
 
@@ -844,6 +901,8 @@ export default function AdminPage() {
                         </div>
                       )}
 
+                      <button onClick={() => openAddOrder(activeTableModal)} style={{ width:'100%', background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius:10, padding:'12px', color:'#C9A84C', fontSize:13, cursor:'pointer', fontWeight:700, marginBottom:12 }}>➕ Sipariş Ekle</button>
+
                       {info.tabData && (
                         <div style={{ display:'flex', gap:8 }}>
                           {!info.tabData.bill_requested && (
@@ -862,6 +921,59 @@ export default function AdminPage() {
                 </div>
               )
             })()}
+
+            {/* Staff order builder - punch in a walk-in/phone/verbal order */}
+            {addOrderTable && (
+              <div style={{ position:'fixed', inset:0, zIndex:210, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', flexDirection:'column' }}>
+                <div style={{ padding:'16px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>➕ {addOrderTable} — Sipariş Ekle</div>
+                  <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                </div>
+
+                <div style={{ display:'flex', gap:6, padding:'12px 16px', overflowX:'auto', borderBottom:'1px solid #2A2A2A' }}>
+                  <button onClick={() => setStaffCategoryFilter(null)}
+                    style={{ flexShrink:0, background: staffCategoryFilter===null ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: staffCategoryFilter===null ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:20, padding:'7px 14px', color: staffCategoryFilter===null ? '#C9A84C' : '#888', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
+                  {categories.map(cat => (
+                    <button key={cat.id} onClick={() => setStaffCategoryFilter(cat.id)}
+                      style={{ flexShrink:0, background: staffCategoryFilter===cat.id ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: staffCategoryFilter===cat.id ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:20, padding:'7px 14px', color: staffCategoryFilter===cat.id ? '#C9A84C' : '#888', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{cat.icon} {cat.name}</button>
+                  ))}
+                </div>
+
+                <div style={{ flex:1, overflowY:'auto', padding:'14px 16px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
+                    {items.filter(it => it.available && (staffCategoryFilter === null || it.category_id === staffCategoryFilter)).map(item => {
+                      const qty = staffCart[item.id] || 0
+                      return (
+                        <div key={item.id} style={{ background:'#1A1A1A', border: qty>0 ? '1.5px solid rgba(201,168,76,.5)' : '1px solid #2A2A2A', borderRadius:12, padding:'12px 10px', display:'flex', flexDirection:'column', gap:8 }}>
+                          <div>
+                            <div style={{ color:'#F0EDE8', fontSize:13, fontWeight:700, marginBottom:2 }}>{item.name}</div>
+                            <div style={{ color:'#C9A84C', fontSize:12, fontWeight:700 }}>{item.price} ₺</div>
+                          </div>
+                          {qty === 0 ? (
+                            <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius:8, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
+                          ) : (
+                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0f0f0f', borderRadius:8, padding:'4px 8px' }}>
+                              <button onClick={() => adjustStaffCart(item.id, -1)} style={{ background:'#2A2A2A', border:'none', borderRadius:6, width:28, height:28, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:800 }}>−</button>
+                              <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>{qty}</span>
+                              <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'#C9A84C', border:'none', borderRadius:6, width:28, height:28, color:'#141414', fontSize:16, cursor:'pointer', fontWeight:800 }}>+</button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ padding:'14px 16px', borderTop:'1px solid #2A2A2A', display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:'#888', fontSize:11 }}>{staffCartCount} ürün</div>
+                    <div style={{ color:'#C9A84C', fontWeight:800, fontSize:18 }}>{staffCartTotal.toFixed(0)} ₺</div>
+                  </div>
+                  <button onClick={submitStaffOrder} disabled={staffCartCount===0}
+                    style={{ background: staffCartCount===0 ? '#2A2A2A' : '#27ae60', border:'none', borderRadius:12, padding:'14px 24px', color: staffCartCount===0 ? '#666' : '#fff', fontSize:14, fontWeight:800, cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>Siparişi Gönder</button>
+                </div>
+              </div>
+            )}
 
             {/* View toggle - table map vs flat list, both roles see this */}
             <div style={{ display:'flex', gap:6, marginBottom:14 }}>
