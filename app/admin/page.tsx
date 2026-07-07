@@ -122,6 +122,7 @@ export default function AdminPage() {
   const [auth, setAuth] = useState(false)
   const [role, setRole] = useState<'manager' | 'staff' | null>(null)
   const isManager = role === 'manager'
+  const [staffName, setStaffName] = useState<string>('')
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotif, setShowNotif] = useState(false)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
@@ -171,7 +172,7 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'map'|'list'>('map')
@@ -216,7 +217,7 @@ export default function AdminPage() {
   }
 
   async function updateOrderStatus(id: string, status: string) {
-    await supabase.from('orders').update({ status }).eq('id', id)
+    await supabase.from('orders').update({ status, handled_by: staffName }).eq('id', id)
     setNotifications(prev => prev.filter(n => n.id !== id))
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
@@ -237,6 +238,48 @@ export default function AdminPage() {
     setPaymentMethod('cash')
     setSplitCash(total.toFixed(0))
     setSplitCard('0')
+  }
+
+  function printKitchenTicket(tableName: string, orders: any[]) {
+    const win = window.open('', '_blank', 'width=420,height=700')
+    if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+    const activeItems = orders.filter((o: any) => o.status !== 'served' && o.status !== 'dismissed')
+    const rows = activeItems.flatMap((o: any) => (o.items || []).map((it: any) => ({ ...it, note: o.note })))
+    const itemRows = rows.map((it: any) =>
+      `<tr><td class="qty">${it.quantity}x</td><td>${it.name}</td></tr>`
+    ).join('')
+    const notes = [...new Set(activeItems.filter((o: any) => o.note).map((o: any) => o.note))]
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="utf-8" />
+        <title>Mutfak Fişi - ${tableName}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; color:#000; padding: 16px; width:300px; margin:0 auto; }
+          .center { text-align:center; }
+          h1 { font-size:22px; margin:6px 0; }
+          .line { border-top:2px dashed #000; margin:10px 0; }
+          table { width:100%; border-collapse:collapse; font-size:20px; }
+          td { padding:6px 0; }
+          .qty { font-weight:bold; width:50px; }
+          .note { font-size:14px; margin-top:10px; border:1px solid #000; padding:8px; }
+        </style>
+      </head>
+      <body>
+        <div class="center">
+          <h1>🍳 ${tableName}</h1>
+          <div style="font-size:13px;">${new Date().toLocaleString('tr-TR')}</div>
+        </div>
+        <div class="line"></div>
+        <table>${itemRows}</table>
+        ${notes.length > 0 ? `<div class="note">📝 ${notes.join(' · ')}</div>` : ''}
+        <div class="line"></div>
+        <script>window.onload = function(){ window.print(); };</script>
+      </body>
+      </html>
+    `)
+    win.document.close()
   }
 
   function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed', orders: any[] }) {
@@ -310,6 +353,7 @@ export default function AdminPage() {
       cash_amount: cash,
       card_amount: card,
       total: paymentTab.total,
+      closed_by: staffName,
     }).eq('id', paymentTab.id)
 
     const receiptInfo = { table_name: paymentTab.table_name, total: paymentTab.total, cash, card, method: paymentMethod, orders: paymentTab.orders }
@@ -368,7 +412,9 @@ export default function AdminPage() {
       total: orderTotal,
       status: 'accepted',
       note: null,
-      tab_id: tabId
+      tab_id: tabId,
+      created_by: staffName,
+      handled_by: staffName,
     })
 
     await loadTableMapData()
@@ -587,6 +633,98 @@ export default function AdminPage() {
 
   useEffect(() => { if (auth) loadOrders() }, [auth])
 
+  // Day-end close-out (Gün Sonu) - built on real payment data from closed tabs
+  const [showDayClose, setShowDayClose] = useState(false)
+  const [dayCloseData, setDayCloseData] = useState<any>(null)
+  const [countedCash, setCountedCash] = useState('')
+
+  async function openDayClose() {
+    const todayStart = new Date().toISOString().split('T')[0]
+    const { data: closedTabs } = await supabase.from('tabs').select('*')
+      .eq('status', 'closed').gte('closed_at', todayStart)
+    const tabs = closedTabs || []
+    const totalRevenue = tabs.reduce((s: number, t: any) => s + Number(t.total), 0)
+    const cashTotal = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0)
+    const cardTotal = tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0)
+    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, tabCount: tabs.length })
+    setCountedCash('')
+    setShowDayClose(true)
+  }
+
+  async function saveDayClose() {
+    if (!dayCloseData) return
+    const counted = parseFloat(countedCash)
+    const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
+    const { error } = await supabase.from('day_close_reports').insert({
+      report_date: new Date().toISOString().split('T')[0],
+      total_revenue: dayCloseData.totalRevenue,
+      cash_total: dayCloseData.cashTotal,
+      card_total: dayCloseData.cardTotal,
+      tab_count: dayCloseData.tabCount,
+      counted_cash: isNaN(counted) ? null : counted,
+      cash_difference: diff,
+      closed_by: staffName,
+    })
+    if (error) {
+      alert('✗ Gün sonu kaydedilemedi.\n\n' + error.message + '\n\nday_close_reports tablosunun Supabase\'de oluşturulduğundan emin olun.')
+      return
+    }
+    setShowDayClose(false)
+    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${dayCloseData.totalRevenue.toFixed(0)} ₺\nNakit: ${dayCloseData.cashTotal.toFixed(0)} ₺\nKart: ${dayCloseData.cardTotal.toFixed(0)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} ₺` : ''}`)
+  }
+
+  function printDayClosePDF() {
+    if (!dayCloseData) return
+    const win = window.open('', '_blank', 'width=800,height=900')
+    if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+    const counted = parseFloat(countedCash)
+    const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
+    const rows = dayCloseData.tabs.map((t: any, i: number) => `
+      <tr><td>${i + 1}</td><td>${t.table_name}</td><td>${new Date(t.closed_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</td><td>${t.payment_method === 'cash' ? 'Nakit' : t.payment_method === 'card' ? 'Kart' : 'Karma'}</td><td>${t.closed_by || '—'}</td><td style="text-align:right">${Number(t.total).toFixed(0)} ₺</td></tr>
+    `).join('')
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="tr">
+      <head>
+        <meta charset="utf-8" />
+        <title>Kahfe Lounge - Gün Sonu - ${new Date().toLocaleDateString('tr-TR')}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; color:#1A1A1A; padding: 36px; }
+          .brand { font-size: 12px; letter-spacing: 3px; color:#8a6d1f; font-weight:700; }
+          h1 { font-size: 22px; margin: 4px 0 20px; }
+          .stats { display:flex; gap:16px; margin-bottom: 24px; flex-wrap:wrap; }
+          .stat { flex:1; min-width:110px; border:1px solid #ddd; border-radius:10px; padding:14px; text-align:center; }
+          .stat .num { font-size: 20px; font-weight:800; }
+          .stat .label { font-size: 11px; color:#888; margin-top:4px; }
+          h2 { font-size:14px; margin-top:28px; border-bottom:2px solid #C9A84C; padding-bottom:8px; }
+          table { width:100%; border-collapse:collapse; margin-top:10px; }
+          th, td { padding:7px 8px; border-bottom:1px solid #eee; font-size:11px; text-align:left; }
+          th { color:#888; text-transform:uppercase; font-size:10px; }
+        </style>
+      </head>
+      <body>
+        <div class="brand">KAHFE LOUNGE</div>
+        <h1>Gün Sonu Raporu — ${new Date().toLocaleDateString('tr-TR')}</h1>
+        <div class="stats">
+          <div class="stat"><div class="num">${dayCloseData.tabCount}</div><div class="label">Kapanan Masa</div></div>
+          <div class="stat"><div class="num">${dayCloseData.totalRevenue.toFixed(0)} ₺</div><div class="label">Toplam Ciro</div></div>
+          <div class="stat"><div class="num">${dayCloseData.cashTotal.toFixed(0)} ₺</div><div class="label">Nakit</div></div>
+          <div class="stat"><div class="num">${dayCloseData.cardTotal.toFixed(0)} ₺</div><div class="label">Kart</div></div>
+          ${diff !== null ? `<div class="stat"><div class="num" style="color:${diff===0?'#27ae60':diff>0?'#3498db':'#e74c3c'}">${diff>=0?'+':''}${diff.toFixed(0)} ₺</div><div class="label">Kasa Farkı</div></div>` : ''}
+        </div>
+        <h2>Kapanan Masalar</h2>
+        <table>
+          <tr><th>#</th><th>Masa</th><th>Saat</th><th>Ödeme</th><th>Kapatan</th><th style="text-align:right">Tutar</th></tr>
+          ${rows || '<tr><td colspan="6">Bugün kapanan masa yok</td></tr>'}
+        </table>
+        <script>window.onload = function(){ window.print(); };</script>
+      </body>
+      </html>
+    `)
+    win.document.close()
+  }
+
   // Keep the orders list itself live: react instantly to any new order or
   // status change, plus a 20s polling safety net in case a realtime event
   // is missed (flaky wifi, tab was backgrounded, etc). No manual refresh needed.
@@ -604,6 +742,10 @@ export default function AdminPage() {
     return () => { supabase.removeChannel(liveChannel); clearInterval(pollId) }
   }, [auth, tab, dateFilter])
   const [categories, setCategories] = useState<Category[]>([])
+  const [staffList, setStaffList] = useState<any[]>([])
+  const [staffFormName, setStaffFormName] = useState('')
+  const [staffFormPin, setStaffFormPin] = useState('')
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
   const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
@@ -635,7 +777,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     const savedRole = localStorage.getItem('kahfe_admin_role')
-    if (savedRole === 'manager' || savedRole === 'staff') { setRole(savedRole); setAuth(true) }
+    const savedName = localStorage.getItem('kahfe_staff_name')
+    if (savedRole === 'manager' || savedRole === 'staff') { setRole(savedRole); setAuth(true); setStaffName(savedName || (savedRole === 'manager' ? 'Yönetici' : 'Personel')) }
   }, [])
 
   // Staff can only ever see the orders tab
@@ -645,24 +788,88 @@ export default function AdminPage() {
   useEffect(() => { if (auth) loadData() }, [auth])
 
   async function loadData() {
-    const [{ data: cats }, { data: its }] = await Promise.all([
+    const [{ data: cats }, { data: its }, { data: staffData }] = await Promise.all([
       supabase.from('categories').select('*').order('order_index'),
       supabase.from('menu_items').select('*').order('order_index'),
+      supabase.from('staff').select('*').order('created_at'),
     ])
     setCategories(cats || [])
     setItems(its || [])
+    setStaffList(staffData || [])
   }
 
-  function login() {
+  function startEditStaff(s: any) {
+    setEditingStaffId(s.id)
+    setStaffFormName(s.name)
+    setStaffFormPin(s.pin)
+  }
+
+  function resetStaffForm() {
+    setEditingStaffId(null)
+    setStaffFormName('')
+    setStaffFormPin('')
+  }
+
+  async function saveStaff() {
+    const name = staffFormName.trim()
+    const pin = staffFormPin.trim()
+    if (!name || !/^\d{4,6}$/.test(pin)) {
+      alert('Lütfen bir isim ve 4-6 haneli bir PIN girin.')
+      return
+    }
+    if (pin === ADMIN_PASSWORD) {
+      alert('Bu PIN yönetici şifresiyle aynı olamaz. Başka bir PIN seçin.')
+      return
+    }
+    const dup = staffList.find(s => s.pin === pin && s.id !== editingStaffId)
+    if (dup) {
+      alert(`Bu PIN zaten ${dup.name} adlı personelde kullanılıyor. Başka bir PIN seçin.`)
+      return
+    }
+    if (editingStaffId) {
+      await supabase.from('staff').update({ name, pin }).eq('id', editingStaffId)
+    } else {
+      await supabase.from('staff').insert({ name, pin, active: true })
+    }
+    resetStaffForm()
+    await loadData()
+  }
+
+  async function toggleStaffActive(s: any) {
+    await supabase.from('staff').update({ active: !s.active }).eq('id', s.id)
+    await loadData()
+  }
+
+  async function deleteStaff(id: string) {
+    if (!confirm('Bu personeli silmek istediğinizden emin misiniz?')) return
+    await supabase.from('staff').delete().eq('id', id)
+    await loadData()
+  }
+
+  async function login() {
     if (pw === ADMIN_PASSWORD) {
       localStorage.setItem('kahfe_admin_role', 'manager')
-      setRole('manager'); setAuth(true)
-    } else if (pw === STAFF_PASSWORD) {
-      localStorage.setItem('kahfe_admin_role', 'staff')
-      setRole('staff'); setAuth(true)
-    } else {
-      setPwError(true)
+      localStorage.setItem('kahfe_staff_name', 'Yönetici')
+      setRole('manager'); setStaffName('Yönetici'); setAuth(true)
+      return
     }
+    // Individual staff PIN lookup
+    const { data: staffMatch } = await supabase.from('staff').select('*').eq('pin', pw).eq('active', true).maybeSingle()
+    if (staffMatch) {
+      localStorage.setItem('kahfe_admin_role', 'staff')
+      localStorage.setItem('kahfe_staff_name', staffMatch.name)
+      setRole('staff'); setStaffName(staffMatch.name); setAuth(true)
+      return
+    }
+    // Legacy shared staff code, kept as a fallback so nobody is locked out
+    // before the manager has set up individual PINs
+    if (pw === STAFF_PASSWORD) {
+      localStorage.setItem('kahfe_admin_role', 'staff')
+      localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
+      setRole('staff'); setStaffName('Personel (Genel)'); setAuth(true)
+      return
+    }
+    setPwError(true)
   }
 
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
@@ -830,7 +1037,7 @@ export default function AdminPage() {
                 <span style={{ position: 'absolute', top: -4, right: -4, background: '#C0392B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notifications.length}</span>
               )}
             </button>
-            <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_admin'); setAuth(false); setRole(null) }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+            <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_admin'); localStorage.removeItem('kahfe_staff_name'); setAuth(false); setRole(null); setStaffName('') }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
           </div>
         </div>
 
@@ -877,10 +1084,10 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A' }}>
-          {(isManager ? (['orders', 'categories', 'items'] as const) : (['orders'] as const)).map(t => (
+          {(isManager ? (['orders', 'categories', 'items', 'staff'] as const) : (['orders'] as const)).map(t => (
             <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter) }}
               style={{ flex: 1, padding: '12px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C0392B' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer', position: 'relative' }}>
-              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : 'Siparişler'}
+              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
                 <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
               )}
@@ -933,6 +1140,60 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+
+            {/* Day-end close-out modal */}
+            {isManager && showDayClose && dayCloseData && (() => {
+              const counted = parseFloat(countedCash)
+              const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
+              return (
+                <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowDayClose(false)}>
+                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', borderBottom:'none' }}>
+                    <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                      <div style={{ color:'#3498db', fontWeight:800, fontSize:16 }}>🌙 Gün Sonu</div>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={printDayClosePDF} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
+                        <button onClick={() => setShowDayClose(false)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                      </div>
+                    </div>
+                    <div style={{ padding:'20px' }}>
+                      <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#888', fontSize:11 }}>KAPANAN MASA</div>
+                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:20 }}>{dayCloseData.tabCount}</div>
+                        </div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#888', fontSize:11 }}>TOPLAM CİRO</div>
+                          <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{dayCloseData.totalRevenue.toFixed(0)} ₺</div>
+                        </div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#888', fontSize:11 }}>💵 NAKİT</div>
+                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cashTotal.toFixed(0)} ₺</div>
+                        </div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#888', fontSize:11 }}>💳 KART</div>
+                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cardTotal.toFixed(0)} ₺</div>
+                        </div>
+                      </div>
+
+                      <label style={{ color:'#888', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺)</label>
+                      <input type="number" value={countedCash} onChange={e => setCountedCash(e.target.value)} placeholder="Örn. 3450"
+                        style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:10, padding:'12px', color:'#F0EDE8', fontSize:16, marginBottom:10 }} />
+
+                      {diff !== null && (
+                        <div style={{ textAlign:'center', padding:'10px', marginBottom:16, borderRadius:10, background: diff===0 ? 'rgba(39,174,96,.1)' : diff>0 ? 'rgba(52,152,219,.1)' : 'rgba(192,57,43,.1)', border:`1px solid ${diff===0 ? 'rgba(39,174,96,.3)' : diff>0 ? 'rgba(52,152,219,.3)' : 'rgba(192,57,43,.3)'}` }}>
+                          <span style={{ color: diff===0 ? '#27ae60' : diff>0 ? '#3498db' : '#e74c3c', fontWeight:800, fontSize:14 }}>
+                            {diff===0 ? '✓ Kasa tam uyuyor' : diff>0 ? `Kasada ${diff.toFixed(0)} ₺ fazla var` : `Kasada ${Math.abs(diff).toFixed(0)} ₺ eksik var`}
+                          </span>
+                        </div>
+                      )}
+
+                      <button onClick={saveDayClose} style={{ width:'100%', background:'#3498db', border:'none', borderRadius:10, padding:14, color:'#fff', fontSize:14, cursor:'pointer', fontWeight:800 }}>✓ Gün Sonunu Kaydet</button>
+                      <div style={{ color:'#666', fontSize:10, marginTop:10, textAlign:'center' }}>Bu, bugün ödemesi alınıp kapatılmış masaları özetler. Henüz kapatılmamış açık masalar dahil değildir.</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Table drilldown modal - tap a table on the map */}
             {activeTableModal && (() => {
@@ -987,7 +1248,12 @@ export default function AdminPage() {
                         </div>
                       )}
 
-                      <button onClick={() => openAddOrder(activeTableModal)} style={{ width:'100%', background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius:10, padding:'12px', color:'#C9A84C', fontSize:13, cursor:'pointer', fontWeight:700, marginBottom:12 }}>➕ Sipariş Ekle</button>
+                      <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                        <button onClick={() => openAddOrder(activeTableModal)} style={{ flex:1, background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius:10, padding:'12px', color:'#C9A84C', fontSize:13, cursor:'pointer', fontWeight:700 }}>➕ Sipariş Ekle</button>
+                        {activeOrders.length > 0 && (
+                          <button onClick={() => printKitchenTicket(activeTableModal, activeOrders)} style={{ flex:1, background:'rgba(243,156,18,.15)', border:'1px solid rgba(243,156,18,.4)', borderRadius:10, padding:'12px', color:'#f39c12', fontSize:13, cursor:'pointer', fontWeight:700 }}>🍳 Mutfak Fişi</button>
+                        )}
+                      </div>
 
                       {info.tabData && (
                         <div style={{ display:'flex', gap:8 }}>
@@ -1184,6 +1450,7 @@ export default function AdminPage() {
                     <button onClick={() => resetStats(dateFilter)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
                     <button onClick={() => exportOrdersPDF()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>📄 PDF</button>
                     <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700 }}>📊 Aylık Rapor</button>
+                    <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.15)', border:'1px solid rgba(52,152,219,.3)', borderRadius:8, padding:'6px 10px', color:'#3498db', fontSize:11, cursor:'pointer', fontWeight:700 }}>🌙 Gün Sonu</button>
                   </>
                 )}
               </div>
@@ -1439,6 +1706,40 @@ export default function AdminPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {isManager && tab === 'staff' && (
+          <div style={s.section}>
+            <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, marginBottom: 12 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
+              <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, marginBottom: 10 }} />
+              <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="4-6 haneli PIN (örn. 4821)" inputMode="numeric" style={{ ...s.input, marginBottom: 10 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={saveStaff} style={{ flex: 1, background: '#C9A84C', border: 'none', borderRadius: 10, padding: 12, color: '#1A0E06', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{editingStaffId ? '✓ Kaydet' : '+ Ekle'}</button>
+                {editingStaffId && (
+                  <button onClick={resetStaffForm} style={{ background: '#2A2A2A', border: 'none', borderRadius: 10, padding: '12px 16px', color: '#888', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>İptal</button>
+                )}
+              </div>
+            </div>
+
+            {staffList.length === 0 && (
+              <div style={{ textAlign:'center', color:'#888', padding:20 }}>Henüz kayıtlı personel yok. Herkes şimdilik ortak personel kodunu (5678) kullanabilir.</div>
+            )}
+
+            {staffList.map(s => (
+              <div key={s.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: 14, padding: '14px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
+                <div>
+                  <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14 }}>{s.name}</div>
+                  <div style={{ color: '#888', fontSize: 12 }}>PIN: {s.pin} {!s.active && '· Pasif'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => startEditStaff(s)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
+                  <button onClick={() => toggleStaffActive(s)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: s.active ? '#f39c12' : '#27ae60', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{s.active ? 'Pasifleştir' : 'Aktifleştir'}</button>
+                  <button onClick={() => deleteStaff(s.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

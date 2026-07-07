@@ -526,7 +526,8 @@ export default function MenuPage() {
         total: total,
         status: 'pending',
         note: orderNote.trim() || null,
-        tab_id: tabId
+        tab_id: tabId,
+        created_by: 'Müşteri (QR)'
       })
       await sendTelegramNotification(mesa, orderItems, total, orderNote, orderNum)
       setOrderSent(true)
