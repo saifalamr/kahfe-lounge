@@ -392,34 +392,54 @@ export default function AdminPage() {
 
   async function submitStaffOrder() {
     if (!addOrderTable || staffCartCount === 0) return
-    const orderItems = Object.entries(staffCart).map(([id, qty]) => {
-      const item = items.find(i => i.id === id)!
-      return { id: item.id, name: item.name, name_en: item.name_en || item.name, price: item.price, quantity: qty, subtotal: item.price * qty }
-    })
-    const orderTotal = orderItems.reduce((s, i) => s + i.subtotal, 0)
+    try {
+      const orderItems = Object.entries(staffCart)
+        .map(([id, qty]) => {
+          const item = items.find(i => i.id === id)
+          if (!item) return null
+          return { id: item.id, name: item.name, name_en: item.name_en || item.name, price: item.price, quantity: qty, subtotal: item.price * qty }
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
 
-    let tabId = openTabs.find((t: any) => t.table_name === addOrderTable)?.id
-    if (!tabId) {
-      const { data: newTab } = await supabase.from('tabs').insert({ table_name: addOrderTable, status: 'open' }).select('id').single()
-      tabId = newTab?.id
+      if (orderItems.length === 0) {
+        alert('Seçilen ürünler artık mevcut değil. Lütfen tekrar seçin.')
+        return
+      }
+      const orderTotal = orderItems.reduce((s, i) => s + i.subtotal, 0)
+
+      let tabId = openTabs.find((t: any) => t.table_name === addOrderTable)?.id
+      if (!tabId) {
+        const { data: newTab, error: tabError } = await supabase.from('tabs').insert({ table_name: addOrderTable, status: 'open' }).select('id').single()
+        if (tabError || !newTab) {
+          alert('✗ Masa açılamadı.\n\n' + (tabError?.message || 'Bilinmeyen hata'))
+          return
+        }
+        tabId = newTab.id
+      }
+
+      // Staff-entered orders go straight to "accepted" (Hazırlanıyor) —
+      // there's no need for a Kabul step on an order staff just typed in themselves
+      const { error: orderError } = await supabase.from('orders').insert({
+        table_name: addOrderTable,
+        items: orderItems,
+        total: orderTotal,
+        status: 'accepted',
+        note: null,
+        tab_id: tabId,
+        created_by: staffName,
+        handled_by: staffName,
+      })
+      if (orderError) {
+        alert('✗ Sipariş eklenemedi.\n\n' + orderError.message)
+        return
+      }
+
+      await loadTableMapData()
+      setAddOrderTable(null)
+      setStaffCart({})
+    } catch (err: any) {
+      alert('✗ Beklenmeyen bir hata oluştu.\n\n' + (err?.message || String(err)))
     }
-
-    // Staff-entered orders go straight to "accepted" (Hazırlanıyor) —
-    // there's no need for a Kabul step on an order staff just typed in themselves
-    await supabase.from('orders').insert({
-      table_name: addOrderTable,
-      items: orderItems,
-      total: orderTotal,
-      status: 'accepted',
-      note: null,
-      tab_id: tabId,
-      created_by: staffName,
-      handled_by: staffName,
-    })
-
-    await loadTableMapData()
-    setAddOrderTable(null)
-    setStaffCart({})
   }
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
   const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
