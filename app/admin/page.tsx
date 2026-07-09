@@ -30,12 +30,20 @@ export default function AdminPage() {
   const [showNotif, setShowNotif] = useState(false)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Tracks notifications the user has already acknowledged (Gördüm) so the
+  // polling fallback below doesn't resurrect them - acknowledging doesn't
+  // change the order's DB status, only dismissing (Kapat) does
+  const acknowledgedIds = useRef<Set<string>>(new Set())
+
+  async function refreshNotifications() {
+    const { data } = await supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false })
+    if (data) setNotifications(data.filter((o: any) => !acknowledgedIds.current.has(o.id)))
+  }
 
   useEffect(() => {
     if (!auth) return
     // Load pending orders on mount
-    supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setNotifications(data) })
+    refreshNotifications()
 
     // Real-time subscription for new orders
     const channel = supabase
@@ -63,12 +71,17 @@ export default function AdminPage() {
 
     loadTableMapData()
 
-    return () => { supabase.removeChannel(channel) }
+    // Polling fallback in case realtime isn't enabled/working for this
+    // Supabase project - checks every 15s regardless of which tab is open
+    const notifPoll = setInterval(refreshNotifications, 15000)
+
+    return () => { supabase.removeChannel(channel); clearInterval(notifPoll) }
   }, [auth])
 
   async function acceptOrder(id: string) {
     // Just acknowledges the popup notification - the order itself stays
     // 'pending' until it's marked Tamamlandı from the main list/table map
+    acknowledgedIds.current.add(id)
     setNotifications(prev => prev.filter(n => n.id !== id))
   }
 
