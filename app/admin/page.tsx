@@ -1088,6 +1088,11 @@ export default function AdminPage() {
             <div style={{ color: '#F0EDE8', fontSize: 19, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {/* Kitchen Display link */}
+            <a href="/kitchen" target="_blank" rel="noopener noreferrer"
+              style={{ background: '#2A2A2A', border: '1px solid #383838', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
+              🍳
+            </a>
             {/* Notification Bell */}
             <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
               style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : '#2A2A2A', border: newOrderAlert ? '1px solid #C0392B' : '1px solid #383838', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
