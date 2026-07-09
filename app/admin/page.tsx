@@ -291,6 +291,25 @@ export default function AdminPage() {
     return { status, tabData: openTab, orders }
   }
 
+  // Table transfer/merge — moving a tab to an empty table renames it in
+  // place; moving it onto a table that already has an open tab merges the
+  // two into one bill. Done via an atomic RPC (advisory lock) so two
+  // simultaneous transfers can't collide.
+  const [showTransferPicker, setShowTransferPicker] = useState<string | null>(null)
+
+  async function transferOrMergeTab(sourceTableName: string, destTableName: string) {
+    const sourceTab = openTabs.find((t: any) => t.table_name === sourceTableName)
+    if (!sourceTab) return
+    const destInfo = getTableInfo(destTableName)
+    const verb = destInfo.status === 'empty' ? 'taşınacak' : 'ile birleştirilecek'
+    if (!confirm(`${sourceTableName} masasındaki adisyon ${destTableName} masasına ${verb}. Emin misiniz?`)) return
+    const { error } = await supabase.rpc('merge_or_transfer_tab', { p_source_tab_id: sourceTab.id, p_destination_table_name: destTableName })
+    if (error) { alert('✗ İşlem başarısız oldu.\n\n' + error.message); return }
+    setShowTransferPicker(null)
+    setActiveTableModal(null)
+    await loadTableMapData()
+  }
+
   async function updateOrderStatus(id: string, status: string) {
     await supabase.from('orders').update({ status, handled_by: staffName }).eq('id', id)
     setNotifications(prev => prev.filter(n => n.id !== id))
@@ -1568,6 +1587,7 @@ export default function AdminPage() {
                           {!info.tabData.bill_requested && (
                             <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🧾 Hesap İstendi</button>
                           )}
+                          <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#B5B0A8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>
                           {activeOrders.length > 0 && (
                             <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 0, color:'#0A0A0A', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
                           )}
@@ -1596,6 +1616,34 @@ export default function AdminPage() {
                     <div style={{ display:'flex', gap:8 }}>
                       <button onClick={() => setVoidingItem(null)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', color:'#8A8A8A', fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>Vazgeç</button>
                       <button onClick={confirmVoid} style={{ flex:1, height:48, background:'#C0392B', border:'none', color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>İptal Et</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transfer/merge destination picker */}
+            {showTransferPicker && (
+              <div style={{ position:'fixed', inset:0, zIndex:225, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowTransferPicker(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'80vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🔀 {showTransferPicker} — Nereye?</div>
+                    <button onClick={() => setShowTransferPicker(null)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    <div style={{ color:'#8A8A8A', fontSize:12, marginBottom:16 }}>Boş bir masaya taşınır. Dolu bir masa seçilirse, iki adisyon birleştirilir.</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(96px, 1fr))', gap:8 }}>
+                      {ALL_TABLES.filter(t => t !== showTransferPicker).map(t => {
+                        const info = getTableInfo(t)
+                        const isEmpty = info.status === 'empty'
+                        return (
+                          <button key={t} onClick={() => transferOrMergeTab(showTransferPicker, t)}
+                            style={{ background: isEmpty ? '#161616' : '#221E12', border: isEmpty ? '1px solid #2A2A2A' : '1px solid rgba(201,168,76,.5)', borderRadius: 0, padding:'10px 8px', cursor:'pointer', textAlign:'left' }}>
+                            <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:14, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{t}</div>
+                            <div style={{ color: isEmpty ? '#6E6E6E' : '#C9A84C', fontSize:10, fontFamily:"'IBM Plex Mono', monospace", textTransform:'uppercase', marginTop:4 }}>{isEmpty ? 'Boş' : 'Birleştir'}</div>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
