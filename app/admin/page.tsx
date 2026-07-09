@@ -77,10 +77,10 @@ function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: B
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 3, fontWeight: 700, marginBottom: 12 }}>FOTOĞRAF DÜZENLE</div>
-      <div style={{ color: '#888', fontSize: 12, marginBottom: 16 }}>Sürükle · Zoom ile boyutlandır · Kırp</div>
+      <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 16 }}>Sürükle · Zoom ile boyutlandır · Kırp</div>
 
       {/* Canvas crop area */}
-      <div ref={containerRef} style={{ position: 'relative', border: '2px solid #C9A84C', borderRadius: 12, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}>
+      <div ref={containerRef} style={{ position: 'relative', border: '2px solid #C9A84C', borderRadius: 0, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}>
         <canvas
           ref={canvasRef}
           width={CROP_W}
@@ -100,18 +100,18 @@ function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: B
 
       {/* Zoom slider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, width: '100%', maxWidth: CROP_W }}>
-        <span style={{ color: '#888', fontSize: 12 }}>🔍</span>
+        <span style={{ color: '#8A8A8A', fontSize: 12 }}>🔍</span>
         <input type="range" min={0.1} max={3} step={0.01} value={zoom}
           onChange={e => setZoom(parseFloat(e.target.value))}
           style={{ flex: 1, accentColor: '#C9A84C' }} />
         <span style={{ color: '#C9A84C', fontSize: 12, minWidth: 36 }}>{Math.round(zoom * 100)}%</span>
-        <button onClick={resetPos} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Sıfırla</button>
+        <button onClick={resetPos} style={{ background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Sıfırla</button>
       </div>
 
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 12, marginTop: 16, width: '100%', maxWidth: CROP_W }}>
-        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 12, padding: 14, color: '#888', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>İptal</button>
-        <button onClick={handleCrop} style={{ flex: 2, background: '#C9A84C', border: 'none', borderRadius: 12, padding: 14, color: '#1A0E06', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>✓ Fotoğrafı Kaydet</button>
+        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 0, padding: 14, color: '#8A8A8A', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>İptal</button>
+        <button onClick={handleCrop} style={{ flex: 2, background: '#C9A84C', border: 'none', borderRadius: 0, padding: 14, color: '#1A0E06', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>✓ Fotoğrafı Kaydet</button>
       </div>
     </div>
   )
@@ -119,6 +119,17 @@ function ImageCropper({ src, onCrop, onCancel }: { src: string; onCrop: (blob: B
 
 /* ── Main Admin Page ── */
 export default function AdminPage() {
+  // Load the redesign's font system client-side (scoped to this page only —
+  // the customer-facing menu keeps its own font/theme untouched)
+  useEffect(() => {
+    if (document.getElementById('kahfe-admin-fonts')) return
+    const link = document.createElement('link')
+    link.id = 'kahfe-admin-fonts'
+    link.rel = 'stylesheet'
+    link.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap'
+    document.head.appendChild(link)
+  }, [])
+
   const [auth, setAuth] = useState(false)
   const [role, setRole] = useState<'manager' | 'staff' | null>(null)
   const isManager = role === 'manager'
@@ -572,10 +583,10 @@ export default function AdminPage() {
           .stats { display:flex; gap:16px; margin-bottom: 24px; }
           .stat { flex:1; border:1px solid #ddd; border-radius:10px; padding:14px; text-align:center; }
           .stat .num { font-size: 22px; font-weight:800; }
-          .stat .label { font-size: 11px; color:#888; margin-top:4px; }
+          .stat .label { font-size: 11px; color:#8A8A8A; margin-top:4px; }
           table { width:100%; border-collapse:collapse; margin-top:10px; }
           th, td { padding:7px 8px; border-bottom:1px solid #eee; font-size:11px; text-align:left; }
-          th { color:#888; text-transform:uppercase; font-size:10px; }
+          th { color:#8A8A8A; text-transform:uppercase; font-size:10px; }
           @media print { .no-print { display:none; } }
         </style>
       </head>
@@ -587,7 +598,7 @@ export default function AdminPage() {
           <div class="stat"><div class="num">${pending}</div><div class="label">Bekliyor</div></div>
           <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Ciro (Tahsil Edilen)</div></div>
         </div>
-        <div style="font-size:10px; color:#888; margin-bottom:10px;">Not: Ciro yalnızca ödemesi alınıp kapatılmış masaları sayar. Aşağıdaki liste, henüz ödenmemiş olanlar dahil bu aralıktaki tüm siparişleri gösterir.</div>
+        <div style="font-size:10px; color:#8A8A8A; margin-bottom:10px;">Not: Ciro yalnızca ödemesi alınıp kapatılmış masaları sayar. Aşağıdaki liste, henüz ödenmemiş olanlar dahil bu aralıktaki tüm siparişleri gösterir.</div>
         <table>
           <tr><th>#</th><th>Masa</th><th>Saat</th><th>Ürünler</th><th>Durum</th><th style="text-align:right">Toplam</th></tr>
           ${rows || '<tr><td colspan="6">Bu aralıkta sipariş yok</td></tr>'}
@@ -624,11 +635,11 @@ export default function AdminPage() {
           .stats { display:flex; gap:16px; margin-bottom: 24px; }
           .stat { flex:1; border:1px solid #ddd; border-radius:10px; padding:14px; text-align:center; }
           .stat .num { font-size: 24px; font-weight:800; }
-          .stat .label { font-size: 11px; color:#888; margin-top:4px; }
+          .stat .label { font-size: 11px; color:#8A8A8A; margin-top:4px; }
           h2 { font-size:14px; margin-top:28px; border-bottom:2px solid #C9A84C; padding-bottom:8px; }
           table { width:100%; border-collapse:collapse; margin-top:10px; }
           th, td { padding:7px 8px; border-bottom:1px solid #eee; font-size:12px; text-align:left; }
-          th { color:#888; text-transform:uppercase; font-size:10px; }
+          th { color:#8A8A8A; text-transform:uppercase; font-size:10px; }
           @media print { .no-print { display:none; } }
         </style>
       </head>
@@ -736,11 +747,11 @@ export default function AdminPage() {
           .stats { display:flex; gap:16px; margin-bottom: 24px; flex-wrap:wrap; }
           .stat { flex:1; min-width:110px; border:1px solid #ddd; border-radius:10px; padding:14px; text-align:center; }
           .stat .num { font-size: 20px; font-weight:800; }
-          .stat .label { font-size: 11px; color:#888; margin-top:4px; }
+          .stat .label { font-size: 11px; color:#8A8A8A; margin-top:4px; }
           h2 { font-size:14px; margin-top:28px; border-bottom:2px solid #C9A84C; padding-bottom:8px; }
           table { width:100%; border-collapse:collapse; margin-top:10px; }
           th, td { padding:7px 8px; border-bottom:1px solid #eee; font-size:11px; text-align:left; }
-          th { color:#888; text-transform:uppercase; font-size:10px; }
+          th { color:#8A8A8A; text-transform:uppercase; font-size:10px; }
         </style>
       </head>
       <body>
@@ -1018,30 +1029,30 @@ export default function AdminPage() {
   }
 
   const s = {
-    page: { background: '#0D0D0D', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 } as React.CSSProperties,
+    page: { background: '#0A0A0A', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 } as React.CSSProperties,
     header: { background: '#1A1A1A', padding: '16px 20px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } as React.CSSProperties,
-    input: { width: '100%', background: '#2A2A2A', border: '1px solid #3A3A3A', borderRadius: 10, padding: '12px 14px', color: '#F0EDE8', fontSize: 14, outline: 'none' } as React.CSSProperties,
-    label: { color: '#888', fontSize: 12, fontWeight: 600, marginBottom: 6, display: 'block', letterSpacing: 1 } as React.CSSProperties,
-    btn: { background: '#C0392B', border: 'none', borderRadius: 10, padding: '12px 20px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' } as React.CSSProperties,
-    btnSecondary: { background: '#2A2A2A', border: 'none', borderRadius: 10, padding: '10px 16px', color: '#888', fontWeight: 600, fontSize: 13, cursor: 'pointer' } as React.CSSProperties,
-    card: { background: '#1A1A1A', borderRadius: 14, padding: '14px 16px', border: '1px solid #2A2A2A', marginBottom: 10 } as React.CSSProperties,
+    input: { width: '100%', background: '#2A2A2A', border: '1px solid #383838', borderRadius: 0, padding: '12px 14px', color: '#F0EDE8', fontSize: 14, outline: 'none' } as React.CSSProperties,
+    label: { color: '#8A8A8A', fontSize: 12, fontWeight: 600, marginBottom: 6, display: 'block', letterSpacing: 1 } as React.CSSProperties,
+    btn: { background: '#C0392B', border: 'none', borderRadius: 0, padding: '12px 20px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' } as React.CSSProperties,
+    btnSecondary: { background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '10px 16px', color: '#8A8A8A', fontWeight: 600, fontSize: 13, cursor: 'pointer' } as React.CSSProperties,
+    card: { background: '#1A1A1A', borderRadius: 0, padding: '14px 16px', border: '1px solid #2A2A2A', marginBottom: 10 } as React.CSSProperties,
     section: { padding: '16px 20px' } as React.CSSProperties,
   }
 
   if (!auth) return (
-    <div style={{ background: '#0D0D0D', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#1A1A1A', borderRadius: 20, padding: 32, width: '100%', maxWidth: 360, border: '1px solid #2A2A2A' }}>
+    <div style={{ background: '#0A0A0A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 32, width: '100%', maxWidth: 360, border: '1px solid #2A2A2A' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 4, fontWeight: 600 }}>YÖNETİM PANELİ</div>
-          <div style={{ color: '#F0EDE8', fontSize: 22, fontWeight: 800 }}>KAHFE LOUNGE</div>
+          <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 4, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM PANELİ</div>
+          <div style={{ color: '#F0EDE8', fontSize: 24, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
         </div>
         <label style={s.label}>ŞİFRE</label>
         <input type="password" value={pw} onChange={e => { setPw(e.target.value); setPwError(false) }}
           onKeyDown={e => e.key === 'Enter' && login()}
-          style={{ ...s.input, borderColor: pwError ? '#C0392B' : '#3A3A3A', marginBottom: 8 }}
+          style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.2em', borderColor: pwError ? '#C0392B' : '#383838', boxShadow: pwError ? 'none' : 'none', marginBottom: 8 }}
           placeholder="Şifrenizi girin" />
         {pwError && <div style={{ color: '#C0392B', fontSize: 12, marginBottom: 12 }}>Hatalı şifre</div>}
-        <button onClick={login} style={{ ...s.btn, marginTop: 8 }}>Giriş Yap</button>
+        <button onClick={login} style={{ ...s.btn, height: 56, fontSize: 16, marginTop: 8 }}>Giriş Yap</button>
       </div>
     </div>
   )
@@ -1056,59 +1067,59 @@ export default function AdminPage() {
           0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)}
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0D0D0D; color: #F0EDE8; font-family: 'Inter', sans-serif; }
+        body { background: #0A0A0A; color: #F0EDE8; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
       `}</style>
-      <div style={{ background: '#0D0D0D', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 }}>
+      <div style={{ background: '#0A0A0A', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 }}>
         <div style={s.header}>
           <div>
-            <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3 }}>YÖNETİM</div>
-            <div style={{ color: '#F0EDE8', fontSize: 18, fontWeight: 800 }}>KAHFE LOUNGE</div>
+            <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>
+            <div style={{ color: '#F0EDE8', fontSize: 19, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {/* Notification Bell */}
             <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
-              style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : '#2A2A2A', border: newOrderAlert ? '1px solid #C0392B' : '1px solid #3A3A3A', borderRadius: 10, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
+              style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : '#2A2A2A', border: newOrderAlert ? '1px solid #C0392B' : '1px solid #383838', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
               🔔
               {notifications.length > 0 && (
                 <span style={{ position: 'absolute', top: -4, right: -4, background: '#C0392B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notifications.length}</span>
               )}
             </button>
-            <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_admin'); localStorage.removeItem('kahfe_staff_name'); setAuth(false); setRole(null); setStaffName('') }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+            <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_admin'); localStorage.removeItem('kahfe_staff_name'); setAuth(false); setRole(null); setStaffName('') }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 0, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
           </div>
         </div>
 
         {/* Notification Panel */}
         {showNotif && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} onClick={() => setShowNotif(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, maxWidth: 480, margin: '0 auto', background: '#1A1A1A', borderRadius: '0 0 20px 20px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
+            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, maxWidth: 480, margin: '0 auto', background: '#1A1A1A', borderRadius: 0, maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
               <div style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>🔔 YENİ SİPARİŞLER ({notifications.length})</span>
-                <button onClick={() => setShowNotif(false)} style={{ background: 'none', border: 'none', color: '#888', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                <button onClick={() => setShowNotif(false)} style={{ background: 'none', border: 'none', color: '#8A8A8A', fontSize: 18, cursor: 'pointer' }}>✕</button>
               </div>
               {notifications.length === 0 ? (
-                <div style={{ padding: 32, textAlign: 'center', color: '#888' }}>Bekleyen sipariş yok</div>
+                <div style={{ padding: 32, textAlign: 'center', color: '#8A8A8A' }}>Bekleyen sipariş yok</div>
               ) : notifications.map((order: any) => (
-                <div key={order.id} style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A' }}>
+                <div key={order.id} style={{ padding: '16px 18px', borderBottom: '1px solid #2A2A2A' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <div>
-                      <span style={{ background: '#C0392B', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 800, marginRight: 8 }}>YENİ</span>
-                      <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 16 }}>🪑 {order.table_name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ background: '#C0392B', color: '#fff', borderRadius: 0, padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.05em' }}>YENİ</span>
+                      <span style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>🪑 {order.table_name}</span>
                     </div>
-                    <span style={{ color: '#888', fontSize: 11 }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                   <div style={{ marginBottom: 10 }}>
                     {order.items.map((item: any, i: number) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#F0EDE8', padding: '3px 0', borderBottom: '1px solid rgba(240,237,232,.05)' }}>
-                        <span>{item.quantity}x {item.name}</span>
-                        <span style={{ color: '#C9A84C' }}>{item.subtotal} ₺</span>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#F0EDE8', padding: '3px 0', borderBottom: '1px solid rgba(240,237,232,.05)' }}>
+                        <span><span style={{ color: '#C9A84C', fontFamily: "'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
+                        <span style={{ color: '#B5B0A8', fontFamily: "'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
                       </div>
                     ))}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(201,168,76,.2)' }}>
-                    <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>TOPLAM: {order.total} ₺</span>
+                    <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 17, fontFamily: "'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => dismissOrder(order.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Kapat</button>
-                      <button onClick={() => acceptOrder(order.id)} style={{ background: '#27ae60', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>✓ Gördüm</button>
+                      <button onClick={() => dismissOrder(order.id)} style={{ background: 'transparent', border: '1px solid #383838', borderRadius: 0, height: 40, padding: '0 14px', color: '#8A8A8A', fontSize: 13, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Kapat</button>
+                      <button onClick={() => acceptOrder(order.id)} style={{ background: '#27ae60', border: 'none', borderRadius: 0, height: 40, padding: '0 16px', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>✓ Gördüm</button>
                     </div>
                   </div>
                 </div>
@@ -1122,7 +1133,7 @@ export default function AdminPage() {
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A' }}>
           {(isManager ? (['orders', 'categories', 'items', 'staff'] as const) : (['orders'] as const)).map(t => (
             <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter) }}
-              style={{ flex: 1, padding: '12px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C0392B' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer', position: 'relative' }}>
+              style={{ flex: 1, padding: '16px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#8A8A8A', fontWeight: tab === t ? 600 : 500, fontSize: 14, cursor: 'pointer', position: 'relative' }}>
               {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
                 <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
@@ -1139,33 +1150,33 @@ export default function AdminPage() {
             {/* Monthly report modal - managers only */}
             {isManager && showMonthlyReport && (
               <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowMonthlyReport(null)}>
-                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                     <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>📊 {showMonthlyReport.month} {showMonthlyReport.year} Raporu</div>
                     <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => exportMonthlyReportPDF(showMonthlyReport)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
-                      <button onClick={() => setShowMonthlyReport(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                      <button onClick={() => exportMonthlyReportPDF(showMonthlyReport)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 0, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
+                      <button onClick={() => setShowMonthlyReport(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
                     </div>
                   </div>
                   <div style={{ padding:'16px 20px' }}>
                     <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-                      <div style={{ flex:1, background:'#1A1A1A', borderRadius:12, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
+                      <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
                         <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{showMonthlyReport.totalOrders}</div>
-                        <div style={{ color:'#888', fontSize:11 }}>Sipariş</div>
+                        <div style={{ color:'#8A8A8A', fontSize:11 }}>Sipariş</div>
                       </div>
-                      <div style={{ flex:1, background:'#1A1A1A', borderRadius:12, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
+                      <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
                         <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{Number(showMonthlyReport.totalRevenue).toFixed(0)} ₺</div>
-                        <div style={{ color:'#888', fontSize:11 }}>Ciro</div>
+                        <div style={{ color:'#8A8A8A', fontSize:11 }}>Ciro</div>
                       </div>
                     </div>
-                    <div style={{ color:'#888', fontSize:11, letterSpacing:1, marginBottom:10 }}>EN ÇOK SATILAN ÜRÜNLER</div>
+                    <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:1, marginBottom:10 }}>EN ÇOK SATILAN ÜRÜNLER</div>
                     {showMonthlyReport.topItems?.slice(0,5).map((item:any, i:number) => (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2A2A2A', fontSize:13 }}>
                         <span style={{ color:'#F0EDE8' }}>#{i+1} {item.name}</span>
                         <span style={{ color:'#C9A84C' }}>{item.count} adet · {item.revenue} ₺</span>
                       </div>
                     ))}
-                    <div style={{ color:'#888', fontSize:11, letterSpacing:1, margin:'16px 0 10px' }}>EN YÜKSEK CİROLU MASALAR</div>
+                    <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:1, margin:'16px 0 10px' }}>EN YÜKSEK CİROLU MASALAR</div>
                     {showMonthlyReport.topTables?.slice(0,5).map((t:any, i:number) => (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2A2A2A', fontSize:13 }}>
                         <span style={{ color:'#F0EDE8' }}>#{i+1} {t.name}</span>
@@ -1183,47 +1194,47 @@ export default function AdminPage() {
               const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
               return (
                 <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowDayClose(false)}>
-                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', borderBottom:'none' }}>
+                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', borderBottom:'none' }}>
                     <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                       <div style={{ color:'#3498db', fontWeight:800, fontSize:16 }}>🌙 Gün Sonu</div>
                       <div style={{ display:'flex', gap:8 }}>
-                        <button onClick={printDayClosePDF} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
-                        <button onClick={() => setShowDayClose(false)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                        <button onClick={printDayClosePDF} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 0, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
+                        <button onClick={() => setShowDayClose(false)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
                       </div>
                     </div>
                     <div style={{ padding:'20px' }}>
                       <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#888', fontSize:11 }}>KAPANAN MASA</div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#8A8A8A', fontSize:11 }}>KAPANAN MASA</div>
                           <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:20 }}>{dayCloseData.tabCount}</div>
                         </div>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#888', fontSize:11 }}>TOPLAM CİRO</div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM CİRO</div>
                           <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{dayCloseData.totalRevenue.toFixed(0)} ₺</div>
                         </div>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#888', fontSize:11 }}>💵 NAKİT</div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#8A8A8A', fontSize:11 }}>💵 NAKİT</div>
                           <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cashTotal.toFixed(0)} ₺</div>
                         </div>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:12, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#888', fontSize:11 }}>💳 KART</div>
+                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
+                          <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
                           <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cardTotal.toFixed(0)} ₺</div>
                         </div>
                       </div>
 
-                      <label style={{ color:'#888', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺)</label>
+                      <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺)</label>
                       <input type="number" value={countedCash} onChange={e => setCountedCash(e.target.value)} placeholder="Örn. 3450"
-                        style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:10, padding:'12px', color:'#F0EDE8', fontSize:16, marginBottom:10 }} />
+                        style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:'12px', color:'#F0EDE8', fontSize:16, marginBottom:10 }} />
 
                       {diff !== null && (
-                        <div style={{ textAlign:'center', padding:'10px', marginBottom:16, borderRadius:10, background: diff===0 ? 'rgba(39,174,96,.1)' : diff>0 ? 'rgba(52,152,219,.1)' : 'rgba(192,57,43,.1)', border:`1px solid ${diff===0 ? 'rgba(39,174,96,.3)' : diff>0 ? 'rgba(52,152,219,.3)' : 'rgba(192,57,43,.3)'}` }}>
+                        <div style={{ textAlign:'center', padding:'10px', marginBottom:16, borderRadius: 0, background: diff===0 ? 'rgba(39,174,96,.1)' : diff>0 ? 'rgba(52,152,219,.1)' : 'rgba(192,57,43,.1)', border:`1px solid ${diff===0 ? 'rgba(39,174,96,.3)' : diff>0 ? 'rgba(52,152,219,.3)' : 'rgba(192,57,43,.3)'}` }}>
                           <span style={{ color: diff===0 ? '#27ae60' : diff>0 ? '#3498db' : '#e74c3c', fontWeight:800, fontSize:14 }}>
                             {diff===0 ? '✓ Kasa tam uyuyor' : diff>0 ? `Kasada ${diff.toFixed(0)} ₺ fazla var` : `Kasada ${Math.abs(diff).toFixed(0)} ₺ eksik var`}
                           </span>
                         </div>
                       )}
 
-                      <button onClick={saveDayClose} style={{ width:'100%', background:'#3498db', border:'none', borderRadius:10, padding:14, color:'#fff', fontSize:14, cursor:'pointer', fontWeight:800 }}>✓ Gün Sonunu Kaydet</button>
+                      <button onClick={saveDayClose} style={{ width:'100%', background:'#3498db', border:'none', borderRadius: 0, padding:14, color:'#fff', fontSize:14, cursor:'pointer', fontWeight:800 }}>✓ Gün Sonunu Kaydet</button>
                       <div style={{ color:'#666', fontSize:10, marginTop:10, textAlign:'center' }}>Bu, bugün ödemesi alınıp kapatılmış masaları özetler. Henüz kapatılmamış açık masalar dahil değildir.</div>
                     </div>
                   </div>
@@ -1238,38 +1249,36 @@ export default function AdminPage() {
               const tabTotal = activeOrders.reduce((s:number,o:any)=>s+Number(o.total),0)
               return (
                 <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setActiveTableModal(null)}>
-                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                    <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                      <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>🪑 {activeTableModal}</div>
-                      <button onClick={() => setActiveTableModal(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                    <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                      <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:20, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🪑 {activeTableModal}</div>
+                      <button onClick={() => setActiveTableModal(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
                     </div>
                     <div style={{ padding:'16px 20px' }}>
                       {activeOrders.length === 0 && (
-                        <div style={{ textAlign:'center', color:'#888', padding:'30px 0' }}>Bu masa şu an boş.</div>
+                        <div style={{ textAlign:'center', color:'#8A8A8A', padding:'30px 0' }}>Bu masa şu an boş.</div>
                       )}
                       {activeOrders.map((order:any) => {
                         const statusColor = order.status==='pending'?'#C0392B':'#27ae60'
                         const statusLabel = order.status==='pending'?'Bekliyor':'Tamamlandı'
                         return (
-                          <div key={order.id} style={{ background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+                          <div key={order.id} style={{ background:'#1A1A1A', border:'1px solid #2A2A2A', borderLeft:`3px solid ${statusColor}`, borderRadius: 0, padding:'14px 16px', marginBottom:10 }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                              <span style={{ background:statusColor, color:'#fff', borderRadius:6, padding:'3px 8px', fontSize:10, fontWeight:800 }}>{statusLabel}</span>
-                              <span style={{ color:'#888', fontSize:11 }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                              <span style={{ background:statusColor, color:'#fff', borderRadius: 0, padding:'4px 10px', fontSize:10, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
+                              <span style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
                             </div>
                             {order.items?.map((item:any, i:number) => (
-                              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'rgba(240,237,232,.7)', padding:'3px 0' }}>
-                                <span>{item.quantity}x {item.name}</span>
-                                <span style={{ color:'#C9A84C' }}>{item.subtotal} ₺</span>
+                              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:14, color:'rgba(240,237,232,.85)', padding:'3px 0' }}>
+                                <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
+                                <span style={{ color:'#B5B0A8', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
                               </div>
                             ))}
                             {order.note && (
-                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius:8, fontSize:12, color:'rgba(240,237,232,.7)' }}>📝 {order.note}</div>
+                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'rgba(240,237,232,.7)' }}>📝 {order.note}</div>
                             )}
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
-                              <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>{order.total} ₺</span>
-                              <div style={{ display:'flex', gap:6 }}>
-                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Tamamlandı</button>}
-                              </div>
+                              <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
+                              {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} style={{ background:'#27ae60', border:'none', borderRadius: 0, height:40, padding:'0 16px', color:'#fff', fontSize:13, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Tamamlandı</button>}
                             </div>
                           </div>
                         )
@@ -1277,25 +1286,25 @@ export default function AdminPage() {
 
                       {activeOrders.length > 0 && (
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 2px', marginTop:6, marginBottom:16 }}>
-                          <span style={{ color:'#888', fontSize:12, fontWeight:700 }}>MASA TOPLAMI</span>
-                          <span style={{ color:'#C9A84C', fontWeight:800, fontSize:18 }}>{tabTotal.toFixed(0)} ₺</span>
+                          <span style={{ color:'#8A8A8A', fontSize:11, fontWeight:600, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase' }}>Masa Toplamı</span>
+                          <span style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {tabTotal.toFixed(0)}</span>
                         </div>
                       )}
 
                       <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                        <button onClick={() => openAddOrder(activeTableModal)} style={{ flex:1, background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius:10, padding:'12px', color:'#C9A84C', fontSize:13, cursor:'pointer', fontWeight:700 }}>➕ Sipariş Ekle</button>
+                        <button onClick={() => openAddOrder(activeTableModal)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#F0EDE8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>➕ Sipariş Ekle</button>
                         {activeOrders.length > 0 && (
-                          <button onClick={() => printKitchenTicket(activeTableModal, activeOrders)} style={{ flex:1, background:'rgba(243,156,18,.15)', border:'1px solid rgba(243,156,18,.4)', borderRadius:10, padding:'12px', color:'#f39c12', fontSize:13, cursor:'pointer', fontWeight:700 }}>🍳 Mutfak Fişi</button>
+                          <button onClick={() => printKitchenTicket(activeTableModal, activeOrders)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
                         )}
                       </div>
 
                       {info.tabData && (
                         <div style={{ display:'flex', gap:8 }}>
                           {!info.tabData.bill_requested && (
-                            <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, background:'rgba(52,152,219,.15)', border:'1px solid rgba(52,152,219,.4)', borderRadius:10, padding:'10px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:700 }}>🧾 Hesap İstendi</button>
+                            <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🧾 Hesap İstendi</button>
                           )}
                           {activeOrders.length > 0 && (
-                            <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, background:'rgba(39,174,96,.15)', border:'1px solid rgba(39,174,96,.4)', borderRadius:10, padding:'10px', color:'#27ae60', fontSize:12, cursor:'pointer', fontWeight:700 }}>💳 Ödeme Al</button>
+                            <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 0, color:'#0A0A0A', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
                           )}
                         </div>
                       )}
@@ -1310,15 +1319,15 @@ export default function AdminPage() {
               <div style={{ position:'fixed', inset:0, zIndex:210, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', flexDirection:'column' }}>
                 <div style={{ padding:'16px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>➕ {addOrderTable} — Sipariş Ekle</div>
-                  <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                  <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
                 </div>
 
                 <div style={{ display:'flex', gap:6, padding:'12px 16px', overflowX:'auto', borderBottom:'1px solid #2A2A2A' }}>
                   <button onClick={() => setStaffCategoryFilter(null)}
-                    style={{ flexShrink:0, background: staffCategoryFilter===null ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: staffCategoryFilter===null ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:20, padding:'7px 14px', color: staffCategoryFilter===null ? '#C9A84C' : '#888', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
+                    style={{ flexShrink:0, background: staffCategoryFilter===null ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: staffCategoryFilter===null ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius: 0, padding:'7px 14px', color: staffCategoryFilter===null ? '#C9A84C' : '#8A8A8A', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
                   {categories.map(cat => (
                     <button key={cat.id} onClick={() => setStaffCategoryFilter(cat.id)}
-                      style={{ flexShrink:0, background: staffCategoryFilter===cat.id ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: staffCategoryFilter===cat.id ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:20, padding:'7px 14px', color: staffCategoryFilter===cat.id ? '#C9A84C' : '#888', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{cat.icon} {cat.name}</button>
+                      style={{ flexShrink:0, background: staffCategoryFilter===cat.id ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: staffCategoryFilter===cat.id ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius: 0, padding:'7px 14px', color: staffCategoryFilter===cat.id ? '#C9A84C' : '#8A8A8A', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{cat.icon} {cat.name}</button>
                   ))}
                 </div>
 
@@ -1327,18 +1336,18 @@ export default function AdminPage() {
                     {items.filter(it => it.available && (staffCategoryFilter === null || it.category_id === staffCategoryFilter)).map(item => {
                       const qty = staffCart[item.id] || 0
                       return (
-                        <div key={item.id} style={{ background:'#1A1A1A', border: qty>0 ? '1.5px solid rgba(201,168,76,.5)' : '1px solid #2A2A2A', borderRadius:12, padding:'12px 10px', display:'flex', flexDirection:'column', gap:8 }}>
+                        <div key={item.id} style={{ background:'#1A1A1A', border: qty>0 ? '1.5px solid rgba(201,168,76,.5)' : '1px solid #2A2A2A', borderRadius: 0, padding:'12px 10px', display:'flex', flexDirection:'column', gap:8 }}>
                           <div>
                             <div style={{ color:'#F0EDE8', fontSize:13, fontWeight:700, marginBottom:2 }}>{item.name}</div>
                             <div style={{ color:'#C9A84C', fontSize:12, fontWeight:700 }}>{item.price} ₺</div>
                           </div>
                           {qty === 0 ? (
-                            <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius:8, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
+                            <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
                           ) : (
-                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0f0f0f', borderRadius:8, padding:'4px 8px' }}>
-                              <button onClick={() => adjustStaffCart(item.id, -1)} style={{ background:'#2A2A2A', border:'none', borderRadius:6, width:28, height:28, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:800 }}>−</button>
+                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0f0f0f', borderRadius: 0, padding:'4px 8px' }}>
+                              <button onClick={() => adjustStaffCart(item.id, -1)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:28, height:28, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:800 }}>−</button>
                               <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>{qty}</span>
-                              <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'#C9A84C', border:'none', borderRadius:6, width:28, height:28, color:'#141414', fontSize:16, cursor:'pointer', fontWeight:800 }}>+</button>
+                              <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'#C9A84C', border:'none', borderRadius: 0, width:28, height:28, color:'#141414', fontSize:16, cursor:'pointer', fontWeight:800 }}>+</button>
                             </div>
                           )}
                         </div>
@@ -1349,11 +1358,11 @@ export default function AdminPage() {
 
                 <div style={{ padding:'14px 16px', borderTop:'1px solid #2A2A2A', display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ flex:1 }}>
-                    <div style={{ color:'#888', fontSize:11 }}>{staffCartCount} ürün</div>
-                    <div style={{ color:'#C9A84C', fontWeight:800, fontSize:18 }}>{staffCartTotal.toFixed(0)} ₺</div>
+                    <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{staffCartCount} ürün</div>
+                    <div style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {staffCartTotal.toFixed(0)}</div>
                   </div>
                   <button onClick={submitStaffOrder} disabled={staffCartCount===0}
-                    style={{ background: staffCartCount===0 ? '#2A2A2A' : '#27ae60', border:'none', borderRadius:12, padding:'14px 24px', color: staffCartCount===0 ? '#666' : '#fff', fontSize:14, fontWeight:800, cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>Siparişi Gönder</button>
+                    style={{ background: staffCartCount===0 ? '#2A2A2A' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: staffCartCount===0 ? '#666' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>Siparişi Gönder</button>
                 </div>
               </div>
             )}
@@ -1361,22 +1370,23 @@ export default function AdminPage() {
             {/* Payment modal - choose method, optionally split, close the tab */}
             {paymentTab && (
               <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setPaymentTab(null)}>
-                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:'20px 20px 0 0', border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
+                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div style={{ color:'#27ae60', fontWeight:800, fontSize:16 }}>💳 {paymentTab.table_name} — Ödeme Al</div>
-                    <button onClick={() => setPaymentTab(null)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, width:30, height:30, color:'#888', cursor:'pointer', fontSize:16 }}>✕</button>
+                    <div style={{ color:'#27ae60', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>💳 {paymentTab.table_name} — Ödeme Al</div>
+                    <button onClick={() => setPaymentTab(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
                   </div>
                   <div style={{ padding:'20px' }}>
                     <div style={{ textAlign:'center', marginBottom:20 }}>
-                      <div style={{ color:'#888', fontSize:11 }}>ÖDENECEK TUTAR</div>
-                      <div style={{ color:'#C9A84C', fontWeight:800, fontSize:32 }}>{paymentTab.total.toFixed(0)} ₺</div>
+                      <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>ÖDENECEK TUTAR</div>
+                      <div style={{ color:'#C9A84C', fontWeight:700, fontSize:36, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {paymentTab.total.toFixed(0)}</div>
                     </div>
 
                     <div style={{ display:'flex', gap:8, marginBottom:16 }}>
                       {(['cash','card','mixed'] as const).map(m => (
                         <button key={m} onClick={() => setPaymentMethod(m)}
-                          style={{ flex:1, background: paymentMethod===m ? 'rgba(39,174,96,.15)' : '#1A1A1A', border: paymentMethod===m ? '1px solid rgba(39,174,96,.5)' : '1px solid #2A2A2A', borderRadius:10, padding:'12px 4px', color: paymentMethod===m ? '#27ae60' : '#888', fontWeight:700, fontSize:12, cursor:'pointer' }}>
-                          {m==='cash' ? '💵 Nakit' : m==='card' ? '💳 Kart' : '🔀 Karma'}
+                          style={{ flex:1, height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid #2A2A2A', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : '#B5B0A8', fontWeight:600, fontSize:14, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
+                          <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : '🔀'}</span>
+                          {m==='cash' ? 'Nakit' : m==='card' ? 'Kart' : 'Böl'}
                         </button>
                       ))}
                     </div>
@@ -1384,23 +1394,23 @@ export default function AdminPage() {
                     {paymentMethod === 'mixed' && (
                       <div style={{ display:'flex', gap:10, marginBottom:16 }}>
                         <div style={{ flex:1 }}>
-                          <label style={{ color:'#888', fontSize:11, display:'block', marginBottom:6 }}>NAKİT (₺)</label>
+                          <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>NAKİT (₺)</label>
                           <input type="number" value={splitCash} onChange={e => setSplitCash(e.target.value)}
-                            style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:10, padding:'10px', color:'#F0EDE8', fontSize:15 }} />
+                            style={{ width:'100%', height:52, background:'#0A0A0A', border:'1px solid #383838', borderRadius: 0, padding:'0 14px', color:'#F0EDE8', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
                         </div>
                         <div style={{ flex:1 }}>
-                          <label style={{ color:'#888', fontSize:11, display:'block', marginBottom:6 }}>KART (₺)</label>
+                          <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>KART (₺)</label>
                           <input type="number" value={splitCard} onChange={e => setSplitCard(e.target.value)}
-                            style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:10, padding:'10px', color:'#F0EDE8', fontSize:15 }} />
+                            style={{ width:'100%', height:52, background:'#0A0A0A', border:'1px solid #383838', borderRadius: 0, padding:'0 14px', color:'#F0EDE8', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
                         </div>
                       </div>
                     )}
 
                     <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: paymentTab.total, cash: paymentMethod==='cash'?paymentTab.total:(parseFloat(splitCash)||0), card: paymentMethod==='card'?paymentTab.total:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders })}
-                      style={{ width:'100%', background:'#2A2A2A', border:'none', borderRadius:10, padding:'12px', color:'#C9A84C', fontSize:13, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
+                      style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
 
                     <button onClick={confirmPayment}
-                      style={{ width:'100%', background:'#27ae60', border:'none', borderRadius:10, padding:'14px', color:'#fff', fontSize:14, cursor:'pointer', fontWeight:800 }}>✓ Ödemeyi Onayla ve Masayı Kapat</button>
+                      style={{ width:'100%', height:56, background:'#27ae60', border:'none', borderRadius: 0, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Ödemeyi Onayla ve Masayı Kapat</button>
                   </div>
                 </div>
               </div>
@@ -1409,15 +1419,15 @@ export default function AdminPage() {
             {/* View toggle - table map vs flat list, both roles see this */}
             <div style={{ display:'flex', gap:6, marginBottom:14 }}>
               <button onClick={() => setViewMode('map')}
-                style={{ flex:1, background: viewMode==='map' ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: viewMode==='map' ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'9px 4px', color: viewMode==='map' ? '#C9A84C' : '#888', fontWeight:700, fontSize:12, cursor:'pointer' }}>🗺️ Masa Haritası</button>
+                style={{ flex:1, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: viewMode==='map' ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
               <button onClick={() => setViewMode('list')}
-                style={{ flex:1, background: viewMode==='list' ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: viewMode==='list' ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'9px 4px', color: viewMode==='list' ? '#C9A84C' : '#888', fontWeight:700, fontSize:12, cursor:'pointer' }}>📋 Liste</button>
+                style={{ flex:1, height:48, background: viewMode==='list' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='list' ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: viewMode==='list' ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📋 Liste</button>
             </div>
 
             {viewMode === 'map' && (
               <div style={{ marginBottom: 20 }}>
                 {/* Legend */}
-                <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, fontSize:10, color:'#888' }}>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:12, marginBottom:16, fontSize:11, color:'#8A8A8A', fontFamily:"'IBM Plex Mono', monospace" }}>
                   <span>🔴 Sipariş Bekliyor</span>
                   <span>🔵 Hesap İstendi</span>
                   <span>🟡 Dolu</span>
@@ -1431,24 +1441,25 @@ export default function AdminPage() {
                   { label: 'VİP', tables: ALL_TABLES.filter(t => t.startsWith('VİP')) },
                 ].map(group => (
                   <div key={group.label} style={{ marginBottom: 18 }}>
-                    <div style={{ color:'#888', fontSize:11, letterSpacing:2, marginBottom:8, fontWeight:700 }}>{group.label}</div>
+                    <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:'0.14em', marginBottom:8, fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>{group.label}</div>
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(84px, 1fr))', gap:8 }}>
                       {group.tables.map(tableName => {
                         const info = getTableInfo(tableName)
-                        const palette: Record<string, { bg:string, border:string, text:string, dot:string }> = {
-                          empty:     { bg:'#1A1A1A', border:'#2A2A2A', text:'#555', dot:'⚪' },
-                          occupied:  { bg:'rgba(201,168,76,.10)', border:'rgba(201,168,76,.3)', text:'#C9A84C', dot:'🟡' },
-                          pending:   { bg:'rgba(192,57,43,.15)', border:'#C0392B', text:'#e74c3c', dot:'🔴' },
-                          bill:      { bg:'rgba(52,152,219,.15)', border:'#3498db', text:'#3498db', dot:'🔵' },
+                        const palette: Record<string, { bg:string, border:string, topAccent:string, text:string, labelText:string, label:string }> = {
+                          empty:     { bg:'#161616', border:'#2A2A2A', topAccent:'transparent', text:'#8A8A8A', labelText:'#6E6E6E', label:'Boş' },
+                          occupied:  { bg:'#221E12', border:'rgba(201,168,76,.5)', topAccent:'#C9A84C', text:'#F0EDE8', labelText:'#C9A84C', label:'Dolu' },
+                          pending:   { bg:'#241413', border:'rgba(192,57,43,.55)', topAccent:'#C0392B', text:'#F0EDE8', labelText:'#E8756A', label:'Bekliyor' },
+                          bill:      { bg:'#12202A', border:'rgba(52,152,219,.55)', topAccent:'#3498DB', text:'#F0EDE8', labelText:'#6FB9E8', label:'Hesap' },
                         }
                         const p = palette[info.status]
                         const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
                         return (
                           <button key={tableName} onClick={() => setActiveTableModal(tableName)}
-                            style={{ background:p.bg, border:`1.5px solid ${p.border}`, borderRadius:12, padding:'10px 6px', cursor:'pointer', textAlign:'center', minHeight:64 }}>
-                            <div style={{ fontSize:16 }}>{p.dot}</div>
-                            <div style={{ color:p.text, fontWeight:700, fontSize:11, marginTop:2 }}>{tableName.replace(/^(MASA|KİTAPLIK|OKEY|KAHFE)-/, '')}</div>
-                            {info.status !== 'empty' && <div style={{ color:'#888', fontSize:9, marginTop:2 }}>{itemCount} sipariş</div>}
+                            style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 0, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                            <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace(/^(MASA|KİTAPLIK|OKEY|KAHFE)-/, '')}</div>
+                            <div style={{ color:p.labelText, fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase', marginTop:6 }}>
+                              {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}
+                            </div>
                           </button>
                         )
                       })}
@@ -1464,23 +1475,23 @@ export default function AdminPage() {
               <div style={{ display:'flex', gap:6, marginBottom:14 }}>
                 {(['today','week','month'] as const).map(f => (
                   <button key={f} onClick={() => { setDateFilter(f); loadOrders(f) }}
-                    style={{ flex:1, background: dateFilter===f ? 'rgba(201,168,76,.15)' : '#1A1A1A', border: dateFilter===f ? '1px solid rgba(201,168,76,.4)' : '1px solid #2A2A2A', borderRadius:10, padding:'8px 4px', color: dateFilter===f ? '#C9A84C' : '#888', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                    style={{ flex:1, height:44, background: dateFilter===f ? 'rgba(201,168,76,.14)' : 'transparent', border: dateFilter===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: dateFilter===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
                     {f==='today'?'Bugün':f==='week'?'Bu Hafta':'Bu Ay'}
                   </button>
                 ))}
               </div>
             )}
 
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:8 }}>
-              <div style={{ color:'#888', fontSize:12, letterSpacing:1 }}>{allOrders.length} SİPARİŞ</div>
-              <div style={{ display:'flex', gap:6 }}>
-                <button onClick={() => loadOrders()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>↻</button>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:8, flexWrap:'wrap' }}>
+              <div style={{ color:'#8A8A8A', fontSize:12, letterSpacing:'0.08em', fontFamily:"'IBM Plex Mono', monospace" }}>{allOrders.length} SİPARİŞ</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                <button onClick={() => loadOrders()} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, width:36, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600 }}>↻</button>
                 {isManager && (
                   <>
-                    <button onClick={() => resetStats(dateFilter)} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#888', fontSize:11, cursor:'pointer', fontWeight:600 }}>Sıfırla</button>
-                    <button onClick={() => exportOrdersPDF()} style={{ background:'#2A2A2A', border:'none', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:600 }}>📄 PDF</button>
-                    <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius:8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700 }}>📊 Aylık Rapor</button>
-                    <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.15)', border:'1px solid rgba(52,152,219,.3)', borderRadius:8, padding:'6px 10px', color:'#3498db', fontSize:11, cursor:'pointer', fontWeight:700 }}>🌙 Gün Sonu</button>
+                    <button onClick={() => resetStats(dateFilter)} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#8A8A8A', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
+                    <button onClick={() => exportOrdersPDF()} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
+                    <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Aylık Rapor</button>
+                    <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
                   </>
                 )}
               </div>
@@ -1488,63 +1499,62 @@ export default function AdminPage() {
 
             {/* Summary bar - revenue stats, managers only */}
             {isManager && allOrders.length > 0 && (
-              <div style={{ background:'#1A1A1A', border:'1px solid rgba(201,168,76,.2)', borderRadius:14, padding:'14px 16px', marginBottom:16, display:'flex', justifyContent:'space-around' }}>
+              <div style={{ background:'#1A1A1A', border:'1px solid rgba(201,168,76,.2)', borderRadius: 0, padding:'16px', marginBottom:16, display:'flex', justifyContent:'space-around' }}>
                 <div style={{ textAlign:'center' }}>
-                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.length}</div>
-                  <div style={{ color:'#888', fontSize:11 }}>Toplam Sipariş</div>
+                  <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>{allOrders.length}</div>
+                  <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Toplam Sipariş</div>
                 </div>
                 <div style={{ textAlign:'center' }}>
-                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{allOrders.filter(o=>o.status==='pending').length}</div>
-                  <div style={{ color:'#888', fontSize:11 }}>Bekliyor</div>
+                  <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>{allOrders.filter(o=>o.status==='pending').length}</div>
+                  <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Bekliyor</div>
                 </div>
                 <div style={{ textAlign:'center' }}>
-                  <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{revenueSummary.revenue.toFixed(0)} ₺</div>
-                  <div style={{ color:'#888', fontSize:11 }}>Ciro (Tahsil Edilen)</div>
+                  <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {revenueSummary.revenue.toFixed(0)}</div>
+                  <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Ciro (Tahsil Edilen)</div>
                 </div>
               </div>
             )}
 
-            {ordersLoading && <div style={{ textAlign:'center', color:'#888', padding:40 }}>Yükleniyor...</div>}
+            {ordersLoading && <div style={{ textAlign:'center', color:'#8A8A8A', padding:40 }}>Yükleniyor...</div>}
 
             {!ordersLoading && allOrders.length === 0 && (
-              <div style={{ textAlign:'center', color:'#888', padding:40 }}>Bugün henüz sipariş yok</div>
+              <div style={{ textAlign:'center', color:'#8A8A8A', padding:40 }}>Bugün henüz sipariş yok</div>
             )}
 
             {allOrders.map((order:any) => {
-              const statusColor = order.status==='pending'?'#C0392B':order.status==='dismissed'?'#888':'#27ae60'
+              const statusColor = order.status==='pending'?'#C0392B':order.status==='dismissed'?'#8A8A8A':'#27ae60'
               const statusLabel = order.status==='pending'?'Bekliyor':order.status==='dismissed'?'Reddedildi':'Tamamlandı'
               return (
-                <div key={order.id} style={{ background:'#1A1A1A', border:`1px solid ${order.status==='pending'?'rgba(192,57,43,.4)':'#2A2A2A'}`, borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
+                <div key={order.id} style={{ background:'#1A1A1A', border:'1px solid #2A2A2A', borderLeft:`3px solid ${statusColor}`, borderRadius: 0, padding:'16px 18px', marginBottom:10 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ background:statusColor, color:'#fff', borderRadius:6, padding:'3px 8px', fontSize:10, fontWeight:800 }}>{statusLabel}</span>
-                      <span style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>🪑 {order.table_name}</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <span style={{ background:statusColor, color:'#fff', borderRadius: 0, padding:'4px 10px', fontSize:11, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
+                      <span style={{ color:'#F0EDE8', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>Masa {order.table_name.replace(/^(MASA|KİTAPLIK|OKEY|KAHFE)-/, '')}</span>
                     </div>
-                    <span style={{ color:'#888', fontSize:11 }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                    <span style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
                   </div>
 
                   {order.items?.map((item:any, i:number) => (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'rgba(240,237,232,.7)', padding:'3px 0', borderBottom:'1px solid rgba(240,237,232,.05)' }}>
-                      <span>{item.quantity}x {item.name}</span>
-                      <span style={{ color:'#C9A84C' }}>{item.subtotal} ₺</span>
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:15, color:'#F0EDE8', padding:'4px 0', borderBottom:'1px solid rgba(240,237,232,.05)' }}>
+                      <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
+                      <span style={{ color:'#B5B0A8', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
                     </div>
                   ))}
 
                   {order.note && (
-                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius:8, fontSize:12, color:'rgba(240,237,232,.7)' }}>
+                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'rgba(240,237,232,.7)' }}>
                       📝 {order.note}
                     </div>
                   )}
 
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
-                    <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>TOPLAM: {order.total} ₺</span>
-                    <div style={{ display:'flex', gap:6 }}>
-                      {order.status === 'pending' && (
-                        <button onClick={() => updateOrderStatus(order.id, 'served')}
-                          style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Tamamlandı</button>
-                      )}
-                    </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:12, paddingTop:10, borderTop:'1px solid #2A2A2A' }}>
+                    <span style={{ color:'#8A8A8A', fontWeight:600, fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase' }}>Toplam</span>
+                    <span style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
                   </div>
+                  {order.status === 'pending' && (
+                    <button onClick={() => updateOrderStatus(order.id, 'served')}
+                      style={{ width:'100%', marginTop:12, background:'#27ae60', border:'none', borderRadius: 0, padding:0, height:48, color:'#fff', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Tamamlandı</button>
+                  )}
                 </div>
               )
             })}
@@ -1554,7 +1564,7 @@ export default function AdminPage() {
 
         {isManager && tab === 'categories' && (
           <div style={s.section}>
-            <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingCat ? 'KATEGORİ DÜZENLE' : 'YENİ KATEGORİ EKLE'}</div>
               <label style={s.label}>KATEGORİ ADI *</label>
               <input value={catName} onChange={e => setCatName(e.target.value)} style={{ ...s.input, marginBottom: 12 }} placeholder="örn. Kahveler" />
@@ -1565,7 +1575,7 @@ export default function AdminPage() {
                 {editingCat && <button onClick={() => { setEditingCat(null); setCatName(''); setCatIcon('') }} style={s.btnSecondary}>İptal</button>}
               </div>
             </div>
-            <div style={{ color: '#888', fontSize: 12, marginBottom: 12, letterSpacing: 1 }}>MEVCUT KATEGORİLER ({categories.length}) — ⠿ Sürükle ile sırala</div>
+            <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 12, letterSpacing: 1 }}>MEVCUT KATEGORİLER ({categories.length}) — ⠿ Sürükle ile sırala</div>
             {categories.map((cat, idx) => (
               <div key={cat.id}
                 draggable
@@ -1592,12 +1602,12 @@ export default function AdminPage() {
                     {cat.icon && <span style={{ fontSize: 22 }}>{cat.icon}</span>}
                     <div>
                       <div style={{ color: '#F0EDE8', fontWeight: 700 }}>{cat.name}</div>
-                      <div style={{ color: '#888', fontSize: 12 }}>{items.filter(i => i.category_id === cat.id).length} ürün · #{idx + 1}</div>
+                      <div style={{ color: '#8A8A8A', fontSize: 12 }}>{items.filter(i => i.category_id === cat.id).length} ürün · #{idx + 1}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => { setEditingCat(cat); setCatName(cat.name); setCatIcon(cat.icon || '') }} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                    <button onClick={() => deleteCategory(cat.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                    <button onClick={() => { setEditingCat(cat); setCatName(cat.name); setCatIcon(cat.icon || '') }} style={{ background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
+                    <button onClick={() => deleteCategory(cat.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                   </div>
                 </div>
               </div>
@@ -1608,7 +1618,7 @@ export default function AdminPage() {
         {/* ITEMS */}
         {isManager && tab === 'items' && (
           <div style={s.section}>
-            <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingItem ? 'ÜRÜN DÜZENLE' : 'YENİ ÜRÜN EKLE'}</div>
 
               <label style={s.label}>ÜRÜN ADI *</label>
@@ -1632,12 +1642,12 @@ export default function AdminPage() {
               {/* Preview */}
               {croppedPreview ? (
                 <div style={{ position: 'relative', marginBottom: 12 }}>
-                  <img src={croppedPreview} alt="önizleme" style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 10, border: '2px solid #C9A84C' }} />
+                  <img src={croppedPreview} alt="önizleme" style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 0, border: '2px solid #C9A84C' }} />
                   <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
-                    {rawImageSrc && <button onClick={() => setShowCropper(true)} style={{ background: '#C9A84C', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#1A0E06', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✂️ Düzenle</button>}
-                    <button onClick={() => { setCroppedPreview(''); setCroppedBlob(null); setExistingImageUrl('') }} style={{ background: '#C0392B', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✕ Sil</button>
+                    {rawImageSrc && <button onClick={() => setShowCropper(true)} style={{ background: '#C9A84C', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#1A0E06', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✂️ Düzenle</button>}
+                    <button onClick={() => { setCroppedPreview(''); setCroppedBlob(null); setExistingImageUrl('') }} style={{ background: '#C0392B', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✕ Sil</button>
                   </div>
-                  <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: '4px 8px', fontSize: 10, color: '#C9A84C' }}>
+                  <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', borderRadius: 0, padding: '4px 8px', fontSize: 10, color: '#C9A84C' }}>
                     {croppedBlob ? '✓ Kırpıldı' : '📷 Mevcut fotoğraf'}
                   </div>
                 </div>
@@ -1648,7 +1658,7 @@ export default function AdminPage() {
                 <label htmlFor="avail" style={{ color: '#F0EDE8', fontSize: 14, cursor: 'pointer' }}>Satışta (aktif)</label>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, background: itemRec ? 'rgba(201,168,76,.08)' : 'transparent', border: itemRec ? '1px solid rgba(201,168,76,.3)' : '1px solid #2A2A2A', borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, background: itemRec ? 'rgba(201,168,76,.08)' : 'transparent', border: itemRec ? '1px solid rgba(201,168,76,.3)' : '1px solid #2A2A2A', borderRadius: 0, padding: '10px 12px' }}>
                 <input type="checkbox" id="rec" checked={itemRec} onChange={e => setItemRec(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#C9A84C' }} />
                 <label htmlFor="rec" style={{ color: '#C9A84C', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>⭐ Öne Çıkan (Önerilen)</label>
               </div>
@@ -1667,19 +1677,19 @@ export default function AdminPage() {
 
             {/* Bulk move toggle */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ color: '#888', fontSize: 12, letterSpacing: 1 }}>
+              <div style={{ color: '#8A8A8A', fontSize: 12, letterSpacing: 1 }}>
                 {items.filter(i => !filterCat || i.category_id === filterCat).length} ÜRÜN
                 {selectedItems.size > 0 && <span style={{ color: '#C9A84C', marginLeft: 8 }}>· {selectedItems.size} seçildi</span>}
               </div>
               <button onClick={() => { setBulkMode(!bulkMode); setSelectedItems(new Set()) }}
-                style={{ background: bulkMode ? 'rgba(201,168,76,.15)' : '#2A2A2A', border: bulkMode ? '1px solid rgba(201,168,76,.4)' : 'none', borderRadius: 8, padding: '6px 12px', color: bulkMode ? '#C9A84C' : '#888', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ background: bulkMode ? 'rgba(201,168,76,.15)' : '#2A2A2A', border: bulkMode ? '1px solid rgba(201,168,76,.4)' : 'none', borderRadius: 0, padding: '6px 12px', color: bulkMode ? '#C9A84C' : '#8A8A8A', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 {bulkMode ? '✕ İptal' : '↔ Toplu Taşı'}
               </button>
             </div>
 
             {/* Bulk move action bar */}
             {bulkMode && selectedItems.size > 0 && (
-              <div style={{ background: '#1A1A1A', border: '1px solid rgba(201,168,76,.3)', borderRadius: 14, padding: 14, marginBottom: 14 }}>
+              <div style={{ background: '#1A1A1A', border: '1px solid rgba(201,168,76,.3)', borderRadius: 0, padding: 14, marginBottom: 14 }}>
                 <div style={{ color: '#C9A84C', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
                   {selectedItems.size} ürünü taşı →
                 </div>
@@ -1703,25 +1713,25 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {/* Bulk mode checkbox */}
                     {bulkMode && (
-                      <div style={{ width: 24, height: 24, borderRadius: 6, border: isSelected ? 'none' : '2px solid #3A3A3A', background: isSelected ? '#C9A84C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: 0, border: isSelected ? 'none' : '2px solid #383838', background: isSelected ? '#C9A84C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>
                         {isSelected && '✓'}
                       </div>
                     )}
-                    <div style={{ width: 60, height: 60, borderRadius: 10, overflow: 'hidden', background: '#2A2A2A', flexShrink: 0 }}>
+                    <div style={{ width: 60, height: 60, borderRadius: 0, overflow: 'hidden', background: '#2A2A2A', flexShrink: 0 }}>
                       {item.image_url
                         ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: 22 }}>📷</div>}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.recommended && <span style={{ marginRight: 4 }}>⭐</span>}{item.name}</div>
-                      <div style={{ color: '#888', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}</div>
+                      <div style={{ color: '#8A8A8A', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}</div>
                       <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 14 }}>{item.price} ₺</div>
                     </div>
                     {!bulkMode && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <button onClick={() => startEditItem(item)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                      <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: item.recommended ? '#C9A84C' : '#888', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
-                      <button onClick={() => deleteItem(item.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                      <button onClick={() => startEditItem(item)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
+                      <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 10px', color: item.recommended ? '#C9A84C' : '#8A8A8A', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
+                      <button onClick={() => deleteItem(item.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                     </div>
                     )}
                   </div>
@@ -1733,32 +1743,32 @@ export default function AdminPage() {
 
         {isManager && tab === 'staff' && (
           <div style={s.section}>
-            <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
-              <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, marginBottom: 12 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
-              <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, marginBottom: 10 }} />
-              <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="4-6 haneli PIN (örn. 4821)" inputMode="numeric" style={{ ...s.input, marginBottom: 10 }} />
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
+              <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
+              <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="4-6 haneli PIN (örn. 4821)" inputMode="numeric" style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.15em', marginBottom: 10 }} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={saveStaff} style={{ flex: 1, background: '#C9A84C', border: 'none', borderRadius: 10, padding: 12, color: '#1A0E06', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>{editingStaffId ? '✓ Kaydet' : '+ Ekle'}</button>
+                <button onClick={saveStaff} style={{ flex: 1, height: 52, background: '#C9A84C', border: 'none', borderRadius: 0, color: '#0A0A0A', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>{editingStaffId ? '✓ Kaydet' : '+ Ekle'}</button>
                 {editingStaffId && (
-                  <button onClick={resetStaffForm} style={{ background: '#2A2A2A', border: 'none', borderRadius: 10, padding: '12px 16px', color: '#888', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>İptal</button>
+                  <button onClick={resetStaffForm} style={{ height: 52, background: 'transparent', border: '1px solid #383838', borderRadius: 0, padding: '0 20px', color: '#8A8A8A', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>İptal</button>
                 )}
               </div>
             </div>
 
             {staffList.length === 0 && (
-              <div style={{ textAlign:'center', color:'#888', padding:20 }}>Henüz kayıtlı personel yok. Herkes şimdilik ortak personel kodunu (5678) kullanabilir.</div>
+              <div style={{ textAlign:'center', color:'#8A8A8A', padding:20 }}>Henüz kayıtlı personel yok. Herkes şimdilik ortak personel kodunu (5678) kullanabilir.</div>
             )}
 
             {staffList.map(s => (
-              <div key={s.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: 14, padding: '14px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
+              <div key={s.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: 0, padding: '16px 18px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
                 <div>
-                  <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14 }}>{s.name}</div>
-                  <div style={{ color: '#888', fontSize: 12 }}>PIN: {s.pin} {!s.active && '· Pasif'}</div>
+                  <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{s.name}</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>PIN: {s.pin} {!s.active && '· Pasif'}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => startEditStaff(s)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                  <button onClick={() => toggleStaffActive(s)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: s.active ? '#f39c12' : '#27ae60', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{s.active ? 'Pasifleştir' : 'Aktifleştir'}</button>
-                  <button onClick={() => deleteStaff(s.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 7, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                  <button onClick={() => startEditStaff(s)} style={{ background: 'transparent', border: '1px solid #383838', borderRadius: 0, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
+                  <button onClick={() => toggleStaffActive(s)} style={{ background: 'transparent', border: '1px solid #383838', borderRadius: 0, height: 40, padding: '0 12px', color: s.active ? '#f39c12' : '#27ae60', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>{s.active ? 'Pasifleştir' : 'Aktifleştir'}</button>
+                  <button onClick={() => deleteStaff(s.id)} style={{ background: 'transparent', border: '1px solid #383838', borderRadius: 0, height: 40, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
                 </div>
               </div>
             ))}
