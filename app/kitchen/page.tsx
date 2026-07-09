@@ -70,6 +70,7 @@ export default function KitchenPage() {
   }
 
   function beep() {
+    if (localStorage.getItem('kahfe_notif_sound') === 'off') return
     try {
       const ctx = new AudioContext()
       const tones = [880, 1046, 1318]

@@ -152,16 +152,18 @@ export default function AdminPage() {
         setNotifications(prev => [payload.new, ...prev])
         setNewOrderAlert(true)
         loadTableMapData()
-        // Play beep sound
-        try {
-          const ctx = new AudioContext()
-          const osc = ctx.createOscillator()
-          const gain = ctx.createGain()
-          osc.connect(gain); gain.connect(ctx.destination)
-          osc.frequency.value = 880; gain.gain.value = 0.3
-          osc.start(); osc.stop(ctx.currentTime + 0.15)
-          setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
-        } catch(e) {}
+        // Play beep sound (respects the Ayarlar sound toggle for this device)
+        if (localStorage.getItem('kahfe_notif_sound') !== 'off') {
+          try {
+            const ctx = new AudioContext()
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain); gain.connect(ctx.destination)
+            osc.frequency.value = 880; gain.gain.value = 0.3
+            osc.start(); osc.stop(ctx.currentTime + 0.15)
+            setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
+          } catch(e) {}
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadTableMapData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => loadTableMapData())
@@ -184,7 +186,7 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'map'|'list'>('map')
@@ -192,13 +194,76 @@ export default function AdminPage() {
   const [tabOrders, setTabOrders] = useState<any[]>([])
   const [activeTableModal, setActiveTableModal] = useState<string | null>(null)
 
-  const ALL_TABLES = [
+  const DEFAULT_TABLES = [
     ...Array.from({ length: 11 }, (_, i) => `MASA-${i + 1}`),
     ...Array.from({ length: 3 }, (_, i) => `KİTAPLIK-${i + 1}`),
     ...Array.from({ length: 4 }, (_, i) => `OKEY-${i + 1}`),
     ...Array.from({ length: 2 }, (_, i) => `KAHFE-${i + 1}`),
     'VİP-ODA',
   ]
+  const [ALL_TABLES, setAllTables] = useState<string[]>(DEFAULT_TABLES)
+  const [telegramRecipients, setTelegramRecipients] = useState<{ name: string, chat_id: string }[]>([])
+  const [notifSoundOn, setNotifSoundOn] = useState(true)
+  const [newTableName, setNewTableName] = useState('')
+  const [newRecipientName, setNewRecipientName] = useState('')
+  const [newRecipientChatId, setNewRecipientChatId] = useState('')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('kahfe_notif_sound')
+    if (saved !== null) setNotifSoundOn(saved !== 'off')
+  }, [])
+
+  async function loadSettings() {
+    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients'])
+    const tablesRow = data?.find((r: any) => r.key === 'tables')
+    const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
+    setAllTables(Array.isArray(tablesRow?.value) && tablesRow.value.length > 0 ? tablesRow.value : DEFAULT_TABLES)
+    setTelegramRecipients(Array.isArray(recipientsRow?.value) ? recipientsRow.value : [])
+  }
+
+  async function saveTables(newList: string[]) {
+    await supabase.from('settings').upsert({ key: 'tables', value: newList, updated_at: new Date().toISOString() })
+    setAllTables(newList)
+  }
+
+  async function addTable() {
+    const name = newTableName.trim().toUpperCase()
+    if (!name) return
+    if (ALL_TABLES.includes(name)) { alert('Bu masa adı zaten var.'); return }
+    await saveTables([...ALL_TABLES, name])
+    setNewTableName('')
+  }
+
+  async function removeTable(name: string) {
+    const hasOpenTab = openTabs.some((t: any) => t.table_name === name)
+    if (hasOpenTab) { alert(`${name} şu anda açık bir hesaba sahip. Önce masayı kapatın.`); return }
+    if (!confirm(`"${name}" masasını silmek istediğinizden emin misiniz?`)) return
+    await saveTables(ALL_TABLES.filter(t => t !== name))
+  }
+
+  async function saveTelegramRecipients(newList: { name: string, chat_id: string }[]) {
+    await supabase.from('settings').upsert({ key: 'telegram_recipients', value: newList, updated_at: new Date().toISOString() })
+    setTelegramRecipients(newList)
+  }
+
+  async function addTelegramRecipient() {
+    const name = newRecipientName.trim()
+    const chatId = newRecipientChatId.trim()
+    if (!name || !/^\d+$/.test(chatId)) { alert('Lütfen bir isim ve sayısal bir Telegram chat ID girin.'); return }
+    if (telegramRecipients.some(r => r.chat_id === chatId)) { alert('Bu chat ID zaten ekli.'); return }
+    await saveTelegramRecipients([...telegramRecipients, { name, chat_id: chatId }])
+    setNewRecipientName(''); setNewRecipientChatId('')
+  }
+
+  async function removeTelegramRecipient(chatId: string) {
+    await saveTelegramRecipients(telegramRecipients.filter(r => r.chat_id !== chatId))
+  }
+
+  function toggleNotifSound() {
+    const next = !notifSoundOn
+    setNotifSoundOn(next)
+    localStorage.setItem('kahfe_notif_sound', next ? 'on' : 'off')
+  }
 
   // Table map state is intentionally independent from the today/week/month
   // stats filter and any Sıfırla reset — an occupied table must never
@@ -875,7 +940,7 @@ export default function AdminPage() {
   useEffect(() => { if (role === 'staff') setTab('orders') }, [role])
   useEffect(() => { if (role === 'staff' && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
 
-  useEffect(() => { if (auth) loadData() }, [auth])
+  useEffect(() => { if (auth) { loadData(); loadSettings() } }, [auth])
 
   async function loadData() {
     const [{ data: cats }, { data: its }, { data: staffData }] = await Promise.all([
@@ -1187,11 +1252,11 @@ export default function AdminPage() {
 
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
-        <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A' }}>
-          {(isManager ? (['orders', 'categories', 'items', 'staff'] as const) : (['orders'] as const)).map(t => (
+        <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A', overflowX: 'auto' }}>
+          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings'] as const) : (['orders'] as const)).map(t => (
             <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter) }}
-              style={{ flex: 1, padding: '16px 4px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#8A8A8A', fontWeight: tab === t ? 600 : 500, fontSize: 14, cursor: 'pointer', position: 'relative' }}>
-              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : 'Siparişler'}
+              style={{ flex: '1 0 auto', minWidth: 80, padding: '16px 8px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#8A8A8A', fontWeight: tab === t ? 600 : 500, fontSize: 13, cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap' }}>
+              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
                 <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
               )}
@@ -1855,6 +1920,60 @@ export default function AdminPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {isManager && tab === 'settings' && (
+          <div className="kahfe-section" style={s.section}>
+            {/* Notification sound (per-device) */}
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🔔 Bildirim Sesi</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Bu cihaz için — her cihazda ayrı ayarlanır (örn. mutfak tableti farklı olabilir).</div>
+              <button onClick={toggleNotifSound} style={{ height: 48, padding: '0 20px', background: notifSoundOn ? 'rgba(39,174,96,.14)' : 'transparent', border: notifSoundOn ? '1px solid #27ae60' : '1px solid #383838', color: notifSoundOn ? '#5FD08C' : '#8A8A8A', fontSize: 14, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                {notifSoundOn ? '🔊 Açık — Kapatmak için tıkla' : '🔇 Kapalı — Açmak için tıkla'}
+              </button>
+            </div>
+
+            {/* Telegram recipients */}
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>📲 Telegram Bildirimleri</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Yeni sipariş geldiğinde Telegram mesajı alacak kişiler.</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <input value={newRecipientName} onChange={e => setNewRecipientName(e.target.value)} placeholder="İsim" style={{ ...s.input, height: 48, flex: 1 }} />
+                <input value={newRecipientChatId} onChange={e => setNewRecipientChatId(e.target.value.replace(/\D/g, ''))} placeholder="Telegram Chat ID" inputMode="numeric" style={{ ...s.input, height: 48, flex: 1, fontFamily: "'IBM Plex Mono', monospace" }} />
+              </div>
+              <button onClick={addTelegramRecipient} style={{ width: '100%', height: 48, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 14, fontFamily: "'IBM Plex Sans', sans-serif" }}>+ Ekle</button>
+              {telegramRecipients.length === 0 && (
+                <div style={{ color: '#8A8A8A', fontSize: 13, textAlign: 'center', padding: '10px 0' }}>Henüz kayıtlı alıcı yok (varsayılan liste kullanılıyor).</div>
+              )}
+              {telegramRecipients.map(r => (
+                <div key={r.chat_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid #2A2A2A' }}>
+                  <div>
+                    <div style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{r.chat_id}</div>
+                  </div>
+                  <button onClick={() => removeTelegramRecipient(r.chat_id)} style={{ background: 'transparent', border: '1px solid #383838', height: 36, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
+                </div>
+              ))}
+            </div>
+
+            {/* Table list */}
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🪑 Masalar</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Masa Haritası'nda görünen masalar. Yeni bir QR/NFC etiketi bastırdığınızda buraya da eklemeyi unutmayın.</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <input value={newTableName} onChange={e => setNewTableName(e.target.value)} placeholder="Örn. MASA-12" style={{ ...s.input, height: 48, flex: 1 }} onKeyDown={e => e.key === 'Enter' && addTable()} />
+                <button onClick={addTable} style={{ height: 48, padding: '0 20px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>+ Ekle</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
+                {ALL_TABLES.map(t => (
+                  <div key={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #2A2A2A', padding: '8px 10px', fontSize: 12, color: '#F0EDE8', fontFamily: "'IBM Plex Mono', monospace" }}>
+                    {t}
+                    <button onClick={() => removeTable(t)} style={{ background: 'transparent', border: 'none', color: '#C0392B', cursor: 'pointer', fontSize: 14, padding: 0, marginLeft: 6 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

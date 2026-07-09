@@ -472,7 +472,13 @@ export default function MenuPage() {
 
   async function sendTelegramNotification(mesa: string, items: any[], total: number, note: string, orderNum: number) {
     const BOT_TOKEN = '8218906305:AAHy-4UAX3elRisvShV3stReePkQrlzTHWw'
-    const CHAT_IDS = ['1626976096', '1462247620', '8892775373']
+    let CHAT_IDS = ['1626976096', '1462247620', '8892775373']
+    try {
+      const { data } = await supabase.from('settings').select('value').eq('key', 'telegram_recipients').maybeSingle()
+      if (data?.value && Array.isArray(data.value) && data.value.length > 0) {
+        CHAT_IDS = data.value.map((r: any) => r.chat_id)
+      }
+    } catch (e) { /* fall back to the hardcoded list above if settings isn't reachable */ }
     const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
     const itemLines = items.map(i => `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`).join('\n')
     const noteSection = note.trim() ? `\n\n📝 <b>Not:</b> ${note.trim()}` : ''
