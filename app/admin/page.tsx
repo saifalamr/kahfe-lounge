@@ -1068,9 +1068,21 @@ export default function AdminPage() {
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #0A0A0A; color: #F0EDE8; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+
+        /* Fill the available width on touchscreens/desktops instead of
+           staying pinned to a narrow phone-width column in the middle */
+        .kahfe-shell { max-width: 480px; margin: 0 auto; }
+        @media (min-width: 700px)  { .kahfe-shell { max-width: 100%; } }
+        @media (min-width: 700px)  { .kahfe-shell .kahfe-section { padding-left: 32px; padding-right: 32px; } }
+        @media (min-width: 700px)  { .kahfe-shell .kahfe-header   { padding-left: 32px; padding-right: 32px; } }
+        @media (min-width: 1100px) { .kahfe-shell .kahfe-section { padding-left: 56px; padding-right: 56px; } }
+        @media (min-width: 1100px) { .kahfe-shell .kahfe-header   { padding-left: 56px; padding-right: 56px; } }
+
+        .kahfe-modal { max-width: 480px; }
+        @media (min-width: 700px) { .kahfe-modal { max-width: 560px; } }
       `}</style>
-      <div style={{ background: '#0A0A0A', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 }}>
-        <div style={s.header}>
+      <div className="kahfe-shell" style={{ background: '#0A0A0A', minHeight: '100vh', paddingBottom: 40 }}>
+        <div className="kahfe-header" style={s.header}>
           <div>
             <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>
             <div style={{ color: '#F0EDE8', fontSize: 19, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
@@ -1091,7 +1103,7 @@ export default function AdminPage() {
         {/* Notification Panel */}
         {showNotif && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} onClick={() => setShowNotif(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, maxWidth: 480, margin: '0 auto', background: '#1A1A1A', borderRadius: 0, maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
+            <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, margin: '0 auto', background: '#1A1A1A', borderRadius: 0, maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
               <div style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>🔔 YENİ SİPARİŞLER ({notifications.length})</span>
                 <button onClick={() => setShowNotif(false)} style={{ background: 'none', border: 'none', color: '#8A8A8A', fontSize: 18, cursor: 'pointer' }}>✕</button>
@@ -1145,12 +1157,12 @@ export default function AdminPage() {
         {/* CATEGORIES */}
         {/* ORDERS TAB */}
         {tab === 'orders' && (
-          <div style={{ padding: '16px 20px' }}>
+          <div className="kahfe-section" style={{ padding: '16px 20px' }}>
 
             {/* Monthly report modal - managers only */}
             {isManager && showMonthlyReport && (
               <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowMonthlyReport(null)}>
-                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                     <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>📊 {showMonthlyReport.month} {showMonthlyReport.year} Raporu</div>
                     <div style={{ display:'flex', gap:8 }}>
@@ -1194,7 +1206,7 @@ export default function AdminPage() {
               const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
               return (
                 <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowDayClose(false)}>
-                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', borderBottom:'none' }}>
+                  <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', borderBottom:'none' }}>
                     <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                       <div style={{ color:'#3498db', fontWeight:800, fontSize:16 }}>🌙 Gün Sonu</div>
                       <div style={{ display:'flex', gap:8 }}>
@@ -1249,7 +1261,7 @@ export default function AdminPage() {
               const tabTotal = activeOrders.reduce((s:number,o:any)=>s+Number(o.total),0)
               return (
                 <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setActiveTableModal(null)}>
-                  <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                  <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
                     <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                       <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:20, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🪑 {activeTableModal}</div>
                       <button onClick={() => setActiveTableModal(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
@@ -1370,7 +1382,7 @@ export default function AdminPage() {
             {/* Payment modal - choose method, optionally split, close the tab */}
             {paymentTab && (
               <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setPaymentTab(null)}>
-                <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius: 0, border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div style={{ color:'#27ae60', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>💳 {paymentTab.table_name} — Ödeme Al</div>
                     <button onClick={() => setPaymentTab(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
@@ -1442,7 +1454,7 @@ export default function AdminPage() {
                 ].map(group => (
                   <div key={group.label} style={{ marginBottom: 18 }}>
                     <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:'0.14em', marginBottom:8, fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>{group.label}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(84px, 1fr))', gap:8 }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(96px, 140px))', gap:10 }}>
                       {group.tables.map(tableName => {
                         const info = getTableInfo(tableName)
                         const palette: Record<string, { bg:string, border:string, topAccent:string, text:string, labelText:string, label:string }> = {
@@ -1563,7 +1575,7 @@ export default function AdminPage() {
         )}
 
         {isManager && tab === 'categories' && (
-          <div style={s.section}>
+          <div className="kahfe-section" style={s.section}>
             <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingCat ? 'KATEGORİ DÜZENLE' : 'YENİ KATEGORİ EKLE'}</div>
               <label style={s.label}>KATEGORİ ADI *</label>
@@ -1617,7 +1629,7 @@ export default function AdminPage() {
 
         {/* ITEMS */}
         {isManager && tab === 'items' && (
-          <div style={s.section}>
+          <div className="kahfe-section" style={s.section}>
             <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 16, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingItem ? 'ÜRÜN DÜZENLE' : 'YENİ ÜRÜN EKLE'}</div>
 
@@ -1742,7 +1754,7 @@ export default function AdminPage() {
         )}
 
         {isManager && tab === 'staff' && (
-          <div style={s.section}>
+          <div className="kahfe-section" style={s.section}>
             <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
               <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
