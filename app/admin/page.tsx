@@ -6,6 +6,7 @@ import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportP
 
 const ADMIN_PASSWORD = '1234'
 const STAFF_PASSWORD = '5678'
+const TOUCHSCREEN_PASSWORD = '9000'
 
 /* ── Main Admin Page ── */
 export default function AdminPage() {
@@ -21,8 +22,9 @@ export default function AdminPage() {
   }, [])
 
   const [auth, setAuth] = useState(false)
-  const [role, setRole] = useState<'manager' | 'staff' | null>(null)
+  const [role, setRole] = useState<'manager' | 'staff' | 'touchscreen' | null>(null)
   const isManager = role === 'manager'
+  const canPrint = role === 'touchscreen'
   const [staffName, setStaffName] = useState<string>('')
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotif, setShowNotif] = useState(false)
@@ -326,7 +328,11 @@ export default function AdminPage() {
     setPaymentTab(null)
     setActiveTableModal(null)
     await loadTableMapData()
-    printReceipt(receiptInfo)
+    if (canPrint) {
+      printReceipt(receiptInfo)
+    } else {
+      alert('✓ Ödeme alındı, masa kapatıldı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
+    }
   }
 
   // Staff-entered orders (walk-ins, phone orders, waiter taking a verbal order)
@@ -670,12 +676,16 @@ export default function AdminPage() {
   useEffect(() => {
     const savedRole = localStorage.getItem('kahfe_admin_role')
     const savedName = localStorage.getItem('kahfe_staff_name')
-    if (savedRole === 'manager' || savedRole === 'staff') { setRole(savedRole); setAuth(true); setStaffName(savedName || (savedRole === 'manager' ? 'Yönetici' : 'Personel')) }
+    if (savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen') {
+      setRole(savedRole)
+      setAuth(true)
+      setStaffName(savedName || (savedRole === 'manager' ? 'Yönetici' : savedRole === 'touchscreen' ? 'Dokunmatik Ekran' : 'Personel'))
+    }
   }, [])
 
-  // Staff can only ever see the orders tab
-  useEffect(() => { if (role === 'staff') setTab('orders') }, [role])
-  useEffect(() => { if (role === 'staff' && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
+  // Staff and the shared Touchscreen account can only ever see the orders tab
+  useEffect(() => { if (role === 'staff' || role === 'touchscreen') setTab('orders') }, [role])
+  useEffect(() => { if ((role === 'staff' || role === 'touchscreen') && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
 
   useEffect(() => { if (auth) { loadData(); loadSettings() } }, [auth])
 
@@ -740,6 +750,12 @@ export default function AdminPage() {
       localStorage.setItem('kahfe_admin_role', 'manager')
       localStorage.setItem('kahfe_staff_name', 'Yönetici')
       setRole('manager'); setStaffName('Yönetici'); setAuth(true)
+      return
+    }
+    if (pw === TOUCHSCREEN_PASSWORD) {
+      localStorage.setItem('kahfe_admin_role', 'touchscreen')
+      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
+      setRole('touchscreen'); setStaffName('Dokunmatik Ekran'); setAuth(true)
       return
     }
     // Individual staff PIN lookup — via RPC so PINs are never fetchable in bulk
@@ -1418,8 +1434,10 @@ export default function AdminPage() {
                       </div>
                     )}
 
-                    <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason, originalTotal: paymentTab.total })}
-                      style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
+                    {canPrint && (
+                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason, originalTotal: paymentTab.total })}
+                        style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
+                    )}
 
                     <button onClick={confirmPayment}
                       style={{ width:'100%', height:56, background:'#27ae60', border:'none', borderRadius: 0, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Ödemeyi Onayla ve Masayı Kapat</button>

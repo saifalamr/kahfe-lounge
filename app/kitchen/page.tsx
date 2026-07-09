@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 // Same credentials as /admin — kept in sync manually. If you change the
-// passwords in app/admin/page.tsx, update these two lines too.
+// passwords in app/admin/page.tsx, update these lines too.
 const ADMIN_PASSWORD = '1234'
 const STAFF_PASSWORD = '5678'
+const TOUCHSCREEN_PASSWORD = '9000'
 
 export default function KitchenPage() {
   // Load the same font system as the redesigned admin panel
@@ -30,7 +31,7 @@ export default function KitchenPage() {
   useEffect(() => {
     const savedRole = localStorage.getItem('kahfe_admin_role')
     const savedName = localStorage.getItem('kahfe_staff_name')
-    if (savedRole === 'manager' || savedRole === 'staff') {
+    if (savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen') {
       setAuth(true)
       setStaffName(savedName || 'Mutfak')
     }
@@ -41,6 +42,12 @@ export default function KitchenPage() {
       localStorage.setItem('kahfe_admin_role', 'manager')
       localStorage.setItem('kahfe_staff_name', 'Yönetici')
       setAuth(true); setStaffName('Yönetici')
+      return
+    }
+    if (pw === TOUCHSCREEN_PASSWORD) {
+      localStorage.setItem('kahfe_admin_role', 'touchscreen')
+      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
+      setAuth(true); setStaffName('Dokunmatik Ekran')
       return
     }
     const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
