@@ -366,12 +366,26 @@ export default function AdminPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'>('cash')
   const [splitCash, setSplitCash] = useState('')
   const [splitCard, setSplitCard] = useState('')
+  const [discountType, setDiscountType] = useState<'none'|'percent'|'amount'>('none')
+  const [discountValue, setDiscountValue] = useState('')
+  const [discountReason, setDiscountReason] = useState('')
+
+  function computeDiscountAmount(total: number) {
+    const v = parseFloat(discountValue) || 0
+    let amt = discountType === 'percent' ? total * (v / 100) : discountType === 'amount' ? v : 0
+    if (amt < 0) amt = 0
+    if (amt > total) amt = total
+    return amt
+  }
 
   function openPayment(tabData: any, total: number, orders: any[]) {
     setPaymentTab({ id: tabData.id, table_name: tabData.table_name, total, orders })
     setPaymentMethod('cash')
     setSplitCash(total.toFixed(0))
     setSplitCard('0')
+    setDiscountType('none')
+    setDiscountValue('')
+    setDiscountReason('')
   }
 
   function printKitchenTicket(tableName: string, orders: any[]) {
@@ -416,13 +430,14 @@ export default function AdminPage() {
     win.document.close()
   }
 
-  function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed', orders: any[] }) {
+  function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number }) {
     const win = window.open('', '_blank', 'width=420,height=700')
     if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
     const itemRows = (info.orders || []).flatMap((o: any) => o.items || []).map((it: any) =>
       `<tr><td>${it.quantity}x ${it.name}</td><td style="text-align:right">${it.subtotal} ₺</td></tr>`
     ).join('')
     const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : 'Karma (Nakit + Kart)'
+    const hasDiscount = (info.discountAmount || 0) > 0
     win.document.write(`
       <!DOCTYPE html>
       <html lang="tr">
@@ -451,6 +466,7 @@ export default function AdminPage() {
         </table>
         <div class="line"></div>
         <table>
+          ${hasDiscount ? `<tr><td>Ara Toplam</td><td style="text-align:right">${(info.originalTotal || info.total).toFixed(0)} ₺</td></tr><tr><td>İndirim${info.discountReason ? ` (${info.discountReason})` : ''}</td><td style="text-align:right">-${(info.discountAmount || 0).toFixed(0)} ₺</td></tr>` : ''}
           <tr class="total-row"><td>TOPLAM</td><td style="text-align:right">${info.total.toFixed(0)} ₺</td></tr>
         </table>
         <div class="line"></div>
@@ -469,14 +485,20 @@ export default function AdminPage() {
 
   async function confirmPayment() {
     if (!paymentTab) return
+    const discountAmount = computeDiscountAmount(paymentTab.total)
+    if (discountAmount > 0 && !discountReason.trim()) {
+      alert('Lütfen indirim için bir neden girin.')
+      return
+    }
+    const finalTotal = paymentTab.total - discountAmount
     let cash = 0, card = 0
-    if (paymentMethod === 'cash') cash = paymentTab.total
-    else if (paymentMethod === 'card') card = paymentTab.total
+    if (paymentMethod === 'cash') cash = finalTotal
+    else if (paymentMethod === 'card') card = finalTotal
     else {
       cash = parseFloat(splitCash) || 0
       card = parseFloat(splitCard) || 0
-      if (Math.abs((cash + card) - paymentTab.total) > 0.5) {
-        alert(`Nakit + Kart tutarı masa toplamıyla eşleşmiyor.\n\nMasa toplamı: ${paymentTab.total.toFixed(0)} ₺\nGirilen: ${(cash + card).toFixed(0)} ₺`)
+      if (Math.abs((cash + card) - finalTotal) > 0.5) {
+        alert(`Nakit + Kart tutarı ödenecek tutarla eşleşmiyor.\n\nÖdenecek tutar: ${finalTotal.toFixed(0)} ₺\nGirilen: ${(cash + card).toFixed(0)} ₺`)
         return
       }
     }
@@ -486,11 +508,24 @@ export default function AdminPage() {
       payment_method: paymentMethod,
       cash_amount: cash,
       card_amount: card,
-      total: paymentTab.total,
+      total: finalTotal,
+      discount_amount: discountAmount,
+      discount_reason: discountAmount > 0 ? discountReason.trim() : null,
       closed_by: staffName,
     }).eq('id', paymentTab.id)
 
-    const receiptInfo = { table_name: paymentTab.table_name, total: paymentTab.total, cash, card, method: paymentMethod, orders: paymentTab.orders }
+    if (discountAmount > 0) {
+      await supabase.from('discounts').insert({
+        tab_id: paymentTab.id,
+        table_name: paymentTab.table_name,
+        original_amount: paymentTab.total,
+        discount_amount: discountAmount,
+        reason: discountReason.trim(),
+        applied_by: staffName,
+      })
+    }
+
+    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason: discountReason.trim(), originalTotal: paymentTab.total }
     setPaymentTab(null)
     setActiveTableModal(null)
     await loadTableMapData()
@@ -898,7 +933,8 @@ export default function AdminPage() {
     const totalRevenue = tabs.reduce((s: number, t: any) => s + Number(t.total), 0)
     const cashTotal = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0)
     const cardTotal = tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0)
-    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, tabCount: tabs.length })
+    const discountTotal = tabs.reduce((s: number, t: any) => s + Number(t.discount_amount || 0), 0)
+    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, discountTotal, tabCount: tabs.length })
     setCountedCash('')
     setShowDayClose(true)
   }
@@ -1438,6 +1474,12 @@ export default function AdminPage() {
                           <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
                           <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cardTotal.toFixed(0)} ₺</div>
                         </div>
+                        {dayCloseData.discountTotal > 0 && (
+                          <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
+                            <div style={{ color:'#8A8A8A', fontSize:11 }}>🏷️ İNDİRİM</div>
+                            <div style={{ color:'#e74c3c', fontWeight:800, fontSize:18 }}>{dayCloseData.discountTotal.toFixed(0)} ₺</div>
+                          </div>
+                        )}
                       </div>
 
                       <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺)</label>
@@ -1704,7 +1746,10 @@ export default function AdminPage() {
             )}
 
             {/* Payment modal - choose method, optionally split, close the tab */}
-            {paymentTab && (
+            {paymentTab && (() => {
+              const discountAmount = computeDiscountAmount(paymentTab.total)
+              const finalTotal = paymentTab.total - discountAmount
+              return (
               <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setPaymentTab(null)}>
                 <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -1712,9 +1757,35 @@ export default function AdminPage() {
                     <button onClick={() => setPaymentTab(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
                   </div>
                   <div style={{ padding:'20px' }}>
-                    <div style={{ textAlign:'center', marginBottom:20 }}>
+                    <div style={{ textAlign:'center', marginBottom:16 }}>
                       <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>ÖDENECEK TUTAR</div>
-                      <div style={{ color:'#C9A84C', fontWeight:700, fontSize:36, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {paymentTab.total.toFixed(0)}</div>
+                      {discountAmount > 0 && (
+                        <div style={{ color:'#8A8A8A', fontSize:15, fontFamily:"'IBM Plex Mono', monospace", textDecoration:'line-through' }}>₺ {paymentTab.total.toFixed(0)}</div>
+                      )}
+                      <div style={{ color:'#C9A84C', fontWeight:700, fontSize:36, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {finalTotal.toFixed(0)}</div>
+                      {discountAmount > 0 && (
+                        <div style={{ color:'#e74c3c', fontSize:13, fontFamily:"'IBM Plex Mono', monospace", marginTop:2 }}>-₺{discountAmount.toFixed(0)} indirim</div>
+                      )}
+                    </div>
+
+                    {/* Discount */}
+                    <div style={{ marginBottom:16 }}>
+                      <div style={{ display:'flex', gap:8, marginBottom: discountType !== 'none' ? 10 : 0 }}>
+                        {(['none','percent','amount'] as const).map(d => (
+                          <button key={d} onClick={() => { setDiscountType(d); if (d === 'none') setDiscountValue('') }}
+                            style={{ flex:1, height:40, background: discountType===d ? 'rgba(201,168,76,.14)' : 'transparent', border: discountType===d ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: discountType===d ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                            {d==='none' ? 'İndirim Yok' : d==='percent' ? '% İndirim' : '₺ İndirim'}
+                          </button>
+                        ))}
+                      </div>
+                      {discountType !== 'none' && (
+                        <div style={{ display:'flex', gap:8 }}>
+                          <input type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)} placeholder={discountType==='percent' ? 'Örn. 10' : 'Örn. 50'}
+                            style={{ width:90, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }} />
+                          <input value={discountReason} onChange={e => setDiscountReason(e.target.value)} placeholder="İndirim nedeni (zorunlu)"
+                            style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ display:'flex', gap:8, marginBottom:16 }}>
@@ -1742,7 +1813,7 @@ export default function AdminPage() {
                       </div>
                     )}
 
-                    <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: paymentTab.total, cash: paymentMethod==='cash'?paymentTab.total:(parseFloat(splitCash)||0), card: paymentMethod==='card'?paymentTab.total:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders })}
+                    <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason, originalTotal: paymentTab.total })}
                       style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
 
                     <button onClick={confirmPayment}
@@ -1750,7 +1821,8 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
-            )}
+              )
+            })()}
 
             {/* View toggle - table map vs flat list, both roles see this */}
             <div style={{ display:'flex', gap:6, marginBottom:14 }}>
