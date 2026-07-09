@@ -232,6 +232,46 @@ export default function AdminPage() {
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
+  // Item-level void — removes one line item from an order, recomputes the
+  // total, and logs who/why for accountability (a real audit trail, not a
+  // silent edit)
+  const [voidingItem, setVoidingItem] = useState<{ order: any, itemIndex: number } | null>(null)
+  const [voidReason, setVoidReason] = useState('')
+
+  function openVoid(order: any, itemIndex: number) {
+    setVoidingItem({ order, itemIndex })
+    setVoidReason('')
+  }
+
+  async function confirmVoid() {
+    if (!voidingItem) return
+    if (!voidReason.trim()) { alert('Lütfen bir iptal nedeni girin.'); return }
+    const { order, itemIndex } = voidingItem
+    const item = order.items[itemIndex]
+    const newItems = order.items.filter((_: any, i: number) => i !== itemIndex)
+    const newTotal = newItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
+    const updates: any = { items: newItems, total: newTotal, handled_by: staffName }
+    if (newItems.length === 0) updates.status = 'dismissed'
+
+    const { error } = await supabase.from('orders').update(updates).eq('id', order.id)
+    if (error) {
+      alert('✗ İptal edilemedi.\n\n' + error.message)
+      return
+    }
+    await supabase.from('voids').insert({
+      order_id: order.id,
+      table_name: order.table_name,
+      item_name: item.name,
+      quantity: item.quantity,
+      amount: item.subtotal,
+      reason: voidReason.trim(),
+      voided_by: staffName,
+    })
+    setVoidingItem(null)
+    setVoidReason('')
+    await Promise.all([loadOrders(dateFilter), loadTableMapData()])
+  }
+
   async function requestBill(tabId: string) {
     await supabase.from('tabs').update({ bill_requested: true }).eq('id', tabId)
     await loadTableMapData()
@@ -1285,9 +1325,12 @@ export default function AdminPage() {
                               <span style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
                             </div>
                             {order.items?.map((item:any, i:number) => (
-                              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:14, color:'rgba(240,237,232,.85)', padding:'3px 0' }}>
+                              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:14, color:'rgba(240,237,232,.85)', padding:'3px 0' }}>
                                 <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
-                                <span style={{ color:'#B5B0A8', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
+                                <span style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                  <span style={{ color:'#B5B0A8', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
+                                  <button onClick={() => openVoid(order, i)} title="Ürünü iptal et" style={{ background:'transparent', border:'1px solid #383838', color:'#8A8A8A', width:26, height:26, cursor:'pointer', fontSize:12, lineHeight:1 }}>✕</button>
+                                </span>
                               </div>
                             ))}
                             {order.note && (
@@ -1330,6 +1373,29 @@ export default function AdminPage() {
                 </div>
               )
             })()}
+
+            {/* Void item modal - mandatory reason, logged to voids table */}
+            {voidingItem && (
+              <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setVoidingItem(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', border:'1px solid rgba(192,57,43,.4)', borderBottom:'none' }}>
+                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A' }}>
+                    <div style={{ color:'#e74c3c', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🗑️ Ürünü İptal Et</div>
+                    <div style={{ color:'#8A8A8A', fontSize:13, marginTop:4, fontFamily:"'IBM Plex Mono', monospace" }}>{voidingItem.order.items[voidingItem.itemIndex]?.quantity}× {voidingItem.order.items[voidingItem.itemIndex]?.name} — {voidingItem.order.table_name}</div>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    <label style={{ color:'#8A8A8A', fontSize:12, display:'block', marginBottom:8, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İPTAL NEDENİ</label>
+                    <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="Örn. Yanlış girildi, müşteri vazgeçti..."
+                      onKeyDown={e => e.key === 'Enter' && confirmVoid()}
+                      autoFocus
+                      style={{ width:'100%', height:52, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:15, marginBottom:16, outline:'none', fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => setVoidingItem(null)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', color:'#8A8A8A', fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>Vazgeç</button>
+                      <button onClick={confirmVoid} style={{ flex:1, height:48, background:'#C0392B', border:'none', color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>İptal Et</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Staff order builder - punch in a walk-in/phone/verbal order */}
             {addOrderTable && (
