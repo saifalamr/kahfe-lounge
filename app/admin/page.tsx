@@ -162,7 +162,8 @@ export default function AdminPage() {
   }, [auth])
 
   async function acceptOrder(id: string) {
-    await supabase.from('orders').update({ status: 'accepted' }).eq('id', id)
+    // Just acknowledges the popup notification - the order itself stays
+    // 'pending' until it's marked Tamamlandı from the main list/table map
     setNotifications(prev => prev.filter(n => n.id !== id))
   }
 
@@ -207,11 +208,9 @@ export default function AdminPage() {
     const openTab = openTabs.find((t: any) => t.table_name === tableName)
     if (!openTab) return { status: 'empty' as const, tabData: null, orders: [] as any[] }
     const orders = tabOrders.filter((o: any) => o.tab_id === openTab.id)
-    const active = orders.filter((o: any) => o.status !== 'served' && o.status !== 'dismissed')
-    let status: 'pending'|'preparing'|'ready'|'bill'|'occupied' = 'occupied'
-    if (active.some((o: any) => o.status === 'pending')) status = 'pending'
-    else if (active.some((o: any) => o.status === 'accepted')) status = 'preparing'
-    else if (active.some((o: any) => o.status === 'ready')) status = 'ready'
+    const hasPending = orders.some((o: any) => o.status === 'pending')
+    let status: 'pending'|'bill'|'occupied' = 'occupied'
+    if (hasPending) status = 'pending'
     else if (openTab.bill_requested) status = 'bill'
     return { status, tabData: openTab, orders }
   }
@@ -243,7 +242,7 @@ export default function AdminPage() {
   function printKitchenTicket(tableName: string, orders: any[]) {
     const win = window.open('', '_blank', 'width=420,height=700')
     if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
-    const activeItems = orders.filter((o: any) => o.status !== 'served' && o.status !== 'dismissed')
+    const activeItems = orders.filter((o: any) => o.status === 'pending')
     const rows = activeItems.flatMap((o: any) => (o.items || []).map((it: any) => ({ ...it, note: o.note })))
     const itemRows = rows.map((it: any) =>
       `<tr><td class="qty">${it.quantity}x</td><td>${it.name}</td></tr>`
@@ -414,13 +413,14 @@ export default function AdminPage() {
         return
       }
 
-      // Staff-entered orders go straight to "accepted" (Hazırlanıyor) —
-      // there's no need for a Kabul step on an order staff just typed in themselves
+      // Staff-entered orders still need to be prepared, so they start as
+      // "pending" the same as customer orders — under the simplified
+      // 2-stage flow (Bekliyor → Tamamlandı), there's no intermediate stage
       const { error: orderError } = await supabase.from('orders').insert({
         table_name: addOrderTable,
         items: orderItems,
         total: orderTotal,
-        status: 'accepted',
+        status: 'pending',
         note: null,
         tab_id: tabId,
         created_by: staffName,
@@ -553,7 +553,7 @@ export default function AdminPage() {
     const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : 'Bu Ay'
     const totalRevenue = revenueSummary.revenue
     const pending = allOrders.filter((o: any) => o.status === 'pending').length
-    const statusLabel = (st: string) => st==='pending'?'Bekliyor':st==='accepted'?'Hazırlanıyor':st==='ready'?'Hazır':st==='served'?'Teslim Edildi':'Kapatıldı'
+    const statusLabel = (st: string) => st==='pending'?'Bekliyor':st==='dismissed'?'Reddedildi':'Tamamlandı'
     const rows = allOrders.map((o: any, i: number) => {
       const itemsText = (o.items || []).map((it: any) => `${it.quantity}x ${it.name}`).join(', ')
       return `<tr><td>${i + 1}</td><td>🪑 ${o.table_name}</td><td>${new Date(o.created_at).toLocaleString('tr-TR')}</td><td>${itemsText}</td><td>${statusLabel(o.status)}</td><td style="text-align:right">${o.total} ₺</td></tr>`
@@ -1108,7 +1108,7 @@ export default function AdminPage() {
                     <span style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>TOPLAM: {order.total} ₺</span>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => dismissOrder(order.id)} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#888', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Kapat</button>
-                      <button onClick={() => acceptOrder(order.id)} style={{ background: '#27ae60', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>✓ Kabul Et</button>
+                      <button onClick={() => acceptOrder(order.id)} style={{ background: '#27ae60', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>✓ Gördüm</button>
                     </div>
                   </div>
                 </div>
@@ -1248,8 +1248,8 @@ export default function AdminPage() {
                         <div style={{ textAlign:'center', color:'#888', padding:'30px 0' }}>Bu masa şu an boş.</div>
                       )}
                       {activeOrders.map((order:any) => {
-                        const statusColor = order.status==='pending'?'#C0392B':order.status==='accepted'?'#f39c12':order.status==='ready'?'#27ae60':'#888'
-                        const statusLabel = order.status==='pending'?'Bekliyor':order.status==='accepted'?'Hazırlanıyor':order.status==='ready'?'Hazır':'Teslim Edildi'
+                        const statusColor = order.status==='pending'?'#C0392B':'#27ae60'
+                        const statusLabel = order.status==='pending'?'Bekliyor':'Tamamlandı'
                         return (
                           <div key={order.id} style={{ background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
@@ -1268,9 +1268,7 @@ export default function AdminPage() {
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
                               <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>{order.total} ₺</span>
                               <div style={{ display:'flex', gap:6 }}>
-                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'accepted')} style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Kabul</button>}
-                                {order.status === 'accepted' && <button onClick={() => updateOrderStatus(order.id, 'ready')} style={{ background:'#f39c12', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Hazır</button>}
-                                {order.status === 'ready' && <button onClick={() => updateOrderStatus(order.id, 'served')} style={{ background:'#2980b9', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Teslim</button>}
+                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Tamamlandı</button>}
                               </div>
                             </div>
                           </div>
@@ -1421,8 +1419,6 @@ export default function AdminPage() {
                 {/* Legend */}
                 <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16, fontSize:10, color:'#888' }}>
                   <span>🔴 Sipariş Bekliyor</span>
-                  <span>🟠 Hazırlanıyor</span>
-                  <span>🟢 Hazır</span>
                   <span>🔵 Hesap İstendi</span>
                   <span>🟡 Dolu</span>
                   <span>⚪ Boş</span>
@@ -1443,8 +1439,6 @@ export default function AdminPage() {
                           empty:     { bg:'#1A1A1A', border:'#2A2A2A', text:'#555', dot:'⚪' },
                           occupied:  { bg:'rgba(201,168,76,.10)', border:'rgba(201,168,76,.3)', text:'#C9A84C', dot:'🟡' },
                           pending:   { bg:'rgba(192,57,43,.15)', border:'#C0392B', text:'#e74c3c', dot:'🔴' },
-                          preparing: { bg:'rgba(243,156,18,.15)', border:'#f39c12', text:'#f39c12', dot:'🟠' },
-                          ready:     { bg:'rgba(39,174,96,.15)', border:'#27ae60', text:'#27ae60', dot:'🟢' },
                           bill:      { bg:'rgba(52,152,219,.15)', border:'#3498db', text:'#3498db', dot:'🔵' },
                         }
                         const p = palette[info.status]
@@ -1517,8 +1511,8 @@ export default function AdminPage() {
             )}
 
             {allOrders.map((order:any) => {
-              const statusColor = order.status==='pending'?'#C0392B':order.status==='accepted'?'#f39c12':order.status==='ready'?'#27ae60':'#888'
-              const statusLabel = order.status==='pending'?'Bekliyor':order.status==='accepted'?'Hazırlanıyor':order.status==='ready'?'Hazır':order.status==='served'?'Teslim Edildi':'Kapatıldı'
+              const statusColor = order.status==='pending'?'#C0392B':order.status==='dismissed'?'#888':'#27ae60'
+              const statusLabel = order.status==='pending'?'Bekliyor':order.status==='dismissed'?'Reddedildi':'Tamamlandı'
               return (
                 <div key={order.id} style={{ background:'#1A1A1A', border:`1px solid ${order.status==='pending'?'rgba(192,57,43,.4)':'#2A2A2A'}`, borderRadius:14, padding:'14px 16px', marginBottom:10 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
@@ -1546,16 +1540,8 @@ export default function AdminPage() {
                     <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>TOPLAM: {order.total} ₺</span>
                     <div style={{ display:'flex', gap:6 }}>
                       {order.status === 'pending' && (
-                        <button onClick={() => updateOrderStatus(order.id, 'accepted')}
-                          style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Kabul</button>
-                      )}
-                      {order.status === 'accepted' && (
-                        <button onClick={() => updateOrderStatus(order.id, 'ready')}
-                          style={{ background:'#f39c12', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Hazır</button>
-                      )}
-                      {order.status === 'ready' && (
                         <button onClick={() => updateOrderStatus(order.id, 'served')}
-                          style={{ background:'#2980b9', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Teslim</button>
+                          style={{ background:'#27ae60', border:'none', borderRadius:8, padding:'6px 12px', color:'#fff', fontSize:11, cursor:'pointer', fontWeight:700 }}>✓ Tamamlandı</button>
                       )}
                     </div>
                   </div>
