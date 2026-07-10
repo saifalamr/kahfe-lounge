@@ -2,6 +2,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
+import NotificationPopup from './components/NotificationPopup'
+import VoidModal from './components/VoidModal'
+import TransferPickerModal from './components/TransferPickerModal'
+import MonthlyReportModal from './components/MonthlyReportModal'
+import DayCloseModal from './components/DayCloseModal'
+import ItemReportModal from './components/ItemReportModal'
+import StaffReportModal from './components/StaffReportModal'
+import DebtorDetailModal from './components/DebtorDetailModal'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
@@ -1144,42 +1152,7 @@ export default function AdminPage() {
 
         {/* Notification Panel */}
         {showNotif && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} onClick={() => setShowNotif(false)}>
-            <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, margin: '0 auto', background: '#1A1A1A', borderRadius: 0, maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>🔔 YENİ SİPARİŞLER ({notifications.length})</span>
-                <button onClick={() => setShowNotif(false)} style={{ background: 'none', border: 'none', color: '#8A8A8A', fontSize: 18, cursor: 'pointer' }}>✕</button>
-              </div>
-              {notifications.length === 0 ? (
-                <div style={{ padding: 32, textAlign: 'center', color: '#8A8A8A' }}>Bekleyen sipariş yok</div>
-              ) : notifications.map((order: any) => (
-                <div key={order.id} style={{ padding: '16px 18px', borderBottom: '1px solid #2A2A2A' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ background: '#C0392B', color: '#fff', borderRadius: 0, padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.05em' }}>YENİ</span>
-                      <span style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>🪑 {order.table_name}</span>
-                    </div>
-                    <span style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <div style={{ marginBottom: 10 }}>
-                    {order.items.map((item: any, i: number) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#F0EDE8', padding: '3px 0', borderBottom: '1px solid rgba(240,237,232,.05)' }}>
-                        <span><span style={{ color: '#C9A84C', fontFamily: "'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
-                        <span style={{ color: '#B5B0A8', fontFamily: "'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(201,168,76,.2)' }}>
-                    <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 17, fontFamily: "'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => dismissOrder(order.id)} style={{ background: 'transparent', border: '1px solid #383838', borderRadius: 0, height: 40, padding: '0 14px', color: '#8A8A8A', fontSize: 13, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Kapat</button>
-                      <button onClick={() => acceptOrder(order.id)} style={{ background: '#27ae60', border: 'none', borderRadius: 0, height: 40, padding: '0 16px', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>✓ Gördüm</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <NotificationPopup notifications={notifications} onClose={() => setShowNotif(false)} onDismiss={dismissOrder} onAccept={acceptOrder} />
         )}
 
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
@@ -1203,216 +1176,25 @@ export default function AdminPage() {
 
             {/* Monthly report modal - managers only */}
             {isManager && showMonthlyReport && (
-              <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowMonthlyReport(null)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                  <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                    <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>📊 {showMonthlyReport.month} {showMonthlyReport.year} Raporu</div>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => exportMonthlyReportPDF(showMonthlyReport)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 0, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
-                      <button onClick={() => setShowMonthlyReport(null)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
-                    </div>
-                  </div>
-                  <div style={{ padding:'16px 20px' }}>
-                    <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-                      <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
-                        <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{showMonthlyReport.totalOrders}</div>
-                        <div style={{ color:'#8A8A8A', fontSize:11 }}>Sipariş</div>
-                      </div>
-                      <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
-                        <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{formatTL(Number(showMonthlyReport.totalRevenue))} ₺</div>
-                        <div style={{ color:'#8A8A8A', fontSize:11 }}>Ciro</div>
-                      </div>
-                    </div>
-                    <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:1, marginBottom:10 }}>EN ÇOK SATILAN ÜRÜNLER</div>
-                    {showMonthlyReport.topItems?.slice(0,5).map((item:any, i:number) => (
-                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2A2A2A', fontSize:13 }}>
-                        <span style={{ color:'#F0EDE8' }}>#{i+1} {item.name}</span>
-                        <span style={{ color:'#C9A84C' }}>{item.count} adet · {item.revenue} ₺</span>
-                      </div>
-                    ))}
-                    <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:1, margin:'16px 0 10px' }}>EN YÜKSEK CİROLU MASALAR</div>
-                    {showMonthlyReport.topTables?.slice(0,5).map((t:any, i:number) => (
-                      <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #2A2A2A', fontSize:13 }}>
-                        <span style={{ color:'#F0EDE8' }}>#{i+1} {t.name}</span>
-                        <span style={{ color:'#C9A84C' }}>{t.revenue} ₺</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <MonthlyReportModal report={showMonthlyReport} onExportPDF={() => exportMonthlyReportPDF(showMonthlyReport)} onClose={() => setShowMonthlyReport(null)} />
             )}
 
             {/* Day-end close-out modal */}
-            {isManager && showDayClose && dayCloseData && (() => {
-              const counted = parseFloat(countedCash)
-              const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
-              return (
-                <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowDayClose(false)}>
-                  <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', borderBottom:'none' }}>
-                    <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                      <div style={{ color:'#3498db', fontWeight:800, fontSize:16 }}>🌙 Gün Sonu</div>
-                      <div style={{ display:'flex', gap:8 }}>
-                        <button onClick={() => printDayClosePDF(dayCloseData, countedCash)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 0, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
-                        <button onClick={() => setShowDayClose(false)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
-                      </div>
-                    </div>
-                    <div style={{ padding:'20px' }}>
-                      <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#8A8A8A', fontSize:11 }}>KAPANAN MASA</div>
-                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:20 }}>{dayCloseData.tabCount}</div>
-                        </div>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM CİRO</div>
-                          <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{formatTL(dayCloseData.totalRevenue)} ₺</div>
-                        </div>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#8A8A8A', fontSize:11 }}>💵 NAKİT</div>
-                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cashTotal)} ₺</div>
-                        </div>
-                        <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
-                          <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
-                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cardTotal)} ₺</div>
-                        </div>
-                        {dayCloseData.discountTotal > 0 && (
-                          <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
-                            <div style={{ color:'#8A8A8A', fontSize:11 }}>🏷️ İNDİRİM</div>
-                            <div style={{ color:'#e74c3c', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.discountTotal)} ₺</div>
-                          </div>
-                        )}
-                      </div>
-
-                      <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺)</label>
-                      <input type="number" value={countedCash} onChange={e => setCountedCash(e.target.value)} placeholder="Örn. 3450"
-                        style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:'12px', color:'#F0EDE8', fontSize:16, marginBottom:10 }} />
-
-                      {diff !== null && (
-                        <div style={{ textAlign:'center', padding:'10px', marginBottom:16, borderRadius: 0, background: diff===0 ? 'rgba(39,174,96,.1)' : diff>0 ? 'rgba(52,152,219,.1)' : 'rgba(192,57,43,.1)', border:`1px solid ${diff===0 ? 'rgba(39,174,96,.3)' : diff>0 ? 'rgba(52,152,219,.3)' : 'rgba(192,57,43,.3)'}` }}>
-                          <span style={{ color: diff===0 ? '#27ae60' : diff>0 ? '#3498db' : '#e74c3c', fontWeight:800, fontSize:14 }}>
-                            {diff===0 ? '✓ Kasa tam uyuyor' : diff>0 ? `Kasada ${formatTL(diff)} ₺ fazla var` : `Kasada ${formatTL(Math.abs(diff))} ₺ eksik var`}
-                          </span>
-                        </div>
-                      )}
-
-                      <button onClick={saveDayClose} style={{ width:'100%', background:'#3498db', border:'none', borderRadius: 0, padding:14, color:'#fff', fontSize:14, cursor:'pointer', fontWeight:800 }}>✓ Gün Sonunu Kaydet</button>
-                      <div style={{ color:'#666', fontSize:10, marginTop:10, textAlign:'center' }}>Bu, bugün ödemesi alınıp kapatılmış masaları özetler. Henüz kapatılmamış açık masalar dahil değildir.</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })()}
+            {isManager && showDayClose && dayCloseData && (
+              <DayCloseModal dayCloseData={dayCloseData} countedCash={countedCash} onCountedCashChange={setCountedCash}
+                onSave={saveDayClose} onExportPDF={() => printDayClosePDF(dayCloseData, countedCash)} onClose={() => setShowDayClose(false)} />
+            )}
 
             {/* Ürün Raporu - per-item sales breakdown */}
             {isManager && showItemReport && (
-              <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowItemReport(false)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                    <div style={{ color:'#C9A84C', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>📦 Ürün Raporu</div>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => printItemReportPDF(itemReportRange, itemReportData)} style={{ background:'transparent', border:'1px solid #383838', height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📄 PDF</button>
-                      <button onClick={() => setShowItemReport(false)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
-                    </div>
-                  </div>
-                  <div style={{ padding:20 }}>
-                    <div style={{ display:'flex', gap:6, marginBottom:16 }}>
-                      {(['today','month','year'] as const).map(f => (
-                        <button key={f} onClick={() => openItemReport(f)}
-                          style={{ flex:1, height:40, background: itemReportRange===f ? 'rgba(201,168,76,.14)' : 'transparent', border: itemReportRange===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: itemReportRange===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                          {f==='today'?'Bugün':f==='month'?'Bu Ay':'Bu Yıl'}
-                        </button>
-                      ))}
-                    </div>
-
-                    {itemReportData.length === 0 && (
-                      <div style={{ textAlign:'center', color:'#8A8A8A', padding:'30px 0' }}>Bu aralıkta veri yok.</div>
-                    )}
-
-                    {itemReportData.map((cat: any) => (
-                      <div key={cat.categoryId} style={{ marginBottom: 18 }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', background:'rgba(201,168,76,.08)', border:'1px solid rgba(201,168,76,.2)' }}>
-                          <div style={{ color:'#C9A84C', fontWeight:700, fontSize:14, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{cat.icon} {cat.categoryName}</div>
-                          <div style={{ display:'flex', gap:14, alignItems:'center' }}>
-                            <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{cat.qty} adet</div>
-                            <div style={{ color:'#C9A84C', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{formatTL(cat.revenue)}</div>
-                          </div>
-                        </div>
-                        {cat.items.map((r: any) => (
-                          <div key={r.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px 10px 24px', borderBottom:'1px solid #2A2A2A' }}>
-                            <div style={{ color:'#F0EDE8', fontSize:13 }}>{r.name}</div>
-                            <div style={{ display:'flex', gap:16, alignItems:'center' }}>
-                              <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{r.qty} adet</div>
-                              <div style={{ color:'#B5B0A8', fontWeight:600, fontSize:13, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{formatTL(r.revenue)}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <ItemReportModal itemReportRange={itemReportRange} itemReportData={itemReportData} onRangeChange={openItemReport}
+                onExportPDF={() => printItemReportPDF(itemReportRange, itemReportData)} onClose={() => setShowItemReport(false)} />
             )}
 
             {/* Staff Performance report modal */}
             {isManager && showStaffReport && (
-              <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowStaffReport(false)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                    <div style={{ color:'#C9A84C', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>👤 Personel Performansı</div>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => printStaffReportPDF(staffReportRange, staffReportData)} style={{ background:'transparent', border:'1px solid #383838', height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📄 PDF</button>
-                      <button onClick={() => setShowStaffReport(false)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
-                    </div>
-                  </div>
-                  <div style={{ padding:20 }}>
-                    <div style={{ display:'flex', gap:6, marginBottom:18 }}>
-                      {(['today','week','month'] as const).map(f => (
-                        <button key={f} onClick={() => openStaffReport(f)}
-                          style={{ flex:1, height:40, background: staffReportRange===f ? 'rgba(201,168,76,.14)' : 'transparent', border: staffReportRange===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: staffReportRange===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                          {f==='today'?'Bugün':f==='week'?'Bu Hafta':'Bu Ay'}
-                        </button>
-                      ))}
-                    </div>
-
-                    {staffReportData.length === 0 && (
-                      <div style={{ textAlign:'center', color:'#8A8A8A', padding:'30px 0' }}>Bu aralıkta veri yok.</div>
-                    )}
-
-                    {staffReportData.map((r: any) => (
-                      <div key={r.name} style={{ background:'#1A1A1A', border:'1px solid #2A2A2A', padding:'16px 18px', marginBottom:10 }}>
-                        <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif", marginBottom:12 }}>{r.name}</div>
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10 }}>
-                          <div>
-                            <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>Girilen Sipariş</div>
-                            <div style={{ color:'#F0EDE8', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>{r.ordersCreated}</div>
-                          </div>
-                          <div>
-                            <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>Tamamlanan</div>
-                            <div style={{ color:'#F0EDE8', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>{r.ordersHandled}</div>
-                          </div>
-                          <div>
-                            <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>Kapatılan Masa</div>
-                            <div style={{ color:'#F0EDE8', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>{r.tabsClosed}</div>
-                          </div>
-                          <div>
-                            <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>Ciro</div>
-                            <div style={{ color:'#C9A84C', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(r.revenueClosed)}</div>
-                          </div>
-                          <div>
-                            <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>İptal</div>
-                            <div style={{ color: r.voidsCount > 0 ? '#e74c3c' : '#F0EDE8', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>{r.voidsCount}</div>
-                          </div>
-                          {r.voidsCount > 0 && (
-                            <div>
-                              <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>İptal Tutarı</div>
-                              <div style={{ color:'#e74c3c', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(r.voidsAmount)}</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <StaffReportModal staffReportRange={staffReportRange} staffReportData={staffReportData} onRangeChange={openStaffReport}
+                onExportPDF={() => printStaffReportPDF(staffReportRange, staffReportData)} onClose={() => setShowStaffReport(false)} />
             )}
 
             {/* Table drilldown modal - tap a table on the map */}
@@ -1500,53 +1282,12 @@ export default function AdminPage() {
 
             {/* Void item modal - mandatory reason, logged to voids table */}
             {voidingItem && (
-              <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setVoidingItem(null)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', border:'1px solid rgba(192,57,43,.4)', borderBottom:'none' }}>
-                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A' }}>
-                    <div style={{ color:'#e74c3c', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🗑️ Ürünü İptal Et</div>
-                    <div style={{ color:'#8A8A8A', fontSize:13, marginTop:4, fontFamily:"'IBM Plex Mono', monospace" }}>{voidingItem.order.items[voidingItem.itemIndex]?.quantity}× {voidingItem.order.items[voidingItem.itemIndex]?.name} — {voidingItem.order.table_name}</div>
-                  </div>
-                  <div style={{ padding:20 }}>
-                    <label style={{ color:'#8A8A8A', fontSize:12, display:'block', marginBottom:8, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İPTAL NEDENİ</label>
-                    <input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="Örn. Yanlış girildi, müşteri vazgeçti..."
-                      onKeyDown={e => e.key === 'Enter' && confirmVoid()}
-                      autoFocus
-                      style={{ width:'100%', height:52, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:15, marginBottom:16, outline:'none', fontFamily:"'IBM Plex Sans', sans-serif" }} />
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button onClick={() => setVoidingItem(null)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', color:'#8A8A8A', fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>Vazgeç</button>
-                      <button onClick={confirmVoid} style={{ flex:1, height:48, background:'#C0392B', border:'none', color:'#fff', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>İptal Et</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <VoidModal voidingItem={voidingItem} voidReason={voidReason} onReasonChange={setVoidReason} onCancel={() => setVoidingItem(null)} onConfirm={confirmVoid} />
             )}
 
             {/* Transfer/merge destination picker */}
             {showTransferPicker && (
-              <div style={{ position:'fixed', inset:0, zIndex:225, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowTransferPicker(null)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'80vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🔀 {showTransferPicker} — Nereye?</div>
-                    <button onClick={() => setShowTransferPicker(null)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
-                  </div>
-                  <div style={{ padding:20 }}>
-                    <div style={{ color:'#8A8A8A', fontSize:12, marginBottom:16 }}>Boş bir masaya taşınır. Dolu bir masa seçilirse, iki adisyon birleştirilir.</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(96px, 1fr))', gap:8 }}>
-                      {ALL_TABLES.filter(t => t !== showTransferPicker).map(t => {
-                        const info = getTableInfo(t)
-                        const isEmpty = info.status === 'empty'
-                        return (
-                          <button key={t} onClick={() => transferOrMergeTab(showTransferPicker, t)}
-                            style={{ background: isEmpty ? '#161616' : '#221E12', border: isEmpty ? '1px solid #2A2A2A' : '1px solid rgba(201,168,76,.5)', borderRadius: 0, padding:'10px 8px', cursor:'pointer', textAlign:'left' }}>
-                            <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:14, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{t}</div>
-                            <div style={{ color: isEmpty ? '#6E6E6E' : '#C9A84C', fontSize:10, fontFamily:"'IBM Plex Mono', monospace", textTransform:'uppercase', marginTop:4 }}>{isEmpty ? 'Boş' : 'Birleştir'}</div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <TransferPickerModal sourceTable={showTransferPicker} allTables={ALL_TABLES} getTableInfo={getTableInfo} onTransfer={transferOrMergeTab} onClose={() => setShowTransferPicker(null)} />
             )}
 
             {/* Staff order builder - punch in a walk-in/phone/verbal order */}
@@ -2188,59 +1929,12 @@ export default function AdminPage() {
           if (!debtor) return null
           const stats = debtorStats(debtDetailId)
           return (
-            <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setDebtDetailId(null)}>
-              <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
-                <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div>
-                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{debtor.name}</div>
-                    {debtor.phone && <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{debtor.phone}</div>}
-                  </div>
-                  <button onClick={() => setDebtDetailId(null)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
-                </div>
-                <div style={{ padding:20 }}>
-                  <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-                    <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
-                      <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM BORÇ</div>
-                      <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(stats.borc)}</div>
-                    </div>
-                    <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
-                      <div style={{ color:'#8A8A8A', fontSize:11 }}>ÖDENEN</div>
-                      <div style={{ color:'#27ae60', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(stats.odenen)}</div>
-                    </div>
-                    <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
-                      <div style={{ color:'#8A8A8A', fontSize:11 }}>KALAN</div>
-                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(stats.kalan)}</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                    <input type="number" value={debtPaymentAmount} onChange={e => setDebtPaymentAmount(e.target.value)} placeholder="Ödeme tutarı (₺)"
-                      style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }} />
-                    <button onClick={() => recordDebtPayment(debtDetailId)} style={{ height:48, padding:'0 20px', background:'#27ae60', border:'none', color:'#fff', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Ödeme Al</button>
-                  </div>
-
-                  <div style={{ display:'flex', gap:8, marginBottom:20 }}>
-                    <input type="number" value={manualDebtAmount} onChange={e => setManualDebtAmount(e.target.value)} placeholder="Manuel borç tutarı (₺)"
-                      style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }} />
-                    <input value={manualDebtNote} onChange={e => setManualDebtNote(e.target.value)} placeholder="Not (opsiyonel)"
-                      style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
-                    <button onClick={() => addManualDebt(debtDetailId)} style={{ height:48, padding:'0 16px', background:'transparent', border:'1px solid #C0392B', color:'#e74c3c', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>+ Borç Ekle</button>
-                  </div>
-
-                  <div style={{ color:'#8A8A8A', fontSize:11, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Hareketler</div>
-                  {stats.txs.length === 0 && <div style={{ color:'#8A8A8A', fontSize:13, textAlign:'center', padding:'10px 0' }}>Henüz hareket yok.</div>}
-                  {stats.txs.map((t: any) => (
-                    <div key={t.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderTop:'1px solid #2A2A2A' }}>
-                      <div>
-                        <div style={{ color: t.type === 'borç' ? '#e74c3c' : '#27ae60', fontSize:13, fontWeight:600 }}>{t.type === 'borç' ? 'Borç' : 'Ödeme'}{t.fatura_no ? ` · Fiş #${t.fatura_no}` : ''}</div>
-                        <div style={{ color:'#8A8A8A', fontSize:11 }}>{new Date(t.created_at).toLocaleString('tr-TR')} {t.note ? `· ${t.note}` : ''}</div>
-                      </div>
-                      <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(Number(t.amount))}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <DebtorDetailModal debtor={debtor} stats={stats}
+              debtPaymentAmount={debtPaymentAmount} onDebtPaymentAmountChange={setDebtPaymentAmount}
+              manualDebtAmount={manualDebtAmount} onManualDebtAmountChange={setManualDebtAmount}
+              manualDebtNote={manualDebtNote} onManualDebtNoteChange={setManualDebtNote}
+              onRecordPayment={() => recordDebtPayment(debtDetailId)} onAddManualDebt={() => addManualDebt(debtDetailId)}
+              onClose={() => setDebtDetailId(null)} />
           )
         })()}
       </div>
