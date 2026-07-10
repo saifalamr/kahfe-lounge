@@ -690,16 +690,31 @@ export default function AdminPage() {
     setItemReportRange(range)
     const fromDate = itemReportFromDate(range)
     const { data: rangeOrders } = await supabase.from('orders').select('items').gte('created_at', fromDate).neq('status', 'dismissed')
-    const itemMap: Record<string, { name: string, qty: number, revenue: number }> = {}
+    const itemMap: Record<string, { name: string, qty: number, revenue: number, categoryId: string | null }> = {}
     ;(rangeOrders || []).forEach((o: any) => {
       (o.items || []).forEach((it: any) => {
-        if (!itemMap[it.name]) itemMap[it.name] = { name: it.name, qty: 0, revenue: 0 }
+        if (!itemMap[it.name]) {
+          const menuItem = items.find((mi: any) => mi.id === it.id)
+          itemMap[it.name] = { name: it.name, qty: 0, revenue: 0, categoryId: menuItem?.category_id || null }
+        }
         itemMap[it.name].qty += Number(it.quantity)
         itemMap[it.name].revenue += Number(it.subtotal)
       })
     })
-    const rows = Object.values(itemMap).sort((a: any, b: any) => b.revenue - a.revenue)
-    setItemReportData(rows)
+
+    const catMap: Record<string, { categoryId: string, categoryName: string, icon: string, qty: number, revenue: number, items: any[] }> = {}
+    Object.values(itemMap).forEach((r: any) => {
+      const cat = categories.find((c: any) => c.id === r.categoryId)
+      const key = r.categoryId || '__other__'
+      if (!catMap[key]) catMap[key] = { categoryId: key, categoryName: cat?.name || 'Diğer', icon: cat?.icon || '📦', qty: 0, revenue: 0, items: [] }
+      catMap[key].qty += r.qty
+      catMap[key].revenue += r.revenue
+      catMap[key].items.push(r)
+    })
+    const catRows = Object.values(catMap).sort((a, b) => b.revenue - a.revenue)
+    catRows.forEach(c => c.items.sort((a: any, b: any) => b.revenue - a.revenue))
+
+    setItemReportData(catRows)
     setShowItemReport(true)
   }
 
@@ -1305,13 +1320,24 @@ export default function AdminPage() {
                       <div style={{ textAlign:'center', color:'#8A8A8A', padding:'30px 0' }}>Bu aralıkta veri yok.</div>
                     )}
 
-                    {itemReportData.map((r: any) => (
-                      <div key={r.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderTop:'1px solid #2A2A2A' }}>
-                        <div style={{ color:'#F0EDE8', fontSize:14, fontWeight:600 }}>{r.name}</div>
-                        <div style={{ display:'flex', gap:16, alignItems:'center' }}>
-                          <div style={{ color:'#8A8A8A', fontSize:13, fontFamily:"'IBM Plex Mono', monospace" }}>{r.qty} adet</div>
-                          <div style={{ color:'#C9A84C', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{r.revenue.toFixed(0)}</div>
+                    {itemReportData.map((cat: any) => (
+                      <div key={cat.categoryId} style={{ marginBottom: 18 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', background:'rgba(201,168,76,.08)', border:'1px solid rgba(201,168,76,.2)' }}>
+                          <div style={{ color:'#C9A84C', fontWeight:700, fontSize:14, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{cat.icon} {cat.categoryName}</div>
+                          <div style={{ display:'flex', gap:14, alignItems:'center' }}>
+                            <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{cat.qty} adet</div>
+                            <div style={{ color:'#C9A84C', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{cat.revenue.toFixed(0)}</div>
+                          </div>
                         </div>
+                        {cat.items.map((r: any) => (
+                          <div key={r.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px 10px 24px', borderBottom:'1px solid #2A2A2A' }}>
+                            <div style={{ color:'#F0EDE8', fontSize:13 }}>{r.name}</div>
+                            <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+                              <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{r.qty} adet</div>
+                              <div style={{ color:'#B5B0A8', fontWeight:600, fontSize:13, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{r.revenue.toFixed(0)}</div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>

@@ -216,10 +216,16 @@ export function printItemReportPDF(itemReportRange: 'today'|'month'|'year', item
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const label = itemReportRange === 'today' ? 'Bugün' : itemReportRange === 'month' ? 'Bu Ay' : 'Bu Yıl'
-  const totalRevenue = itemReportData.reduce((s: number, r: any) => s + r.revenue, 0)
-  const rows = itemReportData.map((r: any, i: number) => `
-    <tr><td>${i + 1}</td><td>${r.name}</td><td style="text-align:right">${r.qty}</td><td style="text-align:right">${r.revenue.toFixed(0)} ₺</td></tr>
-  `).join('')
+  const totalRevenue = itemReportData.reduce((s: number, c: any) => s + c.revenue, 0)
+  const sections = itemReportData.map((cat: any) => {
+    const rows = cat.items.map((r: any) => `
+      <tr><td style="padding-left:20px">${r.name}</td><td style="text-align:right">${r.qty}</td><td style="text-align:right">${r.revenue.toFixed(0)} ₺</td></tr>
+    `).join('')
+    return `
+      <tr style="background:#f7f2e2;"><td><b>${cat.icon} ${cat.categoryName}</b></td><td style="text-align:right"><b>${cat.qty}</b></td><td style="text-align:right"><b>${cat.revenue.toFixed(0)} ₺</b></td></tr>
+      ${rows}
+    `
+  }).join('')
   win.document.write(`
     <!DOCTYPE html>
     <html lang="tr">
@@ -244,8 +250,8 @@ export function printItemReportPDF(itemReportRange: 'today'|'month'|'year', item
       <h1>Ürün Raporu — ${label}</h1>
       <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Toplam Ciro (Ürün Bazlı)</div></div>
       <table>
-        <tr><th>#</th><th>Ürün</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>
-        ${rows || '<tr><td colspan="4">Bu aralıkta veri yok</td></tr>'}
+        <tr><th>Ürün / Kategori</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>
+        ${sections || '<tr><td colspan="3">Bu aralıkta veri yok</td></tr>'}
       </table>
       <script>window.onload = function(){ window.print(); };</script>
     </body>
