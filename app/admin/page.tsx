@@ -1189,6 +1189,11 @@ export default function AdminPage() {
               style={{ background: '#2A2A2A', border: '1px solid #383838', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
               🍳
             </a>
+            {/* Nargile Display link */}
+            <a href="/nargile" target="_blank" rel="noopener noreferrer"
+              style={{ background: '#2A2A2A', border: '1px solid #383838', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
+              💨
+            </a>
             {/* Notification Bell */}
             <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
               style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : '#2A2A2A', border: newOrderAlert ? '1px solid #C0392B' : '1px solid #383838', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
