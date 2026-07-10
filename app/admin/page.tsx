@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
 import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
+import { formatTL } from './lib/format'
 
 const ADMIN_PASSWORD = '1234'
 const STAFF_PASSWORD = '5678'
@@ -410,7 +411,7 @@ export default function AdminPage() {
       cash = parseFloat(splitCash) || 0
       card = parseFloat(splitCard) || 0
       if (Math.abs((cash + card) - finalTotal) > 0.5) {
-        alert(`Nakit + Kart tutarı ödenecek tutarla eşleşmiyor.\n\nÖdenecek tutar: ${finalTotal.toFixed(0)} ₺\nGirilen: ${(cash + card).toFixed(0)} ₺`)
+        alert(`Nakit + Kart tutarı ödenecek tutarla eşleşmiyor.\n\nÖdenecek tutar: ${formatTL(finalTotal)} ₺\nGirilen: ${formatTL(cash + card)} ₺`)
         return
       }
     }
@@ -791,7 +792,7 @@ export default function AdminPage() {
       return
     }
     setShowDayClose(false)
-    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${dayCloseData.totalRevenue.toFixed(0)} ₺\nNakit: ${dayCloseData.cashTotal.toFixed(0)} ₺\nKart: ${dayCloseData.cardTotal.toFixed(0)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} ₺` : ''}`)
+    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit: ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
   }
 
 
@@ -1212,7 +1213,7 @@ export default function AdminPage() {
                         <div style={{ color:'#8A8A8A', fontSize:11 }}>Sipariş</div>
                       </div>
                       <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
-                        <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{Number(showMonthlyReport.totalRevenue).toFixed(0)} ₺</div>
+                        <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{formatTL(Number(showMonthlyReport.totalRevenue))} ₺</div>
                         <div style={{ color:'#8A8A8A', fontSize:11 }}>Ciro</div>
                       </div>
                     </div>
@@ -1257,20 +1258,20 @@ export default function AdminPage() {
                         </div>
                         <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
                           <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM CİRO</div>
-                          <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{dayCloseData.totalRevenue.toFixed(0)} ₺</div>
+                          <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{formatTL(dayCloseData.totalRevenue)} ₺</div>
                         </div>
                         <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
                           <div style={{ color:'#8A8A8A', fontSize:11 }}>💵 NAKİT</div>
-                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cashTotal.toFixed(0)} ₺</div>
+                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cashTotal)} ₺</div>
                         </div>
                         <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
                           <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
-                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{dayCloseData.cardTotal.toFixed(0)} ₺</div>
+                          <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cardTotal)} ₺</div>
                         </div>
                         {dayCloseData.discountTotal > 0 && (
                           <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
                             <div style={{ color:'#8A8A8A', fontSize:11 }}>🏷️ İNDİRİM</div>
-                            <div style={{ color:'#e74c3c', fontWeight:800, fontSize:18 }}>{dayCloseData.discountTotal.toFixed(0)} ₺</div>
+                            <div style={{ color:'#e74c3c', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.discountTotal)} ₺</div>
                           </div>
                         )}
                       </div>
@@ -1282,7 +1283,7 @@ export default function AdminPage() {
                       {diff !== null && (
                         <div style={{ textAlign:'center', padding:'10px', marginBottom:16, borderRadius: 0, background: diff===0 ? 'rgba(39,174,96,.1)' : diff>0 ? 'rgba(52,152,219,.1)' : 'rgba(192,57,43,.1)', border:`1px solid ${diff===0 ? 'rgba(39,174,96,.3)' : diff>0 ? 'rgba(52,152,219,.3)' : 'rgba(192,57,43,.3)'}` }}>
                           <span style={{ color: diff===0 ? '#27ae60' : diff>0 ? '#3498db' : '#e74c3c', fontWeight:800, fontSize:14 }}>
-                            {diff===0 ? '✓ Kasa tam uyuyor' : diff>0 ? `Kasada ${diff.toFixed(0)} ₺ fazla var` : `Kasada ${Math.abs(diff).toFixed(0)} ₺ eksik var`}
+                            {diff===0 ? '✓ Kasa tam uyuyor' : diff>0 ? `Kasada ${formatTL(diff)} ₺ fazla var` : `Kasada ${formatTL(Math.abs(diff))} ₺ eksik var`}
                           </span>
                         </div>
                       )}
@@ -1326,7 +1327,7 @@ export default function AdminPage() {
                           <div style={{ color:'#C9A84C', fontWeight:700, fontSize:14, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{cat.icon} {cat.categoryName}</div>
                           <div style={{ display:'flex', gap:14, alignItems:'center' }}>
                             <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{cat.qty} adet</div>
-                            <div style={{ color:'#C9A84C', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{cat.revenue.toFixed(0)}</div>
+                            <div style={{ color:'#C9A84C', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{formatTL(cat.revenue)}</div>
                           </div>
                         </div>
                         {cat.items.map((r: any) => (
@@ -1334,7 +1335,7 @@ export default function AdminPage() {
                             <div style={{ color:'#F0EDE8', fontSize:13 }}>{r.name}</div>
                             <div style={{ display:'flex', gap:16, alignItems:'center' }}>
                               <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{r.qty} adet</div>
-                              <div style={{ color:'#B5B0A8', fontWeight:600, fontSize:13, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{r.revenue.toFixed(0)}</div>
+                              <div style={{ color:'#B5B0A8', fontWeight:600, fontSize:13, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{formatTL(r.revenue)}</div>
                             </div>
                           </div>
                         ))}
@@ -1388,7 +1389,7 @@ export default function AdminPage() {
                           </div>
                           <div>
                             <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>Ciro</div>
-                            <div style={{ color:'#C9A84C', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {r.revenueClosed.toFixed(0)}</div>
+                            <div style={{ color:'#C9A84C', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(r.revenueClosed)}</div>
                           </div>
                           <div>
                             <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>İptal</div>
@@ -1397,7 +1398,7 @@ export default function AdminPage() {
                           {r.voidsCount > 0 && (
                             <div>
                               <div style={{ color:'#8A8A8A', fontSize:10, textTransform:'uppercase', letterSpacing:'0.05em' }}>İptal Tutarı</div>
-                              <div style={{ color:'#e74c3c', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {r.voidsAmount.toFixed(0)}</div>
+                              <div style={{ color:'#e74c3c', fontSize:18, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(r.voidsAmount)}</div>
                             </div>
                           )}
                         </div>
@@ -1456,7 +1457,7 @@ export default function AdminPage() {
                       {activeOrders.length > 0 && (
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 2px', marginTop:6, marginBottom:16 }}>
                           <span style={{ color:'#8A8A8A', fontSize:11, fontWeight:600, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase' }}>Masa Toplamı</span>
-                          <span style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {tabTotal.toFixed(0)}</span>
+                          <span style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(tabTotal)}</span>
                         </div>
                       )}
 
@@ -1587,7 +1588,7 @@ export default function AdminPage() {
                 <div style={{ padding:'14px 16px', borderTop:'1px solid #2A2A2A', display:'flex', alignItems:'center', gap:12 }}>
                   <div style={{ flex:1 }}>
                     <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{staffCartCount} ürün</div>
-                    <div style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {staffCartTotal.toFixed(0)}</div>
+                    <div style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(staffCartTotal)}</div>
                   </div>
                   <button onClick={submitStaffOrder} disabled={staffCartCount===0}
                     style={{ background: staffCartCount===0 ? '#2A2A2A' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: staffCartCount===0 ? '#666' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>Siparişi Gönder</button>
@@ -1610,11 +1611,11 @@ export default function AdminPage() {
                     <div style={{ textAlign:'center', marginBottom:16 }}>
                       <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>ÖDENECEK TUTAR</div>
                       {discountAmount > 0 && (
-                        <div style={{ color:'#8A8A8A', fontSize:15, fontFamily:"'IBM Plex Mono', monospace", textDecoration:'line-through' }}>₺ {paymentTab.total.toFixed(0)}</div>
+                        <div style={{ color:'#8A8A8A', fontSize:15, fontFamily:"'IBM Plex Mono', monospace", textDecoration:'line-through' }}>₺ {formatTL(paymentTab.total)}</div>
                       )}
-                      <div style={{ color:'#C9A84C', fontWeight:700, fontSize:36, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {finalTotal.toFixed(0)}</div>
+                      <div style={{ color:'#C9A84C', fontWeight:700, fontSize:36, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(finalTotal)}</div>
                       {discountAmount > 0 && (
-                        <div style={{ color:'#e74c3c', fontSize:13, fontFamily:"'IBM Plex Mono', monospace", marginTop:2 }}>-₺{discountAmount.toFixed(0)} indirim</div>
+                        <div style={{ color:'#e74c3c', fontSize:13, fontFamily:"'IBM Plex Mono', monospace", marginTop:2 }}>-₺{formatTL(discountAmount)} indirim</div>
                       )}
                     </div>
 
@@ -1790,7 +1791,7 @@ export default function AdminPage() {
                   <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Bekliyor</div>
                 </div>
                 <div style={{ textAlign:'center' }}>
-                  <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {revenueSummary.revenue.toFixed(0)}</div>
+                  <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(revenueSummary.revenue)}</div>
                   <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Ciro (Tahsil Edilen)</div>
                 </div>
               </div>
@@ -2158,15 +2159,15 @@ export default function AdminPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                     <div>
                       <div style={{ color: '#8A8A8A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Toplam Borç</div>
-                      <div style={{ color: '#F0EDE8', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{stats.borc.toFixed(0)}</div>
+                      <div style={{ color: '#F0EDE8', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(stats.borc)}</div>
                     </div>
                     <div>
                       <div style={{ color: '#8A8A8A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ödenen</div>
-                      <div style={{ color: '#27ae60', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{stats.odenen.toFixed(0)}</div>
+                      <div style={{ color: '#27ae60', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(stats.odenen)}</div>
                     </div>
                     <div>
                       <div style={{ color: '#8A8A8A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kalan</div>
-                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{stats.kalan.toFixed(0)}</div>
+                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(stats.kalan)}</div>
                     </div>
                   </div>
                 </div>
@@ -2194,15 +2195,15 @@ export default function AdminPage() {
                   <div style={{ display:'flex', gap:10, marginBottom:20 }}>
                     <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
                       <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM BORÇ</div>
-                      <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{stats.borc.toFixed(0)}</div>
+                      <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(stats.borc)}</div>
                     </div>
                     <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
                       <div style={{ color:'#8A8A8A', fontSize:11 }}>ÖDENEN</div>
-                      <div style={{ color:'#27ae60', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{stats.odenen.toFixed(0)}</div>
+                      <div style={{ color:'#27ae60', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(stats.odenen)}</div>
                     </div>
                     <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
                       <div style={{ color:'#8A8A8A', fontSize:11 }}>KALAN</div>
-                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{stats.kalan.toFixed(0)}</div>
+                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(stats.kalan)}</div>
                     </div>
                   </div>
 
@@ -2228,7 +2229,7 @@ export default function AdminPage() {
                         <div style={{ color: t.type === 'borç' ? '#e74c3c' : '#27ae60', fontSize:13, fontWeight:600 }}>{t.type === 'borç' ? 'Borç' : 'Ödeme'}{t.fatura_no ? ` · Fiş #${t.fatura_no}` : ''}</div>
                         <div style={{ color:'#8A8A8A', fontSize:11 }}>{new Date(t.created_at).toLocaleString('tr-TR')} {t.note ? `· ${t.note}` : ''}</div>
                       </div>
-                      <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }}>₺{Number(t.amount).toFixed(0)}</div>
+                      <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }}>₺{formatTL(Number(t.amount))}</div>
                     </div>
                   ))}
                 </div>

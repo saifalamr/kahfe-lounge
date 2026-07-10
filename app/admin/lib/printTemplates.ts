@@ -1,3 +1,5 @@
+import { formatTL } from './format'
+
 // Print/export templates for the admin panel. These are pure functions:
 // given data, they open a print window and write an HTML document to it.
 // Kept separate from app/admin/page.tsx so the main component file isn't
@@ -84,13 +86,13 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
       </table>
       <div class="line"></div>
       <table>
-        ${hasDiscount ? `<tr><td>Ara Toplam</td><td style="text-align:right">${(info.originalTotal || info.total).toFixed(0)} ₺</td></tr><tr><td>İndirim${info.discountReason ? ` (${info.discountReason})` : ''}</td><td style="text-align:right">-${(info.discountAmount || 0).toFixed(0)} ₺</td></tr>` : ''}
-        <tr class="total-row"><td>TOPLAM</td><td style="text-align:right">${info.total.toFixed(0)} ₺</td></tr>
+        ${hasDiscount ? `<tr><td>Ara Toplam</td><td style="text-align:right">${formatTL(info.originalTotal || info.total)} ₺</td></tr><tr><td>İndirim${info.discountReason ? ` (${info.discountReason})` : ''}</td><td style="text-align:right">-${formatTL(info.discountAmount || 0)} ₺</td></tr>` : ''}
+        <tr class="total-row"><td>TOPLAM</td><td style="text-align:right">${formatTL(info.total)} ₺</td></tr>
       </table>
       <div class="line"></div>
       <div class="method">
         Ödeme: ${methodLabel}<br/>
-        ${info.method === 'mixed' ? `Nakit: ${info.cash.toFixed(0)} ₺<br/>Kart: ${info.card.toFixed(0)} ₺` : ''}
+        ${info.method === 'mixed' ? `Nakit: ${formatTL(info.cash)} ₺<br/>Kart: ${formatTL(info.card)} ₺` : ''}
       </div>
       <div class="line"></div>
       <div class="center" style="font-size:14px; margin-top:14px;">Bizi tercih ettiğiniz için teşekkürler!</div>
@@ -139,7 +141,7 @@ export function exportOrdersPDF(dateFilter: 'today'|'week'|'month', allOrders: a
       <div class="stats">
         <div class="stat"><div class="num">${allOrders.length}</div><div class="label">Toplam Sipariş</div></div>
         <div class="stat"><div class="num">${pending}</div><div class="label">Bekliyor</div></div>
-        <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Ciro (Tahsil Edilen)</div></div>
+        <div class="stat"><div class="num">${formatTL(totalRevenue)} ₺</div><div class="label">Ciro (Tahsil Edilen)</div></div>
       </div>
       <div style="font-size:10px; color:#8A8A8A; margin-bottom:10px;">Not: Ciro yalnızca ödemesi alınıp kapatılmış masaları sayar. Aşağıdaki liste, henüz ödenmemiş olanlar dahil bu aralıktaki tüm siparişleri gösterir.</div>
       <table>
@@ -191,7 +193,7 @@ export function exportMonthlyReportPDF(report: any) {
       <h1>${report.month} ${report.year} Raporu</h1>
       <div class="stats">
         <div class="stat"><div class="num">${report.totalOrders}</div><div class="label">Toplam Sipariş</div></div>
-        <div class="stat"><div class="num">${Number(report.totalRevenue).toFixed(0)} ₺</div><div class="label">Toplam Ciro</div></div>
+        <div class="stat"><div class="num">${formatTL(Number(report.totalRevenue))} ₺</div><div class="label">Toplam Ciro</div></div>
       </div>
       <h2>En Çok Satılan Ürünler</h2>
       <table>
@@ -219,10 +221,10 @@ export function printItemReportPDF(itemReportRange: 'today'|'month'|'year', item
   const totalRevenue = itemReportData.reduce((s: number, c: any) => s + c.revenue, 0)
   const sections = itemReportData.map((cat: any) => {
     const rows = cat.items.map((r: any) => `
-      <tr><td style="padding-left:20px">${r.name}</td><td style="text-align:right">${r.qty}</td><td style="text-align:right">${r.revenue.toFixed(0)} ₺</td></tr>
+      <tr><td style="padding-left:20px">${r.name}</td><td style="text-align:right">${r.qty}</td><td style="text-align:right">${formatTL(r.revenue)} ₺</td></tr>
     `).join('')
     return `
-      <tr style="background:#f7f2e2;"><td><b>${cat.icon} ${cat.categoryName}</b></td><td style="text-align:right"><b>${cat.qty}</b></td><td style="text-align:right"><b>${cat.revenue.toFixed(0)} ₺</b></td></tr>
+      <tr style="background:#f7f2e2;"><td><b>${cat.icon} ${cat.categoryName}</b></td><td style="text-align:right"><b>${cat.qty}</b></td><td style="text-align:right"><b>${formatTL(cat.revenue)} ₺</b></td></tr>
       ${rows}
     `
   }).join('')
@@ -248,7 +250,7 @@ export function printItemReportPDF(itemReportRange: 'today'|'month'|'year', item
     <body>
       <div class="brand">KAHFE LOUNGE</div>
       <h1>Ürün Raporu — ${label}</h1>
-      <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Toplam Ciro (Ürün Bazlı)</div></div>
+      <div class="stat"><div class="num">${formatTL(totalRevenue)} ₺</div><div class="label">Toplam Ciro (Ürün Bazlı)</div></div>
       <table>
         <tr><th>Ürün / Kategori</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>
         ${sections || '<tr><td colspan="3">Bu aralıkta veri yok</td></tr>'}
@@ -265,7 +267,7 @@ export function printStaffReportPDF(staffReportRange: 'today'|'week'|'month', st
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const label = staffReportRange === 'today' ? 'Bugün' : staffReportRange === 'week' ? 'Bu Hafta' : 'Bu Ay'
   const rows = staffReportData.map((r: any) => `
-    <tr><td>${r.name}</td><td style="text-align:right">${r.ordersCreated}</td><td style="text-align:right">${r.ordersHandled}</td><td style="text-align:right">${r.tabsClosed}</td><td style="text-align:right">${r.revenueClosed.toFixed(0)} ₺</td><td style="text-align:right">${r.voidsCount} (${r.voidsAmount.toFixed(0)} ₺)</td></tr>
+    <tr><td>${r.name}</td><td style="text-align:right">${r.ordersCreated}</td><td style="text-align:right">${r.ordersHandled}</td><td style="text-align:right">${r.tabsClosed}</td><td style="text-align:right">${formatTL(r.revenueClosed)} ₺</td><td style="text-align:right">${r.voidsCount} (${formatTL(r.voidsAmount)} ₺)</td></tr>
   `).join('')
   win.document.write(`
     <!DOCTYPE html>
@@ -304,7 +306,7 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
   const counted = parseFloat(countedCash)
   const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
   const rows = dayCloseData.tabs.map((t: any, i: number) => `
-    <tr><td>${i + 1}</td><td>${t.table_name}</td><td>${new Date(t.closed_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</td><td>${t.payment_method === 'cash' ? 'Nakit' : t.payment_method === 'card' ? 'Kart' : 'Karma'}</td><td>${t.closed_by || '—'}</td><td style="text-align:right">${Number(t.total).toFixed(0)} ₺</td></tr>
+    <tr><td>${i + 1}</td><td>${t.table_name}</td><td>${new Date(t.closed_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</td><td>${t.payment_method === 'cash' ? 'Nakit' : t.payment_method === 'card' ? 'Kart' : 'Karma'}</td><td>${t.closed_by || '—'}</td><td style="text-align:right">${formatTL(Number(t.total))} ₺</td></tr>
   `).join('')
   win.document.write(`
     <!DOCTYPE html>
@@ -332,10 +334,10 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
       <h1>Gün Sonu Raporu — ${new Date().toLocaleDateString('tr-TR')}</h1>
       <div class="stats">
         <div class="stat"><div class="num">${dayCloseData.tabCount}</div><div class="label">Kapanan Masa</div></div>
-        <div class="stat"><div class="num">${dayCloseData.totalRevenue.toFixed(0)} ₺</div><div class="label">Toplam Ciro</div></div>
-        <div class="stat"><div class="num">${dayCloseData.cashTotal.toFixed(0)} ₺</div><div class="label">Nakit</div></div>
-        <div class="stat"><div class="num">${dayCloseData.cardTotal.toFixed(0)} ₺</div><div class="label">Kart</div></div>
-        ${diff !== null ? `<div class="stat"><div class="num" style="color:${diff===0?'#27ae60':diff>0?'#3498db':'#e74c3c'}">${diff>=0?'+':''}${diff.toFixed(0)} ₺</div><div class="label">Kasa Farkı</div></div>` : ''}
+        <div class="stat"><div class="num">${formatTL(dayCloseData.totalRevenue)} ₺</div><div class="label">Toplam Ciro</div></div>
+        <div class="stat"><div class="num">${formatTL(dayCloseData.cashTotal)} ₺</div><div class="label">Nakit</div></div>
+        <div class="stat"><div class="num">${formatTL(dayCloseData.cardTotal)} ₺</div><div class="label">Kart</div></div>
+        ${diff !== null ? `<div class="stat"><div class="num" style="color:${diff===0?'#27ae60':diff>0?'#3498db':'#e74c3c'}">${diff>=0?'+':''}${formatTL(diff)} ₺</div><div class="label">Kasa Farkı</div></div>` : ''}
       </div>
       <h2>Kapanan Masalar</h2>
       <table>
