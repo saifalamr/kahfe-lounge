@@ -103,10 +103,10 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
   win.document.close()
 }
 
-export function exportOrdersPDF(dateFilter: 'today'|'week'|'month', allOrders: any[], revenueSummary: { revenue: number }) {
+export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', allOrders: any[], revenueSummary: { revenue: number }) {
   const win = window.open('', '_blank', 'width=900,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
-  const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : 'Bu Ay'
+  const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : dateFilter === 'custom' ? 'Özel Aralık' : 'Bu Ay'
   const totalRevenue = revenueSummary.revenue
   const pending = allOrders.filter((o: any) => o.status === 'pending').length
   const statusLabel = (st: string) => st==='pending'?'Bekliyor':st==='dismissed'?'Reddedildi':'Tamamlandı'
@@ -214,10 +214,10 @@ export function exportMonthlyReportPDF(report: any) {
   win.document.close()
 }
 
-export function printItemReportPDF(itemReportRange: 'today'|'month'|'year', itemReportData: any[]) {
+export function printItemReportPDF(itemReportRange: 'today'|'month'|'year'|'custom', itemReportData: any[]) {
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
-  const label = itemReportRange === 'today' ? 'Bugün' : itemReportRange === 'month' ? 'Bu Ay' : 'Bu Yıl'
+  const label = itemReportRange === 'today' ? 'Bugün' : itemReportRange === 'month' ? 'Bu Ay' : itemReportRange === 'custom' ? 'Özel Aralık' : 'Bu Yıl'
   const totalRevenue = itemReportData.reduce((s: number, c: any) => s + c.revenue, 0)
   const sections = itemReportData.map((cat: any) => {
     const rows = cat.items.map((r: any) => `

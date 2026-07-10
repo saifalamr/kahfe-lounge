@@ -4,6 +4,7 @@ import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
 import VoidModal from './components/VoidModal'
+import CancelOrderModal from './components/CancelOrderModal'
 import TransferPickerModal from './components/TransferPickerModal'
 import MonthlyReportModal from './components/MonthlyReportModal'
 import DayCloseModal from './components/DayCloseModal'
@@ -106,6 +107,7 @@ export default function AdminPage() {
   const [pwError, setPwError] = useState(false)
   const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
+  const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'map'|'list'>('map')
   const [openTabs, setOpenTabs] = useState<any[]>([])
@@ -303,6 +305,38 @@ export default function AdminPage() {
     })
     setVoidingItem(null)
     setVoidReason('')
+    await Promise.all([loadOrders(dateFilter), loadTableMapData()])
+  }
+
+  // Full order cancellation — cancels an entire order at once (all items)
+  // with a mandatory reason, instead of voiding items one by one. Logged
+  // to the same voids table as a single consolidated entry.
+  const [cancellingOrder, setCancellingOrder] = useState<any>(null)
+  const [cancelReason, setCancelReason] = useState('')
+
+  function openCancelOrder(order: any) {
+    setCancellingOrder(order)
+    setCancelReason('')
+  }
+
+  async function confirmCancelOrder() {
+    if (!cancellingOrder) return
+    if (!cancelReason.trim()) { alert('Lütfen bir iptal nedeni girin.'); return }
+    const order = cancellingOrder
+    const { error } = await supabase.from('orders').update({ status: 'dismissed', handled_by: staffName }).eq('id', order.id)
+    if (error) { alert('✗ İptal edilemedi.\n\n' + error.message); return }
+    const itemCount = (order.items || []).reduce((s: number, it: any) => s + Number(it.quantity), 0)
+    await supabase.from('voids').insert({
+      order_id: order.id,
+      table_name: order.table_name,
+      item_name: `Tüm Sipariş (${itemCount} ürün)`,
+      quantity: itemCount,
+      amount: order.total,
+      reason: cancelReason.trim(),
+      voided_by: staffName,
+    })
+    setCancellingOrder(null)
+    setCancelReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
@@ -553,19 +587,23 @@ export default function AdminPage() {
     }
   }
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
-  const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
+  const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'|'custom'>('today')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   // Reset markers are stored in Supabase (table: reset_markers) so a reset
   // made on one device is instantly reflected on every other device.
-  async function getResetMarker(scope: 'today'|'week'|'month'): Promise<string | null> {
+  async function getResetMarker(scope: 'today'|'week'|'month'|'custom'): Promise<string | null> {
+    if (scope === 'custom') return null // resetting a custom range isn't a meaningful action
     const { data } = await supabase.from('reset_markers').select('reset_at').eq('key', scope).maybeSingle()
     return data?.reset_at || null
   }
 
-  function baseFromForFilter(filter: 'today'|'week'|'month') {
+  function baseFromForFilter(filter: 'today'|'week'|'month'|'custom') {
     const now = new Date()
     if (filter === 'today') return now.toISOString().split('T')[0]
     if (filter === 'week') { const d = new Date(now); d.setDate(d.getDate() - 7); return d.toISOString() }
+    if (filter === 'custom') return customFrom || now.toISOString().split('T')[0]
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   }
 
@@ -587,16 +625,19 @@ export default function AdminPage() {
     }
   }
 
-  async function loadOrders(filter: 'today'|'week'|'month' = dateFilter) {
+  async function loadOrders(filter: 'today'|'week'|'month'|'custom' = dateFilter) {
     setOrdersLoading(true)
     const baseFrom = baseFromForFilter(filter)
     const marker = await getResetMarker(filter)
     // Only honor the marker if it falls within the current window (e.g. a
     // "today" reset from three days ago shouldn't suppress today's orders)
     const fromDate = (marker && marker > baseFrom) ? marker : baseFrom
+    const toDate = filter === 'custom' && customTo ? `${customTo}T23:59:59.999` : undefined
+    let ordersQuery = supabase.from('orders').select('*').gte('created_at', fromDate).order('created_at', { ascending: false })
+    if (toDate) ordersQuery = ordersQuery.lte('created_at', toDate)
     const [{ data }, revenue] = await Promise.all([
-      supabase.from('orders').select('*').gte('created_at', fromDate).order('created_at', { ascending: false }),
-      getClosedTabsRevenue(fromDate),
+      ordersQuery,
+      getClosedTabsRevenue(fromDate, toDate),
     ])
     setAllOrders(data || [])
     setRevenueSummary(revenue)
@@ -689,20 +730,25 @@ export default function AdminPage() {
 
   // Per-item sales report (Ürün Raporu) - daily/monthly/yearly breakdown
   const [showItemReport, setShowItemReport] = useState(false)
-  const [itemReportRange, setItemReportRange] = useState<'today'|'month'|'year'>('today')
+  const [itemReportRange, setItemReportRange] = useState<'today'|'month'|'year'|'custom'>('today')
   const [itemReportData, setItemReportData] = useState<any[]>([])
+  const [itemReportCustomFrom, setItemReportCustomFrom] = useState('')
+  const [itemReportCustomTo, setItemReportCustomTo] = useState('')
 
-  function itemReportFromDate(range: 'today'|'month'|'year') {
+  function itemReportFromDate(range: 'today'|'month'|'year'|'custom') {
     const now = new Date()
     if (range === 'today') return now.toISOString().split('T')[0]
     if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    if (range === 'custom') return itemReportCustomFrom || now.toISOString().split('T')[0]
     return new Date(now.getFullYear(), 0, 1).toISOString()
   }
 
-  async function openItemReport(range: 'today'|'month'|'year' = itemReportRange) {
+  async function openItemReport(range: 'today'|'month'|'year'|'custom' = itemReportRange) {
     setItemReportRange(range)
     const fromDate = itemReportFromDate(range)
-    const { data: rangeOrders } = await supabase.from('orders').select('items').gte('created_at', fromDate).neq('status', 'dismissed')
+    let ordersQuery = supabase.from('orders').select('items').gte('created_at', fromDate).neq('status', 'dismissed')
+    if (range === 'custom' && itemReportCustomTo) ordersQuery = ordersQuery.lte('created_at', `${itemReportCustomTo}T23:59:59.999`)
+    const { data: rangeOrders } = await ordersQuery
     const itemMap: Record<string, { name: string, qty: number, revenue: number, categoryId: string | null }> = {}
     ;(rangeOrders || []).forEach((o: any) => {
       (o.items || []).forEach((it: any) => {
@@ -1188,6 +1234,8 @@ export default function AdminPage() {
             {/* Ürün Raporu - per-item sales breakdown */}
             {isManager && showItemReport && (
               <ItemReportModal itemReportRange={itemReportRange} itemReportData={itemReportData} onRangeChange={openItemReport}
+                customFrom={itemReportCustomFrom} customTo={itemReportCustomTo}
+                onCustomFromChange={setItemReportCustomFrom} onCustomToChange={setItemReportCustomTo}
                 onExportPDF={() => printItemReportPDF(itemReportRange, itemReportData)} onClose={() => setShowItemReport(false)} />
             )}
 
@@ -1236,7 +1284,10 @@ export default function AdminPage() {
                             )}
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
                               <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
-                              {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline} style={{ background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, height:40, padding:'0 16px', color: isOnline ? '#fff' : '#666', fontSize:13, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴'}</button>}
+                              <div style={{ display:'flex', gap:6 }}>
+                                {order.status === 'pending' && <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et" style={{ background:'transparent', border:'1px solid #383838', color:'#e74c3c', height:40, padding:'0 10px', cursor:'pointer', fontSize:16 }}>🚫</button>}
+                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline} style={{ background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, height:40, padding:'0 16px', color: isOnline ? '#fff' : '#666', fontSize:13, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴'}</button>}
+                              </div>
                             </div>
                           </div>
                         )
@@ -1283,6 +1334,11 @@ export default function AdminPage() {
             {/* Void item modal - mandatory reason, logged to voids table */}
             {voidingItem && (
               <VoidModal voidingItem={voidingItem} voidReason={voidReason} onReasonChange={setVoidReason} onCancel={() => setVoidingItem(null)} onConfirm={confirmVoid} />
+            )}
+
+            {/* Full order cancellation modal */}
+            {cancellingOrder && (
+              <CancelOrderModal order={cancellingOrder} cancelReason={cancelReason} onReasonChange={setCancelReason} onCancel={() => setCancellingOrder(null)} onConfirm={confirmCancelOrder} />
             )}
 
             {/* Transfer/merge destination picker */}
@@ -1499,15 +1555,33 @@ export default function AdminPage() {
             {viewMode === 'list' && (<>
             {/* Date filter - week/month view is manager-only */}
             {isManager && (
-              <div style={{ display:'flex', gap:6, marginBottom:14 }}>
-                {(['today','week','month'] as const).map(f => (
-                  <button key={f} onClick={() => { setDateFilter(f); loadOrders(f) }}
-                    style={{ flex:1, height:44, background: dateFilter===f ? 'rgba(201,168,76,.14)' : 'transparent', border: dateFilter===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: dateFilter===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                    {f==='today'?'Bugün':f==='week'?'Bu Hafta':'Bu Ay'}
-                  </button>
-                ))}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display:'flex', gap:6, marginBottom: dateFilter === 'custom' ? 10 : 0 }}>
+                  {(['today','week','month','custom'] as const).map(f => (
+                    <button key={f} onClick={() => { setDateFilter(f); if (f !== 'custom') loadOrders(f) }}
+                      style={{ flex:1, height:44, background: dateFilter===f ? 'rgba(201,168,76,.14)' : 'transparent', border: dateFilter===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: dateFilter===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                      {f==='today'?'Bugün':f==='week'?'Bu Hafta':f==='month'?'Bu Ay':'Özel'}
+                    </button>
+                  ))}
+                </div>
+                {dateFilter === 'custom' && (
+                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                    <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                      style={{ flex:1, height:44, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#F0EDE8', padding:'0 10px', fontSize:13, fontFamily:"'IBM Plex Mono', monospace" }} />
+                    <span style={{ color:'#8A8A8A', fontSize:12 }}>—</span>
+                    <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                      style={{ flex:1, height:44, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#F0EDE8', padding:'0 10px', fontSize:13, fontFamily:"'IBM Plex Mono', monospace" }} />
+                    <button onClick={() => loadOrders('custom')} disabled={!customFrom}
+                      style={{ height:44, padding:'0 16px', background: customFrom ? '#C9A84C' : '#2A2A2A', border:'none', color: customFrom ? '#0A0A0A' : '#666', fontWeight:600, fontSize:13, cursor: customFrom ? 'pointer' : 'not-allowed', fontFamily:"'IBM Plex Sans', sans-serif" }}>Uygula</button>
+                  </div>
+                )}
               </div>
             )}
+
+            <div style={{ marginBottom: 12 }}>
+              <input value={orderSearchQuery} onChange={e => setOrderSearchQuery(e.target.value)} placeholder="🔍 Masa veya ürün adına göre ara..."
+                style={{ width:'100%', height:44, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#F0EDE8', padding:'0 14px', fontSize:14, outline:'none', fontFamily:"'IBM Plex Sans', sans-serif" }} />
+            </div>
 
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:8, flexWrap:'wrap' }}>
               <div style={{ color:'#8A8A8A', fontSize:12, letterSpacing:'0.08em', fontFamily:"'IBM Plex Mono', monospace" }}>{allOrders.length} SİPARİŞ</div>
@@ -1515,11 +1589,13 @@ export default function AdminPage() {
                 <button onClick={() => loadOrders()} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, width:36, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600 }}>↻</button>
                 {isManager && (
                   <>
-                    <button onClick={() => resetStats(dateFilter)} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#8A8A8A', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
+                    {dateFilter !== 'custom' && (
+                      <button onClick={() => resetStats(dateFilter as 'today'|'week'|'month')} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#8A8A8A', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
+                    )}
                     <button onClick={() => exportOrdersPDF(dateFilter, allOrders, revenueSummary)} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
                     <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Aylık Rapor</button>
                     <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
-                    <button onClick={() => openStaffReport(dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
+                    <button onClick={() => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
                     <button onClick={() => openItemReport('today')} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📦 Ürün Raporu</button>
                   </>
                 )}
@@ -1550,7 +1626,13 @@ export default function AdminPage() {
               <div style={{ textAlign:'center', color:'#8A8A8A', padding:40 }}>Bugün henüz sipariş yok</div>
             )}
 
-            {allOrders.map((order:any) => {
+            {allOrders.filter((order: any) => {
+              const q = orderSearchQuery.trim().toLowerCase()
+              if (!q) return true
+              const tableMatch = order.table_name?.toLowerCase().includes(q)
+              const itemMatch = (order.items || []).some((it: any) => it.name?.toLowerCase().includes(q))
+              return tableMatch || itemMatch
+            }).map((order:any) => {
               const statusColor = order.status==='pending'?'#C0392B':order.status==='dismissed'?'#8A8A8A':'#27ae60'
               const statusLabel = order.status==='pending'?'Bekliyor':order.status==='dismissed'?'Reddedildi':'Tamamlandı'
               return (
@@ -1581,8 +1663,12 @@ export default function AdminPage() {
                     <span style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
                   </div>
                   {order.status === 'pending' && (
-                    <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
-                      style={{ width:'100%', marginTop:12, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, padding:0, height:48, color: isOnline ? '#fff' : '#666', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
+                    <div style={{ display:'flex', gap:8, marginTop:12 }}>
+                      <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et"
+                        style={{ width:56, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#e74c3c', fontSize:18, cursor:'pointer' }}>🚫</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
+                        style={{ flex:1, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, padding:0, height:48, color: isOnline ? '#fff' : '#666', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
+                    </div>
                   )}
                 </div>
               )

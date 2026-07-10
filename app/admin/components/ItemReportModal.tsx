@@ -1,10 +1,14 @@
 'use client'
 import { formatTL } from '../lib/format'
 
-export default function ItemReportModal({ itemReportRange, itemReportData, onRangeChange, onExportPDF, onClose }: {
-  itemReportRange: 'today'|'month'|'year'
+export default function ItemReportModal({ itemReportRange, itemReportData, onRangeChange, customFrom, customTo, onCustomFromChange, onCustomToChange, onExportPDF, onClose }: {
+  itemReportRange: 'today'|'month'|'year'|'custom'
   itemReportData: any[]
-  onRangeChange: (range: 'today'|'month'|'year') => void
+  onRangeChange: (range: 'today'|'month'|'year'|'custom') => void
+  customFrom: string
+  customTo: string
+  onCustomFromChange: (v: string) => void
+  onCustomToChange: (v: string) => void
   onExportPDF: () => void
   onClose: () => void
 }) {
@@ -19,14 +23,25 @@ export default function ItemReportModal({ itemReportRange, itemReportData, onRan
           </div>
         </div>
         <div style={{ padding:20 }}>
-          <div style={{ display:'flex', gap:6, marginBottom:16 }}>
-            {(['today','month','year'] as const).map(f => (
+          <div style={{ display:'flex', gap:6, marginBottom: itemReportRange === 'custom' ? 10 : 16 }}>
+            {(['today','month','year','custom'] as const).map(f => (
               <button key={f} onClick={() => onRangeChange(f)}
                 style={{ flex:1, height:40, background: itemReportRange===f ? 'rgba(201,168,76,.14)' : 'transparent', border: itemReportRange===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: itemReportRange===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                {f==='today'?'Bugün':f==='month'?'Bu Ay':'Bu Yıl'}
+                {f==='today'?'Bugün':f==='month'?'Bu Ay':f==='year'?'Bu Yıl':'Özel'}
               </button>
             ))}
           </div>
+          {itemReportRange === 'custom' && (
+            <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:16 }}>
+              <input type="date" value={customFrom} onChange={e => onCustomFromChange(e.target.value)}
+                style={{ flex:1, height:44, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#F0EDE8', padding:'0 10px', fontSize:13, fontFamily:"'IBM Plex Mono', monospace" }} />
+              <span style={{ color:'#8A8A8A', fontSize:12 }}>—</span>
+              <input type="date" value={customTo} onChange={e => onCustomToChange(e.target.value)}
+                style={{ flex:1, height:44, background:'#1A1A1A', border:'1px solid #2A2A2A', color:'#F0EDE8', padding:'0 10px', fontSize:13, fontFamily:"'IBM Plex Mono', monospace" }} />
+              <button onClick={() => onRangeChange('custom')} disabled={!customFrom}
+                style={{ height:44, padding:'0 16px', background: customFrom ? '#C9A84C' : '#2A2A2A', border:'none', color: customFrom ? '#0A0A0A' : '#666', fontWeight:600, fontSize:13, cursor: customFrom ? 'pointer' : 'not-allowed', fontFamily:"'IBM Plex Sans', sans-serif" }}>Uygula</button>
+            </div>
+          )}
 
           {itemReportData.length === 0 && (
             <div style={{ textAlign:'center', color:'#8A8A8A', padding:'30px 0' }}>Bu aralıkta veri yok.</div>
