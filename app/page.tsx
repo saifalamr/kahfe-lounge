@@ -474,9 +474,12 @@ export default function MenuPage() {
     const BOT_TOKEN = '8218906305:AAHy-4UAX3elRisvShV3stReePkQrlzTHWw'
     let CHAT_IDS = ['1626976096', '1462247620', '8892775373']
     try {
-      const { data } = await supabase.from('settings').select('value').eq('key', 'telegram_recipients').maybeSingle()
-      if (data?.value && Array.isArray(data.value) && data.value.length > 0) {
-        CHAT_IDS = data.value.map((r: any) => r.chat_id)
+      const { data } = await supabase.from('settings').select('key,value').in('key', ['telegram_recipients', 'telegram_enabled'])
+      const enabledRow = data?.find((r: any) => r.key === 'telegram_enabled')
+      if (enabledRow?.value === false) return // Telegram notifications turned off in Ayarlar - order still registers normally
+      const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
+      if (recipientsRow?.value && Array.isArray(recipientsRow.value) && recipientsRow.value.length > 0) {
+        CHAT_IDS = recipientsRow.value.map((r: any) => r.chat_id)
       }
     } catch (e) { /* fall back to the hardcoded list above if settings isn't reachable */ }
     const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })

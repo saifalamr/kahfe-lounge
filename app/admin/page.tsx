@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
-import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF } from './lib/printTemplates'
+import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
 
 const ADMIN_PASSWORD = '1234'
 const STAFF_PASSWORD = '5678'
@@ -91,7 +91,7 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'map'|'list'>('map')
@@ -108,6 +108,8 @@ export default function AdminPage() {
   ]
   const [ALL_TABLES, setAllTables] = useState<string[]>(DEFAULT_TABLES)
   const [telegramRecipients, setTelegramRecipients] = useState<{ name: string, chat_id: string }[]>([])
+  const [telegramEnabled, setTelegramEnabled] = useState(true)
+  const [categoryStations, setCategoryStations] = useState<Record<string, 'kitchen'|'nargile'>>({})
   const [notifSoundOn, setNotifSoundOn] = useState(true)
   const [newTableName, setNewTableName] = useState('')
   const [newRecipientName, setNewRecipientName] = useState('')
@@ -119,11 +121,41 @@ export default function AdminPage() {
   }, [])
 
   async function loadSettings() {
-    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients'])
+    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations'])
     const tablesRow = data?.find((r: any) => r.key === 'tables')
     const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
+    const telegramEnabledRow = data?.find((r: any) => r.key === 'telegram_enabled')
+    const stationsRow = data?.find((r: any) => r.key === 'category_stations')
     setAllTables(Array.isArray(tablesRow?.value) && tablesRow.value.length > 0 ? tablesRow.value : DEFAULT_TABLES)
     setTelegramRecipients(Array.isArray(recipientsRow?.value) ? recipientsRow.value : [])
+    setTelegramEnabled(telegramEnabledRow?.value !== false)
+    setCategoryStations(stationsRow?.value && typeof stationsRow.value === 'object' ? stationsRow.value : {})
+  }
+
+  async function toggleTelegramEnabled() {
+    const next = !telegramEnabled
+    await supabase.from('settings').upsert({ key: 'telegram_enabled', value: next, updated_at: new Date().toISOString() })
+    setTelegramEnabled(next)
+  }
+
+  async function setCategoryStation(categoryId: string, station: 'kitchen'|'nargile') {
+    const next = { ...categoryStations, [categoryId]: station }
+    await supabase.from('settings').upsert({ key: 'category_stations', value: next, updated_at: new Date().toISOString() })
+    setCategoryStations(next)
+  }
+
+  // Which physical station (kitchen printer vs nargile printer) a menu
+  // item's category is routed to, for the split-ticket printing below
+  function stationForItem(itemId: string): 'kitchen'|'nargile' {
+    const menuItem = items.find(i => i.id === itemId)
+    if (!menuItem) return 'kitchen'
+    return categoryStations[menuItem.category_id] || 'kitchen'
+  }
+
+  function filterOrdersByStation(orders: any[], station: 'kitchen'|'nargile') {
+    return orders
+      .map((o: any) => ({ ...o, items: (o.items || []).filter((it: any) => stationForItem(it.id) === station) }))
+      .filter((o: any) => o.items.length > 0)
   }
 
   async function saveTables(newList: string[]) {
@@ -268,12 +300,67 @@ export default function AdminPage() {
 
   // Payment & closing a tab
   const [paymentTab, setPaymentTab] = useState<{ id: string, table_name: string, total: number, orders: any[] } | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'|'debt'>('cash')
   const [splitCash, setSplitCash] = useState('')
   const [splitCard, setSplitCard] = useState('')
   const [discountType, setDiscountType] = useState<'none'|'percent'|'amount'>('none')
   const [discountValue, setDiscountValue] = useState('')
   const [discountReason, setDiscountReason] = useState('')
+
+  // Borç (debt/credit) management
+  const [debtors, setDebtors] = useState<any[]>([])
+  const [selectedDebtorId, setSelectedDebtorId] = useState('')
+  const [newDebtorName, setNewDebtorName] = useState('')
+  const [newDebtorPhone, setNewDebtorPhone] = useState('')
+
+  async function loadDebtors() {
+    const { data } = await supabase.from('debtors').select('*').order('name')
+    setDebtors(data || [])
+  }
+
+  const [debtTransactions, setDebtTransactions] = useState<any[]>([])
+  const [debtDetailId, setDebtDetailId] = useState<string | null>(null)
+  const [debtPaymentAmount, setDebtPaymentAmount] = useState('')
+  const [manualDebtAmount, setManualDebtAmount] = useState('')
+  const [manualDebtNote, setManualDebtNote] = useState('')
+  const [newDebtorNameTab, setNewDebtorNameTab] = useState('')
+  const [newDebtorPhoneTab, setNewDebtorPhoneTab] = useState('')
+
+  async function loadDebtTransactions() {
+    const { data } = await supabase.from('debt_transactions').select('*').order('created_at', { ascending: false })
+    setDebtTransactions(data || [])
+  }
+
+  function debtorStats(debtorId: string) {
+    const txs = debtTransactions.filter((t: any) => t.debtor_id === debtorId)
+    const borc = txs.filter((t: any) => t.type === 'borç').reduce((s: number, t: any) => s + Number(t.amount), 0)
+    const odenen = txs.filter((t: any) => t.type === 'ödeme').reduce((s: number, t: any) => s + Number(t.amount), 0)
+    return { borc, odenen, kalan: borc - odenen, txs }
+  }
+
+  async function addDebtorFromTab() {
+    const name = newDebtorNameTab.trim()
+    if (!name) return
+    await supabase.from('debtors').insert({ name, phone: newDebtorPhoneTab.trim() || null })
+    setNewDebtorNameTab(''); setNewDebtorPhoneTab('')
+    await loadDebtors()
+  }
+
+  async function recordDebtPayment(debtorId: string) {
+    const amt = parseFloat(debtPaymentAmount)
+    if (!amt || amt <= 0) { alert('Geçerli bir tutar girin.'); return }
+    await supabase.from('debt_transactions').insert({ debtor_id: debtorId, type: 'ödeme', amount: amt, created_by: staffName })
+    setDebtPaymentAmount('')
+    await loadDebtTransactions()
+  }
+
+  async function addManualDebt(debtorId: string) {
+    const amt = parseFloat(manualDebtAmount)
+    if (!amt || amt <= 0) { alert('Geçerli bir tutar girin.'); return }
+    await supabase.from('debt_transactions').insert({ debtor_id: debtorId, type: 'borç', amount: amt, note: manualDebtNote.trim() || null, created_by: staffName })
+    setManualDebtAmount(''); setManualDebtNote('')
+    await loadDebtTransactions()
+  }
 
   function computeDiscountAmount(total: number) {
     const v = parseFloat(discountValue) || 0
@@ -291,6 +378,9 @@ export default function AdminPage() {
     setDiscountType('none')
     setDiscountValue('')
     setDiscountReason('')
+    setSelectedDebtorId('')
+    setNewDebtorName('')
+    setNewDebtorPhone('')
   }
 
 
@@ -303,8 +393,18 @@ export default function AdminPage() {
       return
     }
     const finalTotal = paymentTab.total - discountAmount
-    let cash = 0, card = 0
-    if (paymentMethod === 'cash') cash = finalTotal
+    let cash = 0, card = 0, debtAmount = 0
+    let debtorId = selectedDebtorId
+    if (paymentMethod === 'debt') {
+      if (!debtorId && newDebtorName.trim()) {
+        const { data: newDebtor, error: debtorError } = await supabase.from('debtors')
+          .insert({ name: newDebtorName.trim(), phone: newDebtorPhone.trim() || null }).select('id').single()
+        if (debtorError || !newDebtor) { alert('✗ Borçlu eklenemedi.\n\n' + (debtorError?.message || '')); return }
+        debtorId = newDebtor.id
+      }
+      if (!debtorId) { alert('Lütfen bir borçlu seçin veya yeni bir borçlu ekleyin.'); return }
+      debtAmount = finalTotal
+    } else if (paymentMethod === 'cash') cash = finalTotal
     else if (paymentMethod === 'card') card = finalTotal
     else {
       cash = parseFloat(splitCash) || 0
@@ -314,17 +414,20 @@ export default function AdminPage() {
         return
       }
     }
-    await supabase.from('tabs').update({
+    const { data: closedTab, error: closeError } = await supabase.from('tabs').update({
       status: 'closed',
       closed_at: new Date().toISOString(),
       payment_method: paymentMethod,
       cash_amount: cash,
       card_amount: card,
+      debt_amount: debtAmount,
       total: finalTotal,
       discount_amount: discountAmount,
       discount_reason: discountAmount > 0 ? discountReason.trim() : null,
       closed_by: staffName,
-    }).eq('id', paymentTab.id)
+    }).eq('id', paymentTab.id).select('fatura_no').single()
+
+    if (closeError) { alert('✗ Ödeme kaydedilemedi.\n\n' + closeError.message); return }
 
     if (discountAmount > 0) {
       await supabase.from('discounts').insert({
@@ -337,7 +440,19 @@ export default function AdminPage() {
       })
     }
 
-    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason: discountReason.trim(), originalTotal: paymentTab.total }
+    if (paymentMethod === 'debt' && debtorId) {
+      await supabase.from('debt_transactions').insert({
+        debtor_id: debtorId,
+        tab_id: paymentTab.id,
+        fatura_no: closedTab?.fatura_no,
+        type: 'borç',
+        amount: finalTotal,
+        created_by: staffName,
+      })
+      await loadDebtors()
+    }
+
+    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason: discountReason.trim(), originalTotal: paymentTab.total, faturaNo: closedTab?.fatura_no }
     setPaymentTab(null)
     setActiveTableModal(null)
     await loadTableMapData()
@@ -559,6 +674,35 @@ export default function AdminPage() {
   const [staffReportData, setStaffReportData] = useState<any[]>([])
   const [staffReportRange, setStaffReportRange] = useState<'today'|'week'|'month'>('today')
 
+  // Per-item sales report (Ürün Raporu) - daily/monthly/yearly breakdown
+  const [showItemReport, setShowItemReport] = useState(false)
+  const [itemReportRange, setItemReportRange] = useState<'today'|'month'|'year'>('today')
+  const [itemReportData, setItemReportData] = useState<any[]>([])
+
+  function itemReportFromDate(range: 'today'|'month'|'year') {
+    const now = new Date()
+    if (range === 'today') return now.toISOString().split('T')[0]
+    if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    return new Date(now.getFullYear(), 0, 1).toISOString()
+  }
+
+  async function openItemReport(range: 'today'|'month'|'year' = itemReportRange) {
+    setItemReportRange(range)
+    const fromDate = itemReportFromDate(range)
+    const { data: rangeOrders } = await supabase.from('orders').select('items').gte('created_at', fromDate).neq('status', 'dismissed')
+    const itemMap: Record<string, { name: string, qty: number, revenue: number }> = {}
+    ;(rangeOrders || []).forEach((o: any) => {
+      (o.items || []).forEach((it: any) => {
+        if (!itemMap[it.name]) itemMap[it.name] = { name: it.name, qty: 0, revenue: 0 }
+        itemMap[it.name].qty += Number(it.quantity)
+        itemMap[it.name].revenue += Number(it.subtotal)
+      })
+    })
+    const rows = Object.values(itemMap).sort((a: any, b: any) => b.revenue - a.revenue)
+    setItemReportData(rows)
+    setShowItemReport(true)
+  }
+
   async function openStaffReport(range: 'today'|'week'|'month' = staffReportRange) {
     setStaffReportRange(range)
     const fromDate = baseFromForFilter(range)
@@ -700,7 +844,7 @@ export default function AdminPage() {
   useEffect(() => { if (role === 'staff' || role === 'touchscreen') setTab('orders') }, [role])
   useEffect(() => { if ((role === 'staff' || role === 'touchscreen') && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
 
-  useEffect(() => { if (auth) { loadData(); loadSettings() } }, [auth])
+  useEffect(() => { if (auth) { loadData(); loadSettings(); loadDebtors() } }, [auth])
 
   async function loadData() {
     const [{ data: cats }, { data: its }, { data: staffData }] = await Promise.all([
@@ -1019,10 +1163,10 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A', overflowX: 'auto' }}>
-          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings'] as const) : (['orders'] as const)).map(t => (
-            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter) }}
+          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings', 'debts'] as const) : (['orders'] as const)).map(t => (
+            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter); if(t==='debts') loadDebtTransactions() }}
               style={{ flex: '1 0 auto', minWidth: 80, padding: '16px 8px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#8A8A8A', fontWeight: tab === t ? 600 : 500, fontSize: 13, cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap' }}>
-              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : 'Siparişler'}
+              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
                 <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
               )}
@@ -1135,6 +1279,45 @@ export default function AdminPage() {
                 </div>
               )
             })()}
+
+            {/* Ürün Raporu - per-item sales breakdown */}
+            {isManager && showItemReport && (
+              <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setShowItemReport(false)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <div style={{ color:'#C9A84C', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>📦 Ürün Raporu</div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => printItemReportPDF(itemReportRange, itemReportData)} style={{ background:'transparent', border:'1px solid #383838', height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📄 PDF</button>
+                      <button onClick={() => setShowItemReport(false)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
+                    </div>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    <div style={{ display:'flex', gap:6, marginBottom:16 }}>
+                      {(['today','month','year'] as const).map(f => (
+                        <button key={f} onClick={() => openItemReport(f)}
+                          style={{ flex:1, height:40, background: itemReportRange===f ? 'rgba(201,168,76,.14)' : 'transparent', border: itemReportRange===f ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: itemReportRange===f ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                          {f==='today'?'Bugün':f==='month'?'Bu Ay':'Bu Yıl'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {itemReportData.length === 0 && (
+                      <div style={{ textAlign:'center', color:'#8A8A8A', padding:'30px 0' }}>Bu aralıkta veri yok.</div>
+                    )}
+
+                    {itemReportData.map((r: any) => (
+                      <div key={r.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderTop:'1px solid #2A2A2A' }}>
+                        <div style={{ color:'#F0EDE8', fontSize:14, fontWeight:600 }}>{r.name}</div>
+                        <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+                          <div style={{ color:'#8A8A8A', fontSize:13, fontFamily:"'IBM Plex Mono', monospace" }}>{r.qty} adet</div>
+                          <div style={{ color:'#C9A84C', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace", minWidth:80, textAlign:'right' }}>₺{r.revenue.toFixed(0)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Staff Performance report modal */}
             {isManager && showStaffReport && (
@@ -1253,10 +1436,17 @@ export default function AdminPage() {
 
                       <div style={{ display:'flex', gap:8, marginBottom:12 }}>
                         <button onClick={() => openAddOrder(activeTableModal)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#F0EDE8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>➕ Sipariş Ekle</button>
-                        {activeOrders.length > 0 && (
-                          <button onClick={() => printKitchenTicket(activeTableModal, activeOrders)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
-                        )}
                       </div>
+                      {activeOrders.length > 0 && (
+                        <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                          {filterOrdersByStation(activeOrders, 'kitchen').length > 0 && (
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'kitchen'))} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
+                          )}
+                          {filterOrdersByStation(activeOrders, 'nargile').length > 0 && (
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'nargile'))} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
+                          )}
+                        </div>
+                      )}
 
                       {info.tabData && (
                         <div style={{ display:'flex', gap:8 }}>
@@ -1423,11 +1613,11 @@ export default function AdminPage() {
                     </div>
 
                     <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                      {(['cash','card','mixed'] as const).map(m => (
+                      {(['cash','card','mixed','debt'] as const).map(m => (
                         <button key={m} onClick={() => setPaymentMethod(m)}
-                          style={{ flex:1, height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid #2A2A2A', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : '#B5B0A8', fontWeight:600, fontSize:14, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
-                          <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : '🔀'}</span>
-                          {m==='cash' ? 'Nakit' : m==='card' ? 'Kart' : 'Böl'}
+                          style={{ flex:1, height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid #2A2A2A', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : '#B5B0A8', fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
+                          <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : m==='mixed' ? '🔀' : '🧾'}</span>
+                          {m==='cash' ? 'Nakit' : m==='card' ? 'Kart' : m==='mixed' ? 'Böl' : 'Borç'}
                         </button>
                       ))}
                     </div>
@@ -1444,6 +1634,25 @@ export default function AdminPage() {
                           <input type="number" value={splitCard} onChange={e => setSplitCard(e.target.value)}
                             style={{ width:'100%', height:52, background:'#0A0A0A', border:'1px solid #383838', borderRadius: 0, padding:'0 14px', color:'#F0EDE8', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
                         </div>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'debt' && (
+                      <div style={{ marginBottom:16, padding:14, background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.2)' }}>
+                        <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:8, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>BORÇLU SEÇ</label>
+                        <select value={selectedDebtorId} onChange={e => { setSelectedDebtorId(e.target.value); if (e.target.value) { setNewDebtorName(''); setNewDebtorPhone('') } }}
+                          style={{ width:'100%', height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:14, marginBottom:10, fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                          <option value="">— Seçiniz veya yeni ekleyin —</option>
+                          {debtors.map(d => <option key={d.id} value={d.id}>{d.name}{d.phone ? ` (${d.phone})` : ''}</option>)}
+                        </select>
+                        {!selectedDebtorId && (
+                          <div style={{ display:'flex', gap:8 }}>
+                            <input value={newDebtorName} onChange={e => setNewDebtorName(e.target.value)} placeholder="Yeni borçlu adı"
+                              style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                            <input value={newDebtorPhone} onChange={e => setNewDebtorPhone(e.target.value)} placeholder="Telefon (opsiyonel)"
+                              style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1537,6 +1746,7 @@ export default function AdminPage() {
                     <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Aylık Rapor</button>
                     <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
                     <button onClick={() => openStaffReport(dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
+                    <button onClick={() => openItemReport('today')} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📦 Ürün Raporu</button>
                   </>
                 )}
               </div>
@@ -1833,23 +2043,45 @@ export default function AdminPage() {
 
             {/* Telegram recipients */}
             <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
-              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>📲 Telegram Bildirimleri</div>
-              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Yeni sipariş geldiğinde Telegram mesajı alacak kişiler.</div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                <input value={newRecipientName} onChange={e => setNewRecipientName(e.target.value)} placeholder="İsim" style={{ ...s.input, height: 48, flex: 1 }} />
-                <input value={newRecipientChatId} onChange={e => setNewRecipientChatId(e.target.value.replace(/\D/g, ''))} placeholder="Telegram Chat ID" inputMode="numeric" style={{ ...s.input, height: 48, flex: 1, fontFamily: "'IBM Plex Mono', monospace" }} />
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 4 }}>
+                <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>📲 Telegram Bildirimleri</div>
+                <button onClick={toggleTelegramEnabled} style={{ height: 36, padding: '0 14px', background: telegramEnabled ? 'rgba(39,174,96,.14)' : 'transparent', border: telegramEnabled ? '1px solid #27ae60' : '1px solid #383838', color: telegramEnabled ? '#5FD08C' : '#8A8A8A', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                  {telegramEnabled ? '🔔 Aktif' : '🔕 Kapalı'}
+                </button>
               </div>
-              <button onClick={addTelegramRecipient} style={{ width: '100%', height: 48, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 14, fontFamily: "'IBM Plex Sans', sans-serif" }}>+ Ekle</button>
-              {telegramRecipients.length === 0 && (
-                <div style={{ color: '#8A8A8A', fontSize: 13, textAlign: 'center', padding: '10px 0' }}>Henüz kayıtlı alıcı yok (varsayılan liste kullanılıyor).</div>
-              )}
-              {telegramRecipients.map(r => (
-                <div key={r.chat_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid #2A2A2A' }}>
-                  <div>
-                    <div style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 600 }}>{r.name}</div>
-                    <div style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{r.chat_id}</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Kapalıyken yeni sipariş geldiğinde hiç Telegram mesajı gönderilmez - sipariş, masa numarasıyla sisteme yine de eklenir.</div>
+              <div style={{ opacity: telegramEnabled ? 1 : 0.4, pointerEvents: telegramEnabled ? 'auto' : 'none' }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  <input value={newRecipientName} onChange={e => setNewRecipientName(e.target.value)} placeholder="İsim" style={{ ...s.input, height: 48, flex: 1 }} />
+                  <input value={newRecipientChatId} onChange={e => setNewRecipientChatId(e.target.value.replace(/\D/g, ''))} placeholder="Telegram Chat ID" inputMode="numeric" style={{ ...s.input, height: 48, flex: 1, fontFamily: "'IBM Plex Mono', monospace" }} />
+                </div>
+                <button onClick={addTelegramRecipient} style={{ width: '100%', height: 48, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 14, fontFamily: "'IBM Plex Sans', sans-serif" }}>+ Ekle</button>
+                {telegramRecipients.length === 0 && (
+                  <div style={{ color: '#8A8A8A', fontSize: 13, textAlign: 'center', padding: '10px 0' }}>Henüz kayıtlı alıcı yok (varsayılan liste kullanılıyor).</div>
+                )}
+                {telegramRecipients.map(r => (
+                  <div key={r.chat_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid #2A2A2A' }}>
+                    <div>
+                      <div style={{ color: '#F0EDE8', fontSize: 14, fontWeight: 600 }}>{r.name}</div>
+                      <div style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{r.chat_id}</div>
+                    </div>
+                    <button onClick={() => removeTelegramRecipient(r.chat_id)} style={{ background: 'transparent', border: '1px solid #383838', height: 36, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
                   </div>
-                  <button onClick={() => removeTelegramRecipient(r.chat_id)} style={{ background: 'transparent', border: '1px solid #383838', height: 36, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category → printer station routing */}
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🖨️ Fiş Yönlendirme</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Her kategorinin fişi hangi istasyona (Mutfak / Nargile) yazdırılacağını seçin. Ayarlanmamış kategoriler varsayılan olarak Mutfak'a gider.</div>
+              {categories.map(cat => (
+                <div key={cat.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid #2A2A2A' }}>
+                  <div style={{ color: '#F0EDE8', fontSize: 14 }}>{cat.icon} {cat.name}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setCategoryStation(cat.id, 'kitchen')} style={{ height: 36, padding: '0 12px', background: (categoryStations[cat.id] || 'kitchen') === 'kitchen' ? 'rgba(243,156,18,.14)' : 'transparent', border: (categoryStations[cat.id] || 'kitchen') === 'kitchen' ? '1px solid #f39c12' : '1px solid #383838', color: (categoryStations[cat.id] || 'kitchen') === 'kitchen' ? '#f39c12' : '#8A8A8A', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>🍳 Mutfak</button>
+                    <button onClick={() => setCategoryStation(cat.id, 'nargile')} style={{ height: 36, padding: '0 12px', background: categoryStations[cat.id] === 'nargile' ? 'rgba(155,89,182,.14)' : 'transparent', border: categoryStations[cat.id] === 'nargile' ? '1px solid #9b59b6' : '1px solid #383838', color: categoryStations[cat.id] === 'nargile' ? '#9b59b6' : '#8A8A8A', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>💨 Nargile</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1873,6 +2105,111 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {isManager && tab === 'debts' && (
+          <div className="kahfe-section" style={s.section}>
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>+ Yeni Borçlu Ekle</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={newDebtorNameTab} onChange={e => setNewDebtorNameTab(e.target.value)} placeholder="İsim" style={{ ...s.input, height: 48, flex: 1 }} />
+                <input value={newDebtorPhoneTab} onChange={e => setNewDebtorPhoneTab(e.target.value)} placeholder="Telefon (opsiyonel)" style={{ ...s.input, height: 48, flex: 1 }} />
+                <button onClick={addDebtorFromTab} style={{ height: 48, padding: '0 20px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>+ Ekle</button>
+              </div>
+            </div>
+
+            {debtors.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#8A8A8A', padding: 20 }}>Henüz kayıtlı borçlu yok.</div>
+            )}
+
+            {debtors.map(d => {
+              const stats = debtorStats(d.id)
+              return (
+                <div key={d.id} onClick={() => setDebtDetailId(d.id)} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderLeft: stats.kalan > 0 ? '3px solid #C0392B' : '3px solid #27ae60', padding: '16px 18px', marginBottom: 10, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{d.name}</div>
+                    {d.phone && <div style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{d.phone}</div>}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    <div>
+                      <div style={{ color: '#8A8A8A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Toplam Borç</div>
+                      <div style={{ color: '#F0EDE8', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{stats.borc.toFixed(0)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#8A8A8A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ödenen</div>
+                      <div style={{ color: '#27ae60', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{stats.odenen.toFixed(0)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#8A8A8A', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kalan</div>
+                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontSize: 16, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{stats.kalan.toFixed(0)}</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Debtor detail modal */}
+        {debtDetailId && (() => {
+          const debtor = debtors.find(d => d.id === debtDetailId)
+          if (!debtor) return null
+          const stats = debtorStats(debtDetailId)
+          return (
+            <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setDebtDetailId(null)}>
+              <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{debtor.name}</div>
+                    {debtor.phone && <div style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{debtor.phone}</div>}
+                  </div>
+                  <button onClick={() => setDebtDetailId(null)} style={{ background:'#2A2A2A', border:'none', width:36, height:36, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
+                </div>
+                <div style={{ padding:20 }}>
+                  <div style={{ display:'flex', gap:10, marginBottom:20 }}>
+                    <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
+                      <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM BORÇ</div>
+                      <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{stats.borc.toFixed(0)}</div>
+                    </div>
+                    <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
+                      <div style={{ color:'#8A8A8A', fontSize:11 }}>ÖDENEN</div>
+                      <div style={{ color:'#27ae60', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{stats.odenen.toFixed(0)}</div>
+                    </div>
+                    <div style={{ flex:1, background:'#1A1A1A', border:'1px solid #2A2A2A', padding:14, textAlign:'center' }}>
+                      <div style={{ color:'#8A8A8A', fontSize:11 }}>KALAN</div>
+                      <div style={{ color: stats.kalan > 0 ? '#e74c3c' : '#8A8A8A', fontWeight:800, fontSize:18, fontFamily:"'IBM Plex Mono', monospace" }}>₺{stats.kalan.toFixed(0)}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                    <input type="number" value={debtPaymentAmount} onChange={e => setDebtPaymentAmount(e.target.value)} placeholder="Ödeme tutarı (₺)"
+                      style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }} />
+                    <button onClick={() => recordDebtPayment(debtDetailId)} style={{ height:48, padding:'0 20px', background:'#27ae60', border:'none', color:'#fff', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Ödeme Al</button>
+                  </div>
+
+                  <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+                    <input type="number" value={manualDebtAmount} onChange={e => setManualDebtAmount(e.target.value)} placeholder="Manuel borç tutarı (₺)"
+                      style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }} />
+                    <input value={manualDebtNote} onChange={e => setManualDebtNote(e.target.value)} placeholder="Not (opsiyonel)"
+                      style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 14px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                    <button onClick={() => addManualDebt(debtDetailId)} style={{ height:48, padding:'0 16px', background:'transparent', border:'1px solid #C0392B', color:'#e74c3c', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>+ Borç Ekle</button>
+                  </div>
+
+                  <div style={{ color:'#8A8A8A', fontSize:11, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Hareketler</div>
+                  {stats.txs.length === 0 && <div style={{ color:'#8A8A8A', fontSize:13, textAlign:'center', padding:'10px 0' }}>Henüz hareket yok.</div>}
+                  {stats.txs.map((t: any) => (
+                    <div key={t.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderTop:'1px solid #2A2A2A' }}>
+                      <div>
+                        <div style={{ color: t.type === 'borç' ? '#e74c3c' : '#27ae60', fontSize:13, fontWeight:600 }}>{t.type === 'borç' ? 'Borç' : 'Ödeme'}{t.fatura_no ? ` · Fiş #${t.fatura_no}` : ''}</div>
+                        <div style={{ color:'#8A8A8A', fontSize:11 }}>{new Date(t.created_at).toLocaleString('tr-TR')} {t.note ? `· ${t.note}` : ''}</div>
+                      </div>
+                      <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:15, fontFamily:"'IBM Plex Mono', monospace" }}>₺{Number(t.amount).toFixed(0)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </div>
     </>
   )

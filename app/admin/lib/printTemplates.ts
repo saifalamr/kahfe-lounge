@@ -45,13 +45,13 @@ export function printKitchenTicket(tableName: string, orders: any[]) {
   win.document.close()
 }
 
-export function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number }) {
-  const win = window.open('', '_blank', 'width=420,height=700')
+export function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed'|'debt', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number, faturaNo?: number }) {
+  const win = window.open('', '_blank', 'width=460,height=750')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const itemRows = (info.orders || []).flatMap((o: any) => o.items || []).map((it: any) =>
     `<tr><td>${it.quantity}x ${it.name}</td><td style="text-align:right">${it.subtotal} ₺</td></tr>`
   ).join('')
-  const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : 'Karma (Nakit + Kart)'
+  const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : info.method === 'debt' ? 'BORÇ (Veresiye)' : 'Karma (Nakit + Kart)'
   const hasDiscount = (info.discountAmount || 0) > 0
   win.document.write(`
     <!DOCTYPE html>
@@ -60,20 +60,23 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
       <meta charset="utf-8" />
       <title>Kahfe Lounge - Fiş - ${info.table_name}</title>
       <style>
-        body { font-family: 'Courier New', monospace; color:#111; padding: 20px; width:280px; margin:0 auto; }
+        body { font-family: 'Courier New', monospace; font-weight: 700; color:#000; padding: 22px; width:320px; margin:0 auto; }
         .center { text-align:center; }
-        h1 { font-size:16px; margin:4px 0; }
-        .line { border-top:1px dashed #333; margin:10px 0; }
-        table { width:100%; border-collapse:collapse; font-size:12px; }
-        td { padding:3px 0; }
-        .total-row td { font-weight:bold; font-size:14px; padding-top:8px; }
+        h1 { font-size:22px; margin:6px 0; font-weight:900; letter-spacing:1px; }
+        .fatura-no { font-size:16px; font-weight:900; margin-top:4px; }
+        .line { border-top:3px dashed #000; margin:14px 0; }
+        table { width:100%; border-collapse:collapse; font-size:16px; }
+        td { padding:5px 0; }
+        .total-row td { font-weight:900; font-size:20px; padding-top:12px; }
+        .method { font-size:16px; font-weight:900; }
       </style>
     </head>
     <body>
       <div class="center">
         <h1>KAHFE LOUNGE</h1>
-        <div style="font-size:11px;">${new Date().toLocaleString('tr-TR')}</div>
-        <div style="font-size:12px; margin-top:6px;">Masa: <b>${info.table_name}</b></div>
+        <div style="font-size:14px;">${new Date().toLocaleString('tr-TR')}</div>
+        ${info.faturaNo ? `<div class="fatura-no">FİŞ NO: ${String(info.faturaNo).padStart(6, '0')}</div>` : ''}
+        <div style="font-size:16px; margin-top:8px;">Masa: <b>${info.table_name}</b></div>
       </div>
       <div class="line"></div>
       <table>
@@ -85,12 +88,12 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
         <tr class="total-row"><td>TOPLAM</td><td style="text-align:right">${info.total.toFixed(0)} ₺</td></tr>
       </table>
       <div class="line"></div>
-      <div style="font-size:12px;">
-        Ödeme: <b>${methodLabel}</b><br/>
+      <div class="method">
+        Ödeme: ${methodLabel}<br/>
         ${info.method === 'mixed' ? `Nakit: ${info.cash.toFixed(0)} ₺<br/>Kart: ${info.card.toFixed(0)} ₺` : ''}
       </div>
       <div class="line"></div>
-      <div class="center" style="font-size:11px; margin-top:10px;">Bizi tercih ettiğiniz için teşekkürler!</div>
+      <div class="center" style="font-size:14px; margin-top:14px;">Bizi tercih ettiğiniz için teşekkürler!</div>
       <script>window.onload = function(){ window.print(); };</script>
     </body>
     </html>
@@ -203,6 +206,48 @@ export function exportMonthlyReportPDF(report: any) {
       <script>
         window.onload = function() { window.print(); };
       </script>
+    </body>
+    </html>
+  `)
+  win.document.close()
+}
+
+export function printItemReportPDF(itemReportRange: 'today'|'month'|'year', itemReportData: any[]) {
+  const win = window.open('', '_blank', 'width=800,height=900')
+  if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+  const label = itemReportRange === 'today' ? 'Bugün' : itemReportRange === 'month' ? 'Bu Ay' : 'Bu Yıl'
+  const totalRevenue = itemReportData.reduce((s: number, r: any) => s + r.revenue, 0)
+  const rows = itemReportData.map((r: any, i: number) => `
+    <tr><td>${i + 1}</td><td>${r.name}</td><td style="text-align:right">${r.qty}</td><td style="text-align:right">${r.revenue.toFixed(0)} ₺</td></tr>
+  `).join('')
+  win.document.write(`
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+      <meta charset="utf-8" />
+      <title>Kahfe Lounge - Ürün Raporu - ${label}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; color:#1A1A1A; padding: 36px; }
+        .brand { font-size: 12px; letter-spacing: 3px; color:#8a6d1f; font-weight:700; }
+        h1 { font-size: 22px; margin: 4px 0 20px; }
+        .stat { display:inline-block; border:1px solid #ddd; border-radius:10px; padding:14px 24px; margin-bottom:20px; }
+        .stat .num { font-size: 20px; font-weight:800; }
+        .stat .label { font-size: 11px; color:#8A8A8A; margin-top:4px; }
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th, td { padding:8px 10px; border-bottom:1px solid #eee; font-size:12px; text-align:left; }
+        th { color:#888; text-transform:uppercase; font-size:10px; }
+      </style>
+    </head>
+    <body>
+      <div class="brand">KAHFE LOUNGE</div>
+      <h1>Ürün Raporu — ${label}</h1>
+      <div class="stat"><div class="num">${totalRevenue.toFixed(0)} ₺</div><div class="label">Toplam Ciro (Ürün Bazlı)</div></div>
+      <table>
+        <tr><th>#</th><th>Ürün</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>
+        ${rows || '<tr><td colspan="4">Bu aralıkta veri yok</td></tr>'}
+      </table>
+      <script>window.onload = function(){ window.print(); };</script>
     </body>
     </html>
   `)
