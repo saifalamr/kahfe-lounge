@@ -520,11 +520,16 @@ export default function AdminPage() {
   const [addOrderTable, setAddOrderTable] = useState<string | null>(null)
   const [staffCart, setStaffCart] = useState<Record<string, number>>({})
   const [staffCategoryFilter, setStaffCategoryFilter] = useState<string | null>(null)
+  const [menuItemOptions, setMenuItemOptions] = useState<Record<string, any[]>>({})
+  const [staffExtraItems, setStaffExtraItems] = useState<Record<string, any>>({})
+  const [staffPendingOptionItem, setStaffPendingOptionItem] = useState<MenuItem | null>(null)
+  const [staffPendingSelections, setStaffPendingSelections] = useState<Record<string,string>>({})
 
   function openAddOrder(tableName: string) {
     setAddOrderTable(tableName)
     setStaffCart({})
     setStaffCategoryFilter(null)
+    setStaffExtraItems({})
   }
 
   function adjustStaffCart(itemId: string, delta: number) {
@@ -537,9 +542,43 @@ export default function AdminPage() {
     })
   }
 
+  function findMenuItemOrSynthetic(id: string): any {
+    return items.find(i => i.id === id) || staffExtraItems[id]
+  }
+
+  function openStaffOptionPicker(item: MenuItem) {
+    const groups = menuItemOptions[item.id] || []
+    const defaults: Record<string,string> = {}
+    groups.forEach((g: any) => { if (g.choices?.[0]) defaults[g.id] = g.choices[0].id })
+    setStaffPendingSelections(defaults)
+    setStaffPendingOptionItem(item)
+  }
+
+  function confirmStaffAddWithOptions() {
+    if (!staffPendingOptionItem) return
+    const groups = menuItemOptions[staffPendingOptionItem.id] || []
+    const chosen = groups.map((g: any) => {
+      const choiceId = staffPendingSelections[g.id]
+      const choice = g.choices.find((c: any) => c.id === choiceId)
+      return { choiceId, choiceName: choice?.name || '', priceDelta: Number(choice?.price_delta || 0) }
+    })
+    if (chosen.some(c => !c.choiceId)) return
+    const optionsText = chosen.map(c => c.choiceName).join(', ')
+    const priceDelta = chosen.reduce((s, c) => s + c.priceDelta, 0)
+    const syntheticId = `${staffPendingOptionItem.id}::${groups.map((g: any) => staffPendingSelections[g.id]).join('_')}`
+    const finalPrice = staffPendingOptionItem.price + priceDelta
+
+    setStaffExtraItems(prev => ({
+      ...prev,
+      [syntheticId]: { ...staffPendingOptionItem, id: syntheticId, price: finalPrice, _baseId: staffPendingOptionItem.id, _optionsText: optionsText }
+    }))
+    adjustStaffCart(syntheticId, 1)
+    setStaffPendingOptionItem(null)
+  }
+
   const staffCartCount = Object.values(staffCart).reduce((s, q) => s + q, 0)
   const staffCartTotal = Object.entries(staffCart).reduce((s, [id, qty]) => {
-    const item = items.find(i => i.id === id)
+    const item = findMenuItemOrSynthetic(id)
     return s + (item ? item.price * qty : 0)
   }, 0)
 
@@ -548,9 +587,11 @@ export default function AdminPage() {
     try {
       const orderItems = Object.entries(staffCart)
         .map(([id, qty]) => {
-          const item = items.find(i => i.id === id)
+          const item = findMenuItemOrSynthetic(id)
           if (!item) return null
-          return { id: item.id, name: item.name, name_en: item.name_en || item.name, price: item.price, quantity: qty, subtotal: item.price * qty }
+          const displayName = item._optionsText ? `${item.name} (${item._optionsText})` : item.name
+          const displayNameEn = item._optionsText ? `${item.name_en || item.name} (${item._optionsText})` : (item.name_en || item.name)
+          return { id: item._baseId || item.id, name: displayName, name_en: displayNameEn, price: item.price, quantity: qty, subtotal: item.price * qty }
         })
         .filter((x): x is NonNullable<typeof x> => x !== null)
 
@@ -587,6 +628,7 @@ export default function AdminPage() {
       await loadTableMapData()
       setAddOrderTable(null)
       setStaffCart({})
+      setStaffExtraItems({})
     } catch (err: any) {
       alert('✗ Beklenmeyen bir hata oluştu.\n\n' + (err?.message || String(err)))
     }
@@ -902,6 +944,54 @@ export default function AdminPage() {
   const [itemRec, setItemRec] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
 
+  // Item options (e.g. Şeker Oranı: Sade / Az Şekerli / Orta Şekerli / Şekerli)
+  // Only editable once an item exists, since groups reference the item id
+  const [itemOptionGroups, setItemOptionGroups] = useState<any[]>([])
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newChoiceText, setNewChoiceText] = useState<Record<string, string>>({})
+
+  async function loadItemOptionGroups(menuItemId: string) {
+    const { data: groups } = await supabase.from('item_option_groups').select('*').eq('menu_item_id', menuItemId).order('order_index')
+    const groupIds = (groups || []).map((g: any) => g.id)
+    let choices: any[] = []
+    if (groupIds.length > 0) {
+      const { data } = await supabase.from('item_option_choices').select('*').in('group_id', groupIds).order('order_index')
+      choices = data || []
+    }
+    setItemOptionGroups((groups || []).map((g: any) => ({ ...g, choices: choices.filter((c: any) => c.group_id === g.id) })))
+  }
+
+  async function addOptionGroup() {
+    const name = newGroupName.trim()
+    if (!name || !editingItem) return
+    const maxOrder = itemOptionGroups.length ? Math.max(...itemOptionGroups.map((g: any) => g.order_index)) + 1 : 0
+    await supabase.from('item_option_groups').insert({ menu_item_id: editingItem.id, name, required: true, order_index: maxOrder })
+    setNewGroupName('')
+    await loadItemOptionGroups(editingItem.id)
+  }
+
+  async function deleteOptionGroup(groupId: string) {
+    if (!confirm('Bu seçenek grubunu (ve tüm seçeneklerini) silmek istediğinizden emin misiniz?')) return
+    await supabase.from('item_option_groups').delete().eq('id', groupId)
+    if (editingItem) await loadItemOptionGroups(editingItem.id)
+  }
+
+  async function addOptionChoice(groupId: string) {
+    const text = (newChoiceText[groupId] || '').trim()
+    if (!text || !editingItem) return
+    const group = itemOptionGroups.find((g: any) => g.id === groupId)
+    const maxOrder = group?.choices?.length ? Math.max(...group.choices.map((c: any) => c.order_index)) + 1 : 0
+    await supabase.from('item_option_choices').insert({ group_id: groupId, name: text, price_delta: 0, order_index: maxOrder })
+    setNewChoiceText(prev => ({ ...prev, [groupId]: '' }))
+    await loadItemOptionGroups(editingItem.id)
+  }
+
+  async function deleteOptionChoice(choiceId: string) {
+    if (!editingItem) return
+    await supabase.from('item_option_choices').delete().eq('id', choiceId)
+    await loadItemOptionGroups(editingItem.id)
+  }
+
   // Image crop states
   const [rawImageSrc, setRawImageSrc] = useState('')
   const [showCropper, setShowCropper] = useState(false)
@@ -934,6 +1024,27 @@ export default function AdminPage() {
     setCategories(cats || [])
     setItems(its || [])
     setStaffList(staffData || [])
+
+    const itemIds = (its || []).map((x: any) => x.id)
+    if (itemIds.length > 0) {
+      const { data: groups } = await supabase.from('item_option_groups').select('*').in('menu_item_id', itemIds).order('order_index')
+      const groupIds = (groups || []).map((g: any) => g.id)
+      let choices: any[] = []
+      if (groupIds.length > 0) {
+        const { data } = await supabase.from('item_option_choices').select('*').in('group_id', groupIds).order('order_index')
+        choices = data || []
+      }
+      const map: Record<string, any[]> = {}
+      ;(groups || []).forEach((g: any) => {
+        if (!map[g.menu_item_id]) map[g.menu_item_id] = []
+        map[g.menu_item_id].push({ ...g, choices: choices.filter((ch: any) => ch.group_id === g.id) })
+      })
+      setMenuItemOptions(map)
+    }
+  }
+
+  function hasMenuOptions(itemId: string) {
+    return (menuItemOptions[itemId]?.length || 0) > 0
   }
 
   function startEditStaff(s: any) {
@@ -1053,13 +1164,16 @@ export default function AdminPage() {
 
       if (editingItem) {
         await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec }).eq('id', editingItem.id)
-        showMsg('Ürün güncellendi ✓'); setEditingItem(null)
+        showMsg('Ürün güncellendi ✓')
+        await loadData()
       } else {
         const maxOrder = items.length ? Math.max(...items.map(i => i.order_index)) + 1 : 0
-        await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, order_index: maxOrder })
-        showMsg('Ürün eklendi ✓')
+        const { data: newItem } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, order_index: maxOrder }).select().single()
+        showMsg('✓ Ürün eklendi. Şimdi isterseniz seçenek (şeker oranı vb.) ekleyebilirsiniz.')
+        await loadData()
+        if (newItem) { startEditItem(newItem as MenuItem); setLoading(false); return }
       }
-      resetItemForm(); await loadData()
+      resetItemForm()
     } catch (e) { showMsg('Hata: ' + (e as Error).message) }
     setLoading(false)
   }
@@ -1102,12 +1216,14 @@ export default function AdminPage() {
     setItemRec(item.recommended || false)
     setExistingImageUrl(item.image_url || ''); setCroppedBlob(null); setCroppedPreview(item.image_url || '')
     setRawImageSrc(''); setShowCropper(false)
+    loadItemOptionGroups(item.id)
   }
 
   function resetItemForm() {
     setItemName(''); setItemDesc(''); setItemPrice(''); setItemCat(''); setItemAvail(true); setItemRec(false)
     setEditingItem(null); setCroppedBlob(null); setCroppedPreview(''); setRawImageSrc('')
     setExistingImageUrl(''); setShowCropper(false)
+    setItemOptionGroups([]); setNewGroupName(''); setNewChoiceText({})
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1378,7 +1494,8 @@ export default function AdminPage() {
                 <div style={{ flex:1, overflowY:'auto', padding:'14px 16px' }}>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:10 }}>
                     {items.filter(it => it.available && (staffCategoryFilter === null || it.category_id === staffCategoryFilter)).map(item => {
-                      const qty = staffCart[item.id] || 0
+                      const withOptions = hasMenuOptions(item.id)
+                      const qty = withOptions ? 0 : (staffCart[item.id] || 0)
                       return (
                         <div key={item.id} style={{ background:'#1A1A1A', border: qty>0 ? '1.5px solid rgba(201,168,76,.5)' : '1px solid #2A2A2A', borderRadius: 0, padding:'12px 10px', display:'flex', flexDirection:'column', gap:8 }}>
                           <div>
@@ -1386,7 +1503,7 @@ export default function AdminPage() {
                             <div style={{ color:'#C9A84C', fontSize:12, fontWeight:700 }}>{item.price} ₺</div>
                           </div>
                           {qty === 0 ? (
-                            <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
+                            <button onClick={() => withOptions ? openStaffOptionPicker(item) : adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
                           ) : (
                             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0f0f0f', borderRadius: 0, padding:'4px 8px' }}>
                               <button onClick={() => adjustStaffCart(item.id, -1)} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:28, height:28, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:800 }}>−</button>
@@ -1407,6 +1524,39 @@ export default function AdminPage() {
                   </div>
                   <button onClick={submitStaffOrder} disabled={staffCartCount===0 || !isOnline}
                     style={{ background: (staffCartCount===0 || !isOnline) ? '#2A2A2A' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: (staffCartCount===0 || !isOnline) ? '#666' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: (staffCartCount===0 || !isOnline) ? 'not-allowed' : 'pointer' }}>{isOnline ? 'Siparişi Gönder' : '🔴 Bağlantı Yok'}</button>
+                </div>
+              </div>
+            )}
+
+            {/* Staff option picker - choose variant (e.g. şeker oranı) before adding */}
+            {staffPendingOptionItem && (
+              <div style={{ position:'fixed', inset:0, zIndex:215, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setStaffPendingOptionItem(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                  <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A' }}>
+                    <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{staffPendingOptionItem.name}</div>
+                    <div style={{ color:'#8A8A8A', fontSize:12, marginTop:2 }}>Tercihinizi seçin</div>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    {(menuItemOptions[staffPendingOptionItem.id] || []).map((g: any) => (
+                      <div key={g.id} style={{ marginBottom:18 }}>
+                        <div style={{ color:'#C9A84C', fontSize:11, letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, marginBottom:10 }}>{g.name}</div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                          {g.choices.map((c: any) => {
+                            const active = staffPendingSelections[g.id] === c.id
+                            return (
+                              <button key={c.id} onClick={() => setStaffPendingSelections(prev => ({ ...prev, [g.id]: c.id }))}
+                                style={{ borderRadius:999, padding:'10px 18px', fontSize:13.5, fontWeight:600, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif",
+                                  background: active ? '#C9A84C' : 'transparent', color: active ? '#0A0A0A' : '#B5B0A8', border: active ? '1px solid #C9A84C' : '1px solid #383838' }}>
+                                {c.name}{c.price_delta > 0 ? ` (+${c.price_delta}₺)` : ''}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={confirmStaffAddWithOptions}
+                      style={{ width:'100%', height:52, background:'#27ae60', border:'none', color:'#fff', fontWeight:600, fontSize:15, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>+ Sepete Ekle</button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1789,6 +1939,41 @@ export default function AdminPage() {
                 <input type="checkbox" id="rec" checked={itemRec} onChange={e => setItemRec(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#C9A84C' }} />
                 <label htmlFor="rec" style={{ color: '#C9A84C', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>⭐ Öne Çıkan (Önerilen)</label>
               </div>
+
+              {editingItem && (
+                <div style={{ marginBottom: 16, border: '1px solid #2A2A2A', padding: 14 }}>
+                  <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>SEÇENEKLER</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 12 }}>Örn. "Şeker Oranı" grubu → Sade, Az Şekerli, Orta Şekerli, Şekerli seçenekleri. Müşteri sipariş verirken bir tanesini seçmek zorunda kalır.</div>
+
+                  {itemOptionGroups.map((group: any) => (
+                    <div key={group.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 12, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 13 }}>{group.name}</div>
+                        <button onClick={() => deleteOptionGroup(group.id)} style={{ background: 'transparent', border: '1px solid #383838', color: '#C0392B', fontSize: 11, cursor: 'pointer', padding: '4px 8px' }}>Grubu Sil</button>
+                      </div>
+                      {group.choices.map((choice: any) => (
+                        <div key={choice.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: '1px solid #2A2A2A' }}>
+                          <span style={{ color: '#F0EDE8', fontSize: 13 }}>{choice.name}</span>
+                          <button onClick={() => deleteOptionChoice(choice.id)} style={{ background: 'transparent', border: 'none', color: '#8A8A8A', fontSize: 14, cursor: 'pointer' }}>✕</button>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <input value={newChoiceText[group.id] || ''} onChange={e => setNewChoiceText(prev => ({ ...prev, [group.id]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && addOptionChoice(group.id)}
+                          placeholder="Yeni seçenek (örn. Az Şekerli)" style={{ ...s.input, flex: 1, height: 40, fontSize: 13 }} />
+                        <button onClick={() => addOptionChoice(group.id)} style={{ height: 40, padding: '0 14px', background: '#2A2A2A', border: 'none', color: '#C9A84C', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>+ Ekle</button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addOptionGroup()}
+                      placeholder="Yeni grup adı (örn. Şeker Oranı)" style={{ ...s.input, flex: 1, height: 44 }} />
+                    <button onClick={addOptionGroup} style={{ height: 44, padding: '0 16px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontSize: 13, cursor: 'pointer', fontWeight: 700 }}>+ Grup Ekle</button>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={saveItem} disabled={loading} style={{ ...s.btn, flex: 1 }}>{loading ? 'Kaydediliyor...' : editingItem ? 'Güncelle' : 'Ekle'}</button>

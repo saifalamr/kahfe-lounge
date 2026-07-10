@@ -5,7 +5,7 @@ import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
 type CartMap = Record<string, number>
-type Line = MenuItem & { qty: number }
+type Line = MenuItem & { qty: number, _baseId?: string, _optionsText?: string }
 
 const fmt = (p: number) => `${p} ₺`
 
@@ -351,6 +351,56 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:Men
   )
 }
 
+function OptionPickerModal({ item, groups, selections, onSelect, onClose, onConfirm, lang }: {
+  item: MenuItem
+  groups: any[]
+  selections: Record<string,string>
+  onSelect: (groupId: string, choiceId: string) => void
+  onClose: () => void
+  onConfirm: () => void
+  lang: string
+}) {
+  const [closing, setClosing] = useState(false)
+  const close = () => { setClosing(true); setTimeout(onClose, 280) }
+  const allSelected = groups.every(g => !!selections[g.id])
+  return (
+    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:45, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end', maxWidth:480, margin:'0 auto', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderTopLeftRadius:26, borderTopRightRadius:26, paddingBottom:24, borderTop:'1px solid rgba(201,168,76,.2)', boxShadow:'0 -20px 60px rgba(0,0,0,.7)', animation: closing?'sheetDown .3s ease-in both':'sheetUp .36s cubic-bezier(.18,.84,.26,1) both' }}>
+        <div style={{ width:38, height:4, borderRadius:4, background:'rgba(240,237,232,.18)', margin:'10px auto 2px' }}/>
+        <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
+        <div style={{ padding:'20px 22px 0' }}>
+          <h2 style={{ fontFamily:'var(--serif)', fontWeight:700, fontSize:22, margin:0, color:'#F0EDE8', direction:lang==='ar'?'rtl':'ltr' }}>{lang==='en'?(item.name_en||item.name):lang==='ar'?(item.name_ar||item.name):item.name}</h2>
+          <div style={{ color:'rgba(240,237,232,.5)', fontSize:12.5, marginTop:4 }}>{lang==='en'?'Choose your preference':lang==='ar'?'اختر ما يناسبك':'Tercihinizi seçin'}</div>
+
+          {groups.map((g:any) => (
+            <div key={g.id} style={{ marginTop:20 }}>
+              <div style={{ color:'#C9A84C', fontSize:11, letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, marginBottom:10 }}>{g.name}</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {g.choices.map((c:any) => {
+                  const active = selections[g.id] === c.id
+                  return (
+                    <button key={c.id} onClick={()=>onSelect(g.id, c.id)}
+                      style={{ appearance:'none', cursor:'pointer', borderRadius:999, padding:'10px 18px', fontSize:13.5, fontWeight:600, fontFamily:'var(--sans)',
+                        background: active ? '#C9A84C' : 'rgba(240,237,232,.06)', color: active ? '#1A0E06' : 'rgba(240,237,232,.75)',
+                        border: active ? '1px solid #C9A84C' : '1px solid rgba(240,237,232,.1)' }}>
+                      {c.name}{c.price_delta > 0 ? ` (+${c.price_delta}₺)` : ''}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          <button onClick={onConfirm} disabled={!allSelected}
+            style={{ width:'100%', marginTop:26, appearance:'none', border:'none', background: allSelected ? '#C9A84C' : 'rgba(240,237,232,.08)', color: allSelected ? '#1A0E06' : 'rgba(240,237,232,.3)', fontFamily:'var(--sans)', fontWeight:700, fontSize:15, minHeight:52, borderRadius:14, cursor: allSelected ? 'pointer' : 'not-allowed', boxShadow: allSelected ? '0 8px 22px rgba(201,168,76,.3)' : 'none' }}>
+            {lang==='en'?'Add to Order':lang==='ar'?'أضف للطلب':'Sepete Ekle'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent, orderNote, onNoteChange, orderNumber, isOnline }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean; orderNote:string; onNoteChange:(v:string)=>void; orderNumber:number|null; isOnline:boolean }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
@@ -369,6 +419,7 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
               <div style={{ width:48, height:48, borderRadius:10, overflow:'hidden' }}><KImg label={l.name} src={l.image_url||''} h={48}/></div>
               <div style={{ display:'flex', flexDirection:'column', minWidth:0 }}>
                 <span style={{ fontWeight:600, fontSize:13.5, color:'#F0EDE8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lang==='en'?(l.name_en||l.name):lang==='ar'?(l.name_ar||l.name):l.name}</span>
+                {l._optionsText && <span style={{ fontSize:11, color:'#C9A84C', marginTop:1 }}>{l._optionsText}</span>}
                 <span style={{ fontSize:11, color:'rgba(240,237,232,.5)', marginTop:2 }}>{fmt(l.price)} · adet</span>
               </div>
               <QtyPill qty={l.qty} onDec={()=>onDec(l)} onInc={()=>onInc(l)} size="sm"/>
@@ -459,6 +510,10 @@ export default function MenuPage() {
   const [loading, setLoading] = useState(true)
   const [activeCat, setActiveCat] = useState('')
   const [cart, setCart] = useState<CartMap>({})
+  const [itemOptions, setItemOptions] = useState<Record<string, any[]>>({})
+  const [extraCartItems, setExtraCartItems] = useState<Record<string, any>>({})
+  const [pendingOptionItem, setPendingOptionItem] = useState<MenuItem|null>(null)
+  const [pendingSelections, setPendingSelections] = useState<Record<string,string>>({})
   const [openItemId, setOpenItemId] = useState<string|null>(null)
   const [showOrder, setShowOrder] = useState(false)
   const [pulseKey, setPulseKey] = useState(0)
@@ -507,9 +562,9 @@ export default function MenuPage() {
     setSendingOrder(true)
     try {
       const orderItems = lines.map((l: any) => ({
-        id: l.id,
-        name: l.name,
-        name_en: l.name_en || l.name,
+        id: l._baseId || l.id,
+        name: l._optionsText ? `${l.name} (${l._optionsText})` : l.name,
+        name_en: l._optionsText ? `${l.name_en || l.name} (${l._optionsText})` : (l.name_en || l.name),
         price: l.price,
         quantity: l.qty,
         subtotal: l.price * l.qty
@@ -570,6 +625,25 @@ export default function MenuPage() {
       const hasRecommended = i.some(x => x.recommended)
       if (hasRecommended) setActiveCat('__recommended__')
       else if(c.length) setActiveCat(c[0].id)
+
+      // Item options (e.g. Şeker Oranı: Sade / Az Şekerli / Orta Şekerli / Şekerli)
+      const itemIds = i.map((x:any)=>x.id)
+      if (itemIds.length > 0) {
+        const { data: groups } = await supabase.from('item_option_groups').select('*').in('menu_item_id', itemIds).order('order_index')
+        const groupIds = (groups||[]).map((g:any)=>g.id)
+        let choices:any[] = []
+        if (groupIds.length > 0) {
+          const { data } = await supabase.from('item_option_choices').select('*').in('group_id', groupIds).order('order_index')
+          choices = data || []
+        }
+        const map: Record<string, any[]> = {}
+        ;(groups||[]).forEach((g:any) => {
+          if (!map[g.menu_item_id]) map[g.menu_item_id] = []
+          map[g.menu_item_id].push({ ...g, choices: choices.filter((ch:any)=>ch.group_id===g.id) })
+        })
+        setItemOptions(map)
+      }
+
       setLoading(false)
     }
     load()
@@ -577,7 +651,7 @@ export default function MenuPage() {
 
   const recommendedItems = useMemo(()=>allItems.filter(i=>i.recommended),[allItems])
   const items  = useMemo(()=> activeCat==='__recommended__' ? recommendedItems : allItems.filter(i=>i.category_id===activeCat),[activeCat,allItems,recommendedItems])
-  const byId   = useMemo(()=>{ const m:Record<string,MenuItem>={};allItems.forEach(i=>m[i.id]=i);return m },[allItems])
+  const byId   = useMemo(()=>{ const m:Record<string,any>={};allItems.forEach(i=>m[i.id]=i);Object.values(extraCartItems).forEach((ei:any)=>m[ei.id]=ei);return m },[allItems,extraCartItems])
   const setQty = (id:string,next:number)=>setCart(c=>{const n={...c};if(next<=0)delete n[id];else n[id]=next;return n})
   const add    = (item:MenuItem)=>{setQty(item.id,(cart[item.id]||0)+1);setPulseKey(k=>k+1)}
   const inc    = (item:MenuItem)=>{setQty(item.id,(cart[item.id]||0)+1);setPulseKey(k=>k+1)}
@@ -586,6 +660,41 @@ export default function MenuPage() {
   const total  = useMemo(()=>Object.entries(cart).reduce((a,[id,q])=>a+(byId[id]?.price||0)*q,0),[cart,byId])
   const lines  = useMemo(()=>Object.entries(cart).map(([id,qty])=>({...byId[id],qty})).filter(l=>l.id),[cart,byId])
   const openItem = openItemId?byId[openItemId]:null
+
+  const hasOptions = (itemId: string) => (itemOptions[itemId]?.length || 0) > 0
+
+  function openForOptions(item: MenuItem) {
+    const groups = itemOptions[item.id] || []
+    // Pre-select the first choice of each group so "Sepete Ekle" is
+    // immediately usable - customer can still change before adding
+    const defaults: Record<string,string> = {}
+    groups.forEach((g:any) => { if (g.choices?.[0]) defaults[g.id] = g.choices[0].id })
+    setPendingSelections(defaults)
+    setPendingOptionItem(item)
+  }
+
+  function confirmAddWithOptions() {
+    if (!pendingOptionItem) return
+    const groups = itemOptions[pendingOptionItem.id] || []
+    const chosen = groups.map((g:any) => {
+      const choiceId = pendingSelections[g.id]
+      const choice = g.choices.find((c:any) => c.id === choiceId)
+      return { choiceId, choiceName: choice?.name || '', priceDelta: Number(choice?.price_delta || 0) }
+    })
+    if (chosen.some(c => !c.choiceId)) return // shouldn't happen given pre-selection, but guard anyway
+    const optionsText = chosen.map(c => c.choiceName).join(', ')
+    const priceDelta = chosen.reduce((s,c) => s + c.priceDelta, 0)
+    const syntheticId = `${pendingOptionItem.id}::${groups.map((g:any)=>pendingSelections[g.id]).join('_')}`
+    const finalPrice = pendingOptionItem.price + priceDelta
+
+    setExtraCartItems(prev => ({
+      ...prev,
+      [syntheticId]: { ...pendingOptionItem, id: syntheticId, price: finalPrice, _baseId: pendingOptionItem.id, _optionsText: optionsText }
+    }))
+    setQty(syntheticId, (cart[syntheticId]||0) + 1)
+    setPulseKey(k=>k+1)
+    setPendingOptionItem(null)
+  }
 
   const recCat: Category | null = useMemo(()=>
     recommendedItems.length > 0
@@ -679,9 +788,9 @@ export default function MenuPage() {
         <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
           {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
           {items.map((it,i)=>(
-            <MenuCard key={it.id} item={it} qty={cart[it.id]||0} index={i} lang={lang}
+            <MenuCard key={it.id} item={it} qty={hasOptions(it.id) ? 0 : (cart[it.id]||0)} index={i} lang={lang}
               onOpen={()=>setOpenItemId(it.id)}
-              onAdd={()=>add(it)} onInc={()=>inc(it)} onDec={()=>dec(it)}/>
+              onAdd={()=>hasOptions(it.id) ? openForOptions(it) : add(it)} onInc={()=>inc(it)} onDec={()=>dec(it)}/>
           ))}
         </div>
 
@@ -704,10 +813,16 @@ export default function MenuPage() {
         )}
 
         {openItem && (
-          <ItemSheet item={openItem} qty={cart[openItem.id]||0} lang={lang}
+          <ItemSheet item={openItem} qty={hasOptions(openItem.id) ? 0 : (cart[openItem.id]||0)} lang={lang}
             onClose={()=>setOpenItemId(null)}
-            onAdd={()=>{add(openItem);setOpenItemId(null)}}
+            onAdd={()=>{ if (hasOptions(openItem.id)) { openForOptions(openItem) } else { add(openItem) }; setOpenItemId(null) }}
             onInc={()=>inc(openItem)} onDec={()=>dec(openItem)}/>
+        )}
+        {pendingOptionItem && (
+          <OptionPickerModal item={pendingOptionItem} groups={itemOptions[pendingOptionItem.id] || []} selections={pendingSelections} lang={lang}
+            onSelect={(groupId, choiceId) => setPendingSelections(prev => ({ ...prev, [groupId]: choiceId }))}
+            onClose={() => setPendingOptionItem(null)}
+            onConfirm={confirmAddWithOptions} />
         )}
         {showOrder && count>0 && (
           <OrderSummary lines={lines as Line[]} total={total} count={count} lang={lang}
