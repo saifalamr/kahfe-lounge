@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
+import { useConnectivity } from '@/lib/useConnectivity'
+import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
 import { formatTL } from './lib/format'
 
@@ -11,6 +13,8 @@ const TOUCHSCREEN_PASSWORD = '9000'
 
 /* ── Main Admin Page ── */
 export default function AdminPage() {
+  const isOnline = useConnectivity()
+
   // Load the redesign's font system client-side (scoped to this page only —
   // the customer-facing menu keeps its own font/theme untouched)
   useEffect(() => {
@@ -1072,6 +1076,7 @@ export default function AdminPage() {
 
   if (!auth) return (
     <div style={{ background: '#0A0A0A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <ConnectivityBanner />
       <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 32, width: '100%', maxWidth: 360, border: '1px solid #2A2A2A' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 4, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM PANELİ</div>
@@ -1113,6 +1118,7 @@ export default function AdminPage() {
         @media (min-width: 700px) { .kahfe-modal { max-width: 560px; } }
       `}</style>
       <div className="kahfe-shell" style={{ background: '#0A0A0A', minHeight: '100vh', paddingBottom: 40 }}>
+        <ConnectivityBanner />
         <div className="kahfe-header" style={s.header}>
           <div>
             <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>
@@ -1448,7 +1454,7 @@ export default function AdminPage() {
                             )}
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
                               <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
-                              {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} style={{ background:'#27ae60', border:'none', borderRadius: 0, height:40, padding:'0 16px', color:'#fff', fontSize:13, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Tamamlandı</button>}
+                              {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline} style={{ background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, height:40, padding:'0 16px', color: isOnline ? '#fff' : '#666', fontSize:13, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴'}</button>}
                             </div>
                           </div>
                         )
@@ -1590,8 +1596,8 @@ export default function AdminPage() {
                     <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{staffCartCount} ürün</div>
                     <div style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(staffCartTotal)}</div>
                   </div>
-                  <button onClick={submitStaffOrder} disabled={staffCartCount===0}
-                    style={{ background: staffCartCount===0 ? '#2A2A2A' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: staffCartCount===0 ? '#666' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>Siparişi Gönder</button>
+                  <button onClick={submitStaffOrder} disabled={staffCartCount===0 || !isOnline}
+                    style={{ background: (staffCartCount===0 || !isOnline) ? '#2A2A2A' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: (staffCartCount===0 || !isOnline) ? '#666' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: (staffCartCount===0 || !isOnline) ? 'not-allowed' : 'pointer' }}>{isOnline ? 'Siparişi Gönder' : '🔴 Bağlantı Yok'}</button>
                 </div>
               </div>
             )}
@@ -1688,8 +1694,8 @@ export default function AdminPage() {
                         style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
-                    <button onClick={confirmPayment}
-                      style={{ width:'100%', height:56, background:'#27ae60', border:'none', borderRadius: 0, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Ödemeyi Onayla ve Masayı Kapat</button>
+                    <button onClick={confirmPayment} disabled={!isOnline}
+                      style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, color: isOnline ? '#fff' : '#666', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Ödemeyi Onayla ve Masayı Kapat' : '🔴 Bağlantı Yok'}</button>
                   </div>
                 </div>
               </div>
@@ -1834,8 +1840,8 @@ export default function AdminPage() {
                     <span style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
                   </div>
                   {order.status === 'pending' && (
-                    <button onClick={() => updateOrderStatus(order.id, 'served')}
-                      style={{ width:'100%', marginTop:12, background:'#27ae60', border:'none', borderRadius: 0, padding:0, height:48, color:'#fff', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✓ Tamamlandı</button>
+                    <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
+                      style={{ width:'100%', marginTop:12, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, padding:0, height:48, color: isOnline ? '#fff' : '#666', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
                   )}
                 </div>
               )

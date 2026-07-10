@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
+import { useConnectivity } from '@/lib/useConnectivity'
+import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
 type CartMap = Record<string, number>
 type Line = MenuItem & { qty: number }
@@ -349,7 +351,7 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:Men
   )
 }
 
-function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent, orderNote, onNoteChange, orderNumber }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean; orderNote:string; onNoteChange:(v:string)=>void; orderNumber:number|null }) {
+function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent, orderNote, onNoteChange, orderNumber, isOnline }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean; orderNote:string; onNoteChange:(v:string)=>void; orderNumber:number|null; isOnline:boolean }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
@@ -413,9 +415,11 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
                 style={{ width:'100%', background:'rgba(240,237,232,.06)', border:'1px solid rgba(240,237,232,.15)', borderRadius:12, padding:'12px 14px', color:'#F0EDE8', fontSize:13, resize:'none', minHeight:70, fontFamily:'inherit', outline:'none' }}
               />
             </div>
-            <button onClick={onSubmit} disabled={sending}
-              style={{ width:'100%', background: sending ? '#2A2A2A' : '#C0392B', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:800, fontSize:16, cursor: sending ? 'not-allowed' : 'pointer', boxShadow: sending ? 'none' : '0 8px 24px rgba(192,57,43,.35)', transition:'all .2s' }}>
-              {sending
+            <button onClick={onSubmit} disabled={sending || !isOnline}
+              style={{ width:'100%', background: (sending || !isOnline) ? '#2A2A2A' : '#C0392B', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:800, fontSize:16, cursor: (sending || !isOnline) ? 'not-allowed' : 'pointer', boxShadow: (sending || !isOnline) ? 'none' : '0 8px 24px rgba(192,57,43,.35)', transition:'all .2s' }}>
+              {!isOnline
+                ? (lang==='en'?'🔴 No Connection':lang==='ar'?'🔴 لا يوجد اتصال':'🔴 Bağlantı Yok')
+                : sending
                 ? (lang==='en'?'Sending...':lang==='ar'?'جارٍ الإرسال...':'Gönderiliyor...')
                 : (lang==='en'?'✓ Confirm Order':lang==='ar'?'✓ تأكيد الطلب':'✓ Siparişi Onayla')
               }
@@ -449,6 +453,7 @@ function getCatName(cat: Category, lang: string): string {
 }
 
 export default function MenuPage() {
+  const isOnline = useConnectivity()
   const [categories, setCategories] = useState<Category[]>([])
   const [allItems, setAllItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -624,6 +629,8 @@ export default function MenuPage() {
         .lang-pick-btn:active{transform:scale(.97);}
       `}</style>
 
+      <ConnectivityBanner />
+
       {/* WELCOME POPUP */}
       {showWelcome && (
         <div style={{ position:'fixed', inset:0, zIndex:100, background:'rgba(0,0,0,.92)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, maxWidth:480, margin:'0 auto' }}>
@@ -705,7 +712,7 @@ export default function MenuPage() {
         {showOrder && count>0 && (
           <OrderSummary lines={lines as Line[]} total={total} count={count} lang={lang}
             tableName={tableName} onSubmit={submitOrder} sending={sendingOrder} sent={orderSent}
-            orderNote={orderNote} onNoteChange={setOrderNote} orderNumber={orderNumber}
+            orderNote={orderNote} onNoteChange={setOrderNote} orderNumber={orderNumber} isOnline={isOnline}
             onClose={()=>setShowOrder(false)} onInc={inc} onDec={dec}/>
         )}
       </div>

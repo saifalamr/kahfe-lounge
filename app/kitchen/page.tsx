@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useConnectivity } from '@/lib/useConnectivity'
+import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
 // Same credentials as /admin — kept in sync manually. If you change the
 // passwords in app/admin/page.tsx, update these lines too.
@@ -9,6 +11,8 @@ const STAFF_PASSWORD = '5678'
 const TOUCHSCREEN_PASSWORD = '9000'
 
 export default function KitchenPage() {
+  const isOnline = useConnectivity()
+
   // Load the same font system as the redesigned admin panel
   useEffect(() => {
     if (document.getElementById('kahfe-kitchen-fonts')) return
@@ -111,6 +115,7 @@ export default function KitchenPage() {
 
   if (!auth) return (
     <div style={{ background: '#0A0A0A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <ConnectivityBanner />
       <div style={{ background: '#1A1A1A', padding: 32, width: '100%', maxWidth: 360, border: '1px solid #2A2A2A' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 4, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>MUTFAK EKRANI</div>
@@ -128,6 +133,7 @@ export default function KitchenPage() {
 
   return (
     <div style={{ background: '#0A0A0A', minHeight: '100vh', padding: '24px 32px', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <ConnectivityBanner />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <div style={{ color: '#F0EDE8', fontSize: 30, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>🍳 Mutfak Ekranı</div>
         <div style={{ color: '#8A8A8A', fontSize: 17, fontFamily: "'IBM Plex Mono', monospace" }}>{orders.length} bekleyen sipariş</div>
@@ -158,7 +164,7 @@ export default function KitchenPage() {
               {order.note && (
                 <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(201,168,76,.08)', border: '1px solid rgba(201,168,76,.2)', fontSize: 16, color: '#F0EDE8' }}>📝 {order.note}</div>
               )}
-              <button onClick={() => markDone(order.id)} style={{ width: '100%', height: 60, background: '#27ae60', border: 'none', color: '#fff', fontSize: 18, fontWeight: 600, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>✓ Hazır</button>
+              <button onClick={() => markDone(order.id)} disabled={!isOnline} style={{ width: '100%', height: 60, background: isOnline ? '#27ae60' : '#2A2A2A', border: 'none', color: isOnline ? '#fff' : '#666', fontSize: 18, fontWeight: 600, cursor: isOnline ? 'pointer' : 'not-allowed', fontFamily: "'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Hazır' : '🔴 Bağlantı Yok'}</button>
             </div>
           )
         })}
