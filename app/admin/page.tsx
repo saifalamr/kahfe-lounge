@@ -345,6 +345,11 @@ export default function AdminPage() {
     await loadTableMapData()
   }
 
+  async function cancelBillRequest(tabId: string) {
+    await supabase.from('tabs').update({ bill_requested: false }).eq('id', tabId)
+    await loadTableMapData()
+  }
+
   // Payment & closing a tab
   const [paymentTab, setPaymentTab] = useState<{ id: string, table_name: string, total: number, orders: any[] } | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'|'debt'>('cash')
@@ -1316,8 +1321,10 @@ export default function AdminPage() {
 
                       {info.tabData && (
                         <div style={{ display:'flex', gap:8 }}>
-                          {!info.tabData.bill_requested && (
+                          {!info.tabData.bill_requested ? (
                             <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🧾 Hesap İstendi</button>
+                          ) : (
+                            <button onClick={() => cancelBillRequest(info.tabData.id)} title="Hesap isteğini iptal et" style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✕ Hesap İsteğini İptal Et</button>
                           )}
                           <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#B5B0A8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>
                           {activeOrders.length > 0 && (
