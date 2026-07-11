@@ -334,7 +334,16 @@ export default function AdminPage() {
     const openTab = openTabs.find((t: any) => t.table_name === tableName)
     if (!openTab) return { status: 'empty' as const, tabData: null, orders: [] as any[] }
     const orders = tabOrders.filter((o: any) => o.tab_id === openTab.id)
-    const hasPending = orders.some((o: any) => o.status === 'pending')
+    // Dismissed (cancelled/voided) orders don't count toward "this table is
+    // occupied" — a tab can still technically be open in the database (e.g.
+    // every order on it got cancelled, or it was created but never got an
+    // order) while having nothing active left. Without this filter the map
+    // tile showed "Dolu" even though the detail view correctly showed the
+    // table as empty, since the two used different filtering rules on the
+    // same data.
+    const activeOrders = orders.filter((o: any) => o.status !== 'dismissed')
+    if (activeOrders.length === 0) return { status: 'empty' as const, tabData: openTab, orders }
+    const hasPending = activeOrders.some((o: any) => o.status === 'pending')
     let status: 'pending'|'bill'|'occupied' = 'occupied'
     if (hasPending) status = 'pending'
     else if (openTab.bill_requested) status = 'bill'
