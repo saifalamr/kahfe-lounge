@@ -2336,22 +2336,34 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* Table list */}
+            {/* Table list, grouped the same way as Masa Haritası so it's not one flat jumble */}
             <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
               <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🪑 Masalar</div>
               <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Masa Haritası'nda görünen masalar. Yeni bir QR/NFC etiketi bastırdığınızda buraya da eklemeyi unutmayın.</div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
                 <input value={newTableName} onChange={e => setNewTableName(e.target.value)} placeholder="Örn. MASA-12" style={{ ...s.input, height: 48, flex: 1 }} onKeyDown={e => e.key === 'Enter' && addTable()} />
                 <button onClick={addTable} style={{ height: 48, padding: '0 20px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>+ Ekle</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
-                {ALL_TABLES.map(t => (
-                  <div key={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #2A2A2A', padding: '8px 10px', fontSize: 12, color: '#F0EDE8', fontFamily: "'IBM Plex Mono', monospace" }}>
-                    {t}
-                    <button onClick={() => removeTable(t)} style={{ background: 'transparent', border: 'none', color: '#C0392B', cursor: 'pointer', fontSize: 14, padding: 0, marginLeft: 6 }}>✕</button>
+              {[
+                { label: 'MASALAR', tables: ALL_TABLES.filter(t => t.startsWith('MASA')) },
+                { label: 'KİTAPLIK', tables: ALL_TABLES.filter(t => t.startsWith('KİTAPLIK')) },
+                { label: 'OKEY', tables: ALL_TABLES.filter(t => t.startsWith('OKEY')) },
+                { label: 'KAHFE', tables: ALL_TABLES.filter(t => t.startsWith('KAHFE')) },
+                { label: 'VİP', tables: ALL_TABLES.filter(t => t.startsWith('VİP')) },
+                { label: 'DİĞER', tables: ALL_TABLES.filter(t => !/^(MASA|KİTAPLIK|OKEY|KAHFE|VİP)/.test(t)) },
+              ].filter(group => group.tables.length > 0).map(group => (
+                <div key={group.label} style={{ marginBottom: 16 }}>
+                  <div style={{ color: '#C9A84C', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 8, fontFamily: "'IBM Plex Mono', monospace" }}>{group.label} ({group.tables.length})</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
+                    {group.tables.map(t => (
+                      <div key={t} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #2A2A2A', padding: '8px 10px', fontSize: 12, color: '#F0EDE8', fontFamily: "'IBM Plex Mono', monospace" }}>
+                        {t}
+                        <button onClick={() => removeTable(t)} style={{ background: 'transparent', border: 'none', color: '#C0392B', cursor: 'pointer', fontSize: 14, padding: 0, marginLeft: 6 }}>✕</button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
