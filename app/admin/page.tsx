@@ -1227,6 +1227,20 @@ export default function AdminPage() {
     await loadItemOptionGroups(editingItem.id)
   }
 
+  // These only fill in the English/Arabic name so the customer menu can
+  // show the right language - the admin panel itself stays Turkish-only.
+  async function updateGroupTranslation(groupId: string, field: 'name_en' | 'name_ar', value: string) {
+    setItemOptionGroups(prev => prev.map((g: any) => g.id === groupId ? { ...g, [field]: value } : g))
+    await supabase.from('item_option_groups').update({ [field]: value || null }).eq('id', groupId)
+  }
+
+  async function updateChoiceTranslation(groupId: string, choiceId: string, field: 'name_en' | 'name_ar', value: string) {
+    setItemOptionGroups(prev => prev.map((g: any) => g.id === groupId
+      ? { ...g, choices: g.choices.map((c: any) => c.id === choiceId ? { ...c, [field]: value } : c) }
+      : g))
+    await supabase.from('item_option_choices').update({ [field]: value || null }).eq('id', choiceId)
+  }
+
   // Image crop states
   const [rawImageSrc, setRawImageSrc] = useState('')
   const [showCropper, setShowCropper] = useState(false)
@@ -2241,7 +2255,7 @@ export default function AdminPage() {
               {editingItem && (
                 <div style={{ marginBottom: 16, border: '1px solid #2A2A2A', padding: 14 }}>
                   <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>SEÇENEKLER</div>
-                  <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 12 }}>Örn. "Şeker Oranı" grubu → Sade, Az Şekerli, Orta Şekerli, Şekerli seçenekleri. Müşteri sipariş verirken bir tanesini seçmek zorunda kalır.</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 12 }}>Örn. "Şeker Oranı" grubu → Sade, Az Şekerli, Orta Şekerli, Şekerli seçenekleri. Müşteri sipariş verirken bir tanesini seçmek zorunda kalır. İngilizce/Arapça alanlarını doldurursanız, menüde o dile göre otomatik gösterilir; boş bırakılırsa Türkçe adı gösterilir.</div>
 
                   {itemOptionGroups.map((group: any) => (
                     <div key={group.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 12, marginBottom: 10 }}>
@@ -2249,10 +2263,24 @@ export default function AdminPage() {
                         <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 13 }}>{group.name}</div>
                         <button onClick={() => deleteOptionGroup(group.id)} style={{ background: 'transparent', border: '1px solid #383838', color: '#C0392B', fontSize: 11, cursor: 'pointer', padding: '4px 8px' }}>Grubu Sil</button>
                       </div>
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                        <input defaultValue={group.name_en || ''} onBlur={e => updateGroupTranslation(group.id, 'name_en', e.target.value)}
+                          placeholder="İngilizce grup adı (örn. Sugar Level)" style={{ ...s.input, flex: 1, height: 34, fontSize: 12 }} />
+                        <input defaultValue={group.name_ar || ''} onBlur={e => updateGroupTranslation(group.id, 'name_ar', e.target.value)}
+                          placeholder="Arapça grup adı (opsiyonel)" style={{ ...s.input, flex: 1, height: 34, fontSize: 12, direction: 'rtl' }} />
+                      </div>
                       {group.choices.map((choice: any) => (
-                        <div key={choice.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderTop: '1px solid #2A2A2A' }}>
-                          <span style={{ color: '#F0EDE8', fontSize: 13 }}>{choice.name}</span>
-                          <button onClick={() => deleteOptionChoice(choice.id)} style={{ background: 'transparent', border: 'none', color: '#8A8A8A', fontSize: 14, cursor: 'pointer' }}>✕</button>
+                        <div key={choice.id} style={{ padding: '8px 0', borderTop: '1px solid #2A2A2A' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <span style={{ color: '#F0EDE8', fontSize: 13 }}>{choice.name}</span>
+                            <button onClick={() => deleteOptionChoice(choice.id)} style={{ background: 'transparent', border: 'none', color: '#8A8A8A', fontSize: 14, cursor: 'pointer' }}>✕</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input defaultValue={choice.name_en || ''} onBlur={e => updateChoiceTranslation(group.id, choice.id, 'name_en', e.target.value)}
+                              placeholder="İngilizce (örn. Less Sweet)" style={{ ...s.input, flex: 1, height: 32, fontSize: 12 }} />
+                            <input defaultValue={choice.name_ar || ''} onBlur={e => updateChoiceTranslation(group.id, choice.id, 'name_ar', e.target.value)}
+                              placeholder="Arapça (opsiyonel)" style={{ ...s.input, flex: 1, height: 32, fontSize: 12, direction: 'rtl' }} />
+                          </div>
                         </div>
                       ))}
                       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>

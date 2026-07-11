@@ -5,7 +5,7 @@ import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
 type CartMap = Record<string, number>
-type Line = MenuItem & { qty: number, _baseId?: string, _optionsText?: string }
+type Line = MenuItem & { qty: number, _baseId?: string, _optionsText?: string, _optionsTextEn?: string, _optionsTextAr?: string }
 
 const fmt = (p: number) => `${p} ₺`
 
@@ -374,16 +374,17 @@ function OptionPickerModal({ item, groups, selections, onSelect, onClose, onConf
 
           {groups.map((g:any) => (
             <div key={g.id} style={{ marginTop:20 }}>
-              <div style={{ color:'#C9A84C', fontSize:11, letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, marginBottom:10 }}>{g.name}</div>
+              <div style={{ color:'#C9A84C', fontSize:11, letterSpacing:'.08em', textTransform:'uppercase', fontWeight:700, marginBottom:10 }}>{lang==='en'?(g.name_en||g.name):lang==='ar'?(g.name_ar||g.name):g.name}</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                 {g.choices.map((c:any) => {
                   const active = selections[g.id] === c.id
+                  const choiceLabel = lang==='en'?(c.name_en||c.name):lang==='ar'?(c.name_ar||c.name):c.name
                   return (
                     <button key={c.id} onClick={()=>onSelect(g.id, c.id)}
                       style={{ appearance:'none', cursor:'pointer', borderRadius:999, padding:'10px 18px', fontSize:13.5, fontWeight:600, fontFamily:'var(--sans)',
                         background: active ? '#C9A84C' : 'rgba(240,237,232,.06)', color: active ? '#1A0E06' : 'rgba(240,237,232,.75)',
                         border: active ? '1px solid #C9A84C' : '1px solid rgba(240,237,232,.1)' }}>
-                      {c.name}{c.price_delta > 0 ? ` (+${c.price_delta}₺)` : ''}
+                      {choiceLabel}{c.price_delta > 0 ? ` (+${c.price_delta}₺)` : ''}
                     </button>
                   )
                 })}
@@ -419,7 +420,7 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
               <div style={{ width:48, height:48, borderRadius:10, overflow:'hidden' }}><KImg label={l.name} src={l.image_url||''} h={48}/></div>
               <div style={{ display:'flex', flexDirection:'column', minWidth:0 }}>
                 <span style={{ fontWeight:600, fontSize:13.5, color:'#F0EDE8', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lang==='en'?(l.name_en||l.name):lang==='ar'?(l.name_ar||l.name):l.name}</span>
-                {l._optionsText && <span style={{ fontSize:11, color:'#C9A84C', marginTop:1 }}>{l._optionsText}</span>}
+                {l._optionsText && <span style={{ fontSize:11, color:'#C9A84C', marginTop:1 }}>{lang==='en'?(l._optionsTextEn||l._optionsText):lang==='ar'?(l._optionsTextAr||l._optionsText):l._optionsText}</span>}
                 <span style={{ fontSize:11, color:'rgba(240,237,232,.5)', marginTop:2 }}>{fmt(l.price)} · adet</span>
               </div>
               <QtyPill qty={l.qty} onDec={()=>onDec(l)} onInc={()=>onInc(l)} size="sm"/>
@@ -564,7 +565,7 @@ export default function MenuPage() {
       const orderItems = lines.map((l: any) => ({
         id: l._baseId || l.id,
         name: l._optionsText ? `${l.name} (${l._optionsText})` : l.name,
-        name_en: l._optionsText ? `${l.name_en || l.name} (${l._optionsText})` : (l.name_en || l.name),
+        name_en: l._optionsTextEn ? `${l.name_en || l.name} (${l._optionsTextEn})` : (l.name_en || l.name),
         price: l.price,
         quantity: l.qty,
         subtotal: l.price * l.qty
@@ -679,17 +680,19 @@ export default function MenuPage() {
     const chosen = groups.map((g:any) => {
       const choiceId = pendingSelections[g.id]
       const choice = g.choices.find((c:any) => c.id === choiceId)
-      return { choiceId, choiceName: choice?.name || '', priceDelta: Number(choice?.price_delta || 0) }
+      return { choiceId, choiceName: choice?.name || '', choiceNameEn: choice?.name_en || choice?.name || '', choiceNameAr: choice?.name_ar || choice?.name || '', priceDelta: Number(choice?.price_delta || 0) }
     })
     if (chosen.some(c => !c.choiceId)) return // shouldn't happen given pre-selection, but guard anyway
     const optionsText = chosen.map(c => c.choiceName).join(', ')
+    const optionsTextEn = chosen.map(c => c.choiceNameEn).join(', ')
+    const optionsTextAr = chosen.map(c => c.choiceNameAr).join(', ')
     const priceDelta = chosen.reduce((s,c) => s + c.priceDelta, 0)
     const syntheticId = `${pendingOptionItem.id}::${groups.map((g:any)=>pendingSelections[g.id]).join('_')}`
     const finalPrice = pendingOptionItem.price + priceDelta
 
     setExtraCartItems(prev => ({
       ...prev,
-      [syntheticId]: { ...pendingOptionItem, id: syntheticId, price: finalPrice, _baseId: pendingOptionItem.id, _optionsText: optionsText }
+      [syntheticId]: { ...pendingOptionItem, id: syntheticId, price: finalPrice, _baseId: pendingOptionItem.id, _optionsText: optionsText, _optionsTextEn: optionsTextEn, _optionsTextAr: optionsTextAr }
     }))
     setQty(syntheticId, (cart[syntheticId]||0) + 1)
     setPulseKey(k=>k+1)
