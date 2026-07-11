@@ -59,7 +59,7 @@ export function printKitchenTicket(tableName: string, orders: any[], autoPrint: 
   win.document.close()
 }
 
-export function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed'|'debt', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number, faturaNo?: number }, autoPrint: boolean = false) {
+export function printReceipt(info: { table_name: string, total: number, cash: number, card: number, transfer?: number, method: 'cash'|'card'|'transfer'|'mixed'|'debt', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number, faturaNo?: number }, autoPrint: boolean = false) {
   if (autoPrint) {
     printViaRawBT(buildReceiptEscPos(info))
     return
@@ -69,7 +69,7 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
   const itemRows = (info.orders || []).flatMap((o: any) => o.items || []).map((it: any) =>
     `<tr><td>${it.quantity}x ${it.name}</td><td style="text-align:right">${it.subtotal} ₺</td></tr>`
   ).join('')
-  const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : info.method === 'debt' ? 'BORÇ (Veresiye)' : 'Karma (Nakit + Kart)'
+  const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : info.method === 'transfer' ? 'Havale/EFT' : info.method === 'debt' ? 'BORÇ (Veresiye)' : 'Karma (Nakit + Kart)'
   const hasDiscount = (info.discountAmount || 0) > 0
   win.document.write(`
     <!DOCTYPE html>
@@ -322,7 +322,7 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
   const counted = parseFloat(countedCash)
   const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
   const rows = dayCloseData.tabs.map((t: any, i: number) => `
-    <tr><td>${i + 1}</td><td>${t.table_name}</td><td>${new Date(t.closed_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</td><td>${t.payment_method === 'cash' ? 'Nakit' : t.payment_method === 'card' ? 'Kart' : 'Karma'}</td><td>${t.closed_by || '—'}</td><td style="text-align:right">${formatTL(Number(t.total))} ₺</td></tr>
+    <tr><td>${i + 1}</td><td>${t.table_name}</td><td>${new Date(t.closed_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</td><td>${t.payment_method === 'cash' ? 'Nakit' : t.payment_method === 'card' ? 'Kart' : t.payment_method === 'transfer' ? 'Havale' : t.payment_method === 'debt' ? 'Borç' : 'Karma'}</td><td>${t.closed_by || '—'}</td><td style="text-align:right">${formatTL(Number(t.total))} ₺</td></tr>
   `).join('')
   win.document.write(`
     <!DOCTYPE html>
@@ -353,6 +353,7 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
         <div class="stat"><div class="num">${formatTL(dayCloseData.totalRevenue)} ₺</div><div class="label">Toplam Ciro</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.cashTotal)} ₺</div><div class="label">Nakit</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.cardTotal)} ₺</div><div class="label">Kart</div></div>
+        <div class="stat"><div class="num">${formatTL(dayCloseData.transferTotal || 0)} ₺</div><div class="label">Havale</div></div>
         ${diff !== null ? `<div class="stat"><div class="num" style="color:${diff===0?'#27ae60':diff>0?'#3498db':'#e74c3c'}">${diff>=0?'+':''}${formatTL(diff)} ₺</div><div class="label">Kasa Farkı</div></div>` : ''}
       </div>
       <h2>Kapanan Masalar</h2>

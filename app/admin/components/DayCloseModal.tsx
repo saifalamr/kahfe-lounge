@@ -40,6 +40,10 @@ export default function DayCloseModal({ dayCloseData, countedCash, onCountedCash
               <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
               <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cardTotal)} ₺</div>
             </div>
+            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
+              <div style={{ color:'#8A8A8A', fontSize:11 }}>🏦 HAVALE</div>
+              <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.transferTotal || 0)} ₺</div>
+            </div>
             {dayCloseData.discountTotal > 0 && (
               <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
                 <div style={{ color:'#8A8A8A', fontSize:11 }}>🏷️ İNDİRİM</div>

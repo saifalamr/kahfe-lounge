@@ -101,14 +101,14 @@ export function buildKitchenTicketEscPos(tableName: string, orders: any[]): Uint
 }
 
 export function buildReceiptEscPos(info: {
-  table_name: string, total: number, cash: number, card: number,
-  method: 'cash' | 'card' | 'mixed' | 'debt', orders: any[],
+  table_name: string, total: number, cash: number, card: number, transfer?: number,
+  method: 'cash' | 'card' | 'transfer' | 'mixed' | 'debt', orders: any[],
   discountAmount?: number, discountReason?: string, originalTotal?: number, faturaNo?: number,
 }): Uint8Array {
   const b = new EscPosBuilder()
   const fmt = (n: number) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
   const items = (info.orders || []).flatMap((o: any) => o.items || [])
-  const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : info.method === 'debt' ? 'BORC (Veresiye)' : 'Karma (Nakit + Kart)'
+  const methodLabel = info.method === 'cash' ? 'Nakit' : info.method === 'card' ? 'Kart' : info.method === 'transfer' ? 'Havale/EFT' : info.method === 'debt' ? 'BORC (Veresiye)' : 'Karma (Nakit + Kart)'
   const hasDiscount = (info.discountAmount || 0) > 0
 
   b.init()

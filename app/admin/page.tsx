@@ -361,7 +361,7 @@ export default function AdminPage() {
 
   // Payment & closing a tab
   const [paymentTab, setPaymentTab] = useState<{ id: string, table_name: string, total: number, orders: any[] } | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'|'debt'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'transfer'|'mixed'|'debt'>('cash')
   const [splitCash, setSplitCash] = useState('')
   const [splitCard, setSplitCard] = useState('')
   const [splitPeopleCount, setSplitPeopleCount] = useState('2')
@@ -460,7 +460,7 @@ export default function AdminPage() {
       return
     }
     const finalTotal = paymentTab.total - discountAmount
-    let cash = 0, card = 0, debtAmount = 0
+    let cash = 0, card = 0, debtAmount = 0, transferAmount = 0
     let debtorId = selectedDebtorId
     if (paymentMethod === 'debt') {
       if (!debtorId && newDebtorName.trim()) {
@@ -473,6 +473,7 @@ export default function AdminPage() {
       debtAmount = finalTotal
     } else if (paymentMethod === 'cash') cash = finalTotal
     else if (paymentMethod === 'card') card = finalTotal
+    else if (paymentMethod === 'transfer') transferAmount = finalTotal
     else {
       cash = parseFloat(splitCash) || 0
       card = parseFloat(splitCard) || 0
@@ -487,6 +488,7 @@ export default function AdminPage() {
       payment_method: paymentMethod,
       cash_amount: cash,
       card_amount: card,
+      transfer_amount: transferAmount,
       debt_amount: debtAmount,
       total: finalTotal,
       discount_amount: discountAmount,
@@ -519,7 +521,7 @@ export default function AdminPage() {
       await loadDebtors()
     }
 
-    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason: discountReason.trim(), originalTotal: paymentTab.total, faturaNo: closedTab?.fatura_no }
+    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, transfer: transferAmount, method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason: discountReason.trim(), originalTotal: paymentTab.total, faturaNo: closedTab?.fatura_no }
     setPaymentTab(null)
     setActiveTableModal(null)
     await loadTableMapData()
@@ -561,7 +563,7 @@ export default function AdminPage() {
       return
     }
     const finalTotal = selectedTotal - discountAmount
-    let cash = 0, card = 0, debtAmount = 0
+    let cash = 0, card = 0, debtAmount = 0, transferAmount = 0
     let debtorId = selectedDebtorId
     if (paymentMethod === 'debt') {
       if (!debtorId && newDebtorName.trim()) {
@@ -574,6 +576,7 @@ export default function AdminPage() {
       debtAmount = finalTotal
     } else if (paymentMethod === 'cash') cash = finalTotal
     else if (paymentMethod === 'card') card = finalTotal
+    else if (paymentMethod === 'transfer') transferAmount = finalTotal
     else {
       cash = parseFloat(splitCash) || 0
       card = parseFloat(splitCard) || 0
@@ -600,6 +603,7 @@ export default function AdminPage() {
       payment_method: paymentMethod,
       cash_amount: cash,
       card_amount: card,
+      transfer_amount: transferAmount,
       debt_amount: debtAmount,
       total: finalTotal,
       discount_amount: discountAmount,
@@ -632,7 +636,7 @@ export default function AdminPage() {
       await loadDebtors()
     }
 
-    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, method: paymentMethod, orders: selectedOrders, discountAmount, discountReason: discountReason.trim(), originalTotal: selectedTotal, faturaNo: closedTab?.fatura_no }
+    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, transfer: transferAmount, method: paymentMethod, orders: selectedOrders, discountAmount, discountReason: discountReason.trim(), originalTotal: selectedTotal, faturaNo: closedTab?.fatura_no }
     setPaymentTab(null)
     await loadTableMapData()
     if (canPrint) {
@@ -999,8 +1003,9 @@ export default function AdminPage() {
     const totalRevenue = tabs.reduce((s: number, t: any) => s + Number(t.total), 0)
     const cashTotal = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0)
     const cardTotal = tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0)
+    const transferTotal = tabs.reduce((s: number, t: any) => s + Number(t.transfer_amount || 0), 0)
     const discountTotal = tabs.reduce((s: number, t: any) => s + Number(t.discount_amount || 0), 0)
-    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, discountTotal, tabCount: tabs.length })
+    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, transferTotal, discountTotal, tabCount: tabs.length })
     setCountedCash('')
     setShowDayClose(true)
   }
@@ -1014,6 +1019,7 @@ export default function AdminPage() {
       total_revenue: dayCloseData.totalRevenue,
       cash_total: dayCloseData.cashTotal,
       card_total: dayCloseData.cardTotal,
+      transfer_total: dayCloseData.transferTotal,
       tab_count: dayCloseData.tabCount,
       counted_cash: isNaN(counted) ? null : counted,
       cash_difference: diff,
@@ -1024,7 +1030,7 @@ export default function AdminPage() {
       return
     }
     setShowDayClose(false)
-    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit: ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
+    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit: ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺\nHavale: ${formatTL(dayCloseData.transferTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
   }
 
 
@@ -1777,12 +1783,12 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                      {(['cash','card','mixed','debt'] as const).map(m => (
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, marginBottom:16 }}>
+                      {(['cash','card','transfer','mixed','debt'] as const).map(m => (
                         <button key={m} onClick={() => setPaymentMethod(m)}
-                          style={{ flex:1, height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid #2A2A2A', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : '#B5B0A8', fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
-                          <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : m==='mixed' ? '🔀' : '🧾'}</span>
-                          {m==='cash' ? 'Nakit' : m==='card' ? 'Kart' : m==='mixed' ? 'Böl' : 'Borç'}
+                          style={{ height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid #2A2A2A', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : '#B5B0A8', fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
+                          <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : m==='transfer' ? '🏦' : m==='mixed' ? '🔀' : '🧾'}</span>
+                          {m==='cash' ? 'Nakit' : m==='card' ? 'Kart' : m==='transfer' ? 'Havale' : m==='mixed' ? 'Böl' : 'Borç'}
                         </button>
                       ))}
                     </div>
@@ -1822,7 +1828,7 @@ export default function AdminPage() {
                     )}
 
                     {canPrint && (
-                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: settleMode==='select' && selectedOrders.length>0 ? selectedOrders : paymentTab.orders, discountAmount, discountReason, originalTotal: baseTotal }, autoPrintEnabled)}
+                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), transfer: paymentMethod==='transfer'?finalTotal:0, method: paymentMethod, orders: settleMode==='select' && selectedOrders.length>0 ? selectedOrders : paymentTab.orders, discountAmount, discountReason, originalTotal: baseTotal }, autoPrintEnabled)}
                         style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
