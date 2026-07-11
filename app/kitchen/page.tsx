@@ -4,11 +4,9 @@ import { supabase } from '@/lib/supabase'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
-// Same credentials as /admin — kept in sync manually. If you change the
-// passwords in app/admin/page.tsx, update these lines too.
-const ADMIN_PASSWORD = '1234'
-const STAFF_PASSWORD = '5678'
-const TOUCHSCREEN_PASSWORD = '9000'
+// Manager/Touchscreen/shared-staff-code PINs are verified server-side via
+// the verify_access_pin RPC (see access_pins table, shared with /admin) -
+// nothing sensitive is hardcoded in this file.
 
 export default function KitchenPage() {
   const isOnline = useConnectivity()
@@ -42,18 +40,6 @@ export default function KitchenPage() {
   }, [])
 
   async function login() {
-    if (pw === ADMIN_PASSWORD) {
-      localStorage.setItem('kahfe_admin_role', 'manager')
-      localStorage.setItem('kahfe_staff_name', 'Yönetici')
-      setAuth(true); setStaffName('Yönetici')
-      return
-    }
-    if (pw === TOUCHSCREEN_PASSWORD) {
-      localStorage.setItem('kahfe_admin_role', 'touchscreen')
-      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
-      setAuth(true); setStaffName('Dokunmatik Ekran')
-      return
-    }
     const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
     if (staffMatch) {
       localStorage.setItem('kahfe_admin_role', 'staff')
@@ -61,7 +47,20 @@ export default function KitchenPage() {
       setAuth(true); setStaffName(staffMatch.name)
       return
     }
-    if (pw === STAFF_PASSWORD) {
+    const { data: accessRole } = await supabase.rpc('verify_access_pin', { p_pin: pw }) as { data: string | null }
+    if (accessRole === 'manager') {
+      localStorage.setItem('kahfe_admin_role', 'manager')
+      localStorage.setItem('kahfe_staff_name', 'Yönetici')
+      setAuth(true); setStaffName('Yönetici')
+      return
+    }
+    if (accessRole === 'touchscreen') {
+      localStorage.setItem('kahfe_admin_role', 'touchscreen')
+      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
+      setAuth(true); setStaffName('Dokunmatik Ekran')
+      return
+    }
+    if (accessRole === 'staff_shared') {
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
       setAuth(true); setStaffName('Personel (Genel)')

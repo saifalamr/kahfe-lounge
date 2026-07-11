@@ -16,9 +16,10 @@ import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
 import { formatTL } from './lib/format'
 
-const ADMIN_PASSWORD = '1234'
-const STAFF_PASSWORD = '5678'
-const TOUCHSCREEN_PASSWORD = '9000'
+// Manager/Touchscreen/shared-staff-code PINs are verified server-side via
+// the verify_access_pin RPC (see access_pins table) - nothing sensitive is
+// hardcoded in this file anymore, since anything here ships straight to
+// the browser and is readable by anyone who opens dev tools.
 
 /* ── Main Admin Page ── */
 export default function AdminPage() {
@@ -1315,8 +1316,9 @@ export default function AdminPage() {
       alert('Lütfen bir isim ve 4-6 haneli bir PIN girin.')
       return
     }
-    if (pin === ADMIN_PASSWORD) {
-      alert('Bu PIN yönetici şifresiyle aynı olamaz. Başka bir PIN seçin.')
+    const { data: reserved } = await supabase.rpc('pin_is_reserved', { p_pin: pin }) as { data: boolean | null }
+    if (reserved) {
+      alert('Bu PIN, yönetici/dokunmatik ekran şifrelerinden biriyle aynı olamaz. Başka bir PIN seçin.')
       return
     }
     const dup = staffList.find(s => s.pin === pin && s.id !== editingStaffId)
@@ -1342,18 +1344,6 @@ export default function AdminPage() {
   }
 
   async function login() {
-    if (pw === ADMIN_PASSWORD) {
-      localStorage.setItem('kahfe_admin_role', 'manager')
-      localStorage.setItem('kahfe_staff_name', 'Yönetici')
-      setRole('manager'); setStaffName('Yönetici'); setAuth(true)
-      return
-    }
-    if (pw === TOUCHSCREEN_PASSWORD) {
-      localStorage.setItem('kahfe_admin_role', 'touchscreen')
-      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
-      setRole('touchscreen'); setStaffName('Dokunmatik Ekran'); setAuth(true)
-      return
-    }
     // Individual staff PIN lookup — via RPC so PINs are never fetchable in bulk
     const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
     if (staffMatch) {
@@ -1362,9 +1352,22 @@ export default function AdminPage() {
       setRole('staff'); setStaffName(staffMatch.name); setAuth(true)
       return
     }
-    // Legacy shared staff code, kept as a fallback so nobody is locked out
-    // before the manager has set up individual PINs
-    if (pw === STAFF_PASSWORD) {
+    // Manager / Touchscreen / legacy shared-staff-code — all checked
+    // server-side now, nothing sensitive lives in this file
+    const { data: accessRole } = await supabase.rpc('verify_access_pin', { p_pin: pw }) as { data: string | null }
+    if (accessRole === 'manager') {
+      localStorage.setItem('kahfe_admin_role', 'manager')
+      localStorage.setItem('kahfe_staff_name', 'Yönetici')
+      setRole('manager'); setStaffName('Yönetici'); setAuth(true)
+      return
+    }
+    if (accessRole === 'touchscreen') {
+      localStorage.setItem('kahfe_admin_role', 'touchscreen')
+      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
+      setRole('touchscreen'); setStaffName('Dokunmatik Ekran'); setAuth(true)
+      return
+    }
+    if (accessRole === 'staff_shared') {
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
       setRole('staff'); setStaffName('Personel (Genel)'); setAuth(true)
