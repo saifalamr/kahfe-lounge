@@ -44,14 +44,88 @@ export default function AdminPage() {
   const [showNotif, setShowNotif] = useState(false)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Mobile browsers (iOS Safari, Android Chrome) refuse to let a fresh
+  // AudioContext produce sound until it's been "unlocked" by a real user
+  // tap/click somewhere on the page first - a new AudioContext created
+  // straight from a realtime event (no gesture attached) stays silently
+  // suspended. Desktop doesn't have this restriction, which is why the
+  // notification beep worked there but not on mobile. Keeping one
+  // AudioContext alive across the whole session and unlocking it on the
+  // very first tap (see effect below) fixes that.
+  const audioCtxRef = useRef<AudioContext | null>(null)
   // Tracks notifications the user has already acknowledged (Gördüm) so the
   // polling fallback below doesn't resurrect them - acknowledging doesn't
   // change the order's DB status, only dismissing (Kapat) does
   const acknowledgedIds = useRef<Set<string>>(new Set())
 
+  // Unlock the shared AudioContext on the very first tap/click anywhere on
+  // the page (works whether that's the login screen or, for a device
+  // that's already logged in from a previous session, the first touch
+  // after reload) so the notification beep can actually play later.
+  useEffect(() => {
+    function unlock() {
+      if (!audioCtxRef.current) {
+        try { audioCtxRef.current = new AudioContext() } catch (e) { return }
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {})
+      }
+      document.removeEventListener('pointerdown', unlock)
+      document.removeEventListener('touchstart', unlock)
+    }
+    document.addEventListener('pointerdown', unlock)
+    document.addEventListener('touchstart', unlock)
+    return () => {
+      document.removeEventListener('pointerdown', unlock)
+      document.removeEventListener('touchstart', unlock)
+    }
+  }, [])
+
+  function playNotifSound() {
+    if (localStorage.getItem('kahfe_notif_sound') === 'off') return
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext()
+      const ctx = audioCtxRef.current
+      const fire = () => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = 880; gain.gain.value = 0.3
+        osc.start(); osc.stop(ctx.currentTime + 0.15)
+        setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
+      }
+      // If the context is still suspended (e.g. no tap registered yet, or
+      // the mobile browser re-suspended it after backgrounding), resume it
+      // first — resume() itself doesn't need a fresh gesture once the
+      // context has been unlocked once already this session.
+      if (ctx.state === 'suspended') ctx.resume().then(fire).catch(() => {})
+      else fire()
+    } catch (e) {}
+  }
+
+  // Tracks which pending order IDs have already been seen (via realtime or
+  // a previous poll), so the 15s polling fallback below can tell a
+  // genuinely new order apart from ones it's already reported on. This
+  // matters most on mobile: backgrounding a browser tab commonly drops the
+  // realtime websocket, so polling becomes the only way new orders (and
+  // their sound alert) get noticed at all until the tab is foregrounded.
+  const seenOrderIdsRef = useRef<Set<string> | null>(null)
+
   async function refreshNotifications() {
     const { data } = await supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false })
-    if (data) setNotifications(data.filter((o: any) => !acknowledgedIds.current.has(o.id)))
+    if (!data) return
+    if (seenOrderIdsRef.current === null) {
+      // First load this session - just record what's already pending, don't beep for it
+      seenOrderIdsRef.current = new Set(data.map((o: any) => o.id))
+    } else {
+      const newlySeen = data.filter((o: any) => !seenOrderIdsRef.current!.has(o.id))
+      if (newlySeen.length > 0) {
+        setNewOrderAlert(true)
+        playNotifSound()
+      }
+      seenOrderIdsRef.current = new Set(data.map((o: any) => o.id))
+    }
+    setNotifications(data.filter((o: any) => !acknowledgedIds.current.has(o.id)))
   }
 
   useEffect(() => {
@@ -66,18 +140,9 @@ export default function AdminPage() {
         setNotifications(prev => [payload.new, ...prev])
         setNewOrderAlert(true)
         loadTableMapData()
+        if (seenOrderIdsRef.current) seenOrderIdsRef.current.add((payload.new as any).id)
         // Play beep sound (respects the Ayarlar sound toggle for this device)
-        if (localStorage.getItem('kahfe_notif_sound') !== 'off') {
-          try {
-            const ctx = new AudioContext()
-            const osc = ctx.createOscillator()
-            const gain = ctx.createGain()
-            osc.connect(gain); gain.connect(ctx.destination)
-            osc.frequency.value = 880; gain.gain.value = 0.3
-            osc.start(); osc.stop(ctx.currentTime + 0.15)
-            setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
-          } catch(e) {}
-        }
+        playNotifSound()
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadTableMapData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => loadTableMapData())
