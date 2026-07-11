@@ -364,6 +364,9 @@ export default function AdminPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash'|'card'|'mixed'|'debt'>('cash')
   const [splitCash, setSplitCash] = useState('')
   const [splitCard, setSplitCard] = useState('')
+  const [splitPeopleCount, setSplitPeopleCount] = useState('2')
+  const [settleMode, setSettleMode] = useState<'all'|'select'>('all')
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [discountType, setDiscountType] = useState<'none'|'percent'|'amount'>('none')
   const [discountValue, setDiscountValue] = useState('')
   const [discountReason, setDiscountReason] = useState('')
@@ -436,6 +439,9 @@ export default function AdminPage() {
     setPaymentMethod('cash')
     setSplitCash(total.toFixed(0))
     setSplitCard('0')
+    setSplitPeopleCount('2')
+    setSettleMode('all')
+    setSelectedOrderIds(new Set())
     setDiscountType('none')
     setDiscountValue('')
     setDiscountReason('')
@@ -521,6 +527,118 @@ export default function AdminPage() {
       printReceipt(receiptInfo, autoPrintEnabled)
     } else {
       alert('✓ Ödeme alındı, masa kapatıldı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
+    }
+  }
+
+  function toggleSelectedOrder(orderId: string) {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev)
+      if (next.has(orderId)) next.delete(orderId)
+      else next.add(orderId)
+      return next
+    })
+  }
+
+  // Settle only a subset of the orders on this tab (e.g. one guest's items),
+  // take payment + print for just that portion, and leave the rest of the
+  // table open with its remaining orders untouched.
+  async function confirmPartialPayment() {
+    if (!paymentTab) return
+    const selectedOrders = paymentTab.orders.filter((o: any) => selectedOrderIds.has(o.id))
+    if (selectedOrders.length === 0) { alert('Lütfen ödenecek en az bir sipariş seçin.'); return }
+
+    // If every order on the tab was selected, this is just a full close —
+    // use the normal flow so we don't leave an empty open tab behind.
+    if (selectedOrders.length === paymentTab.orders.length) {
+      await confirmPayment()
+      return
+    }
+
+    const selectedTotal = selectedOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+    const discountAmount = computeDiscountAmount(selectedTotal)
+    if (discountAmount > 0 && !discountReason.trim()) {
+      alert('Lütfen indirim için bir neden girin.')
+      return
+    }
+    const finalTotal = selectedTotal - discountAmount
+    let cash = 0, card = 0, debtAmount = 0
+    let debtorId = selectedDebtorId
+    if (paymentMethod === 'debt') {
+      if (!debtorId && newDebtorName.trim()) {
+        const { data: newDebtor, error: debtorError } = await supabase.from('debtors')
+          .insert({ name: newDebtorName.trim(), phone: newDebtorPhone.trim() || null }).select('id').single()
+        if (debtorError || !newDebtor) { alert('✗ Borçlu eklenemedi.\n\n' + (debtorError?.message || '')); return }
+        debtorId = newDebtor.id
+      }
+      if (!debtorId) { alert('Lütfen bir borçlu seçin veya yeni bir borçlu ekleyin.'); return }
+      debtAmount = finalTotal
+    } else if (paymentMethod === 'cash') cash = finalTotal
+    else if (paymentMethod === 'card') card = finalTotal
+    else {
+      cash = parseFloat(splitCash) || 0
+      card = parseFloat(splitCard) || 0
+      if (Math.abs((cash + card) - finalTotal) > 0.5) {
+        alert(`Nakit + Kart tutarı ödenecek tutarla eşleşmiyor.\n\nÖdenecek tutar: ${formatTL(finalTotal)} ₺\nGirilen: ${formatTL(cash + card)} ₺`)
+        return
+      }
+    }
+
+    // Create a fresh tab for just the selected orders, then close it — this
+    // gets it its own fatura_no via the DB trigger, same as a normal close.
+    const { data: newTab, error: newTabError } = await supabase.from('tabs')
+      .insert({ table_name: paymentTab.table_name, status: 'open' }).select('id').single()
+    if (newTabError || !newTab) { alert('✗ Kısmi hesap oluşturulamadı.\n\n' + (newTabError?.message || '')); return }
+
+    const { error: moveError } = await supabase.from('orders')
+      .update({ tab_id: newTab.id })
+      .in('id', selectedOrders.map((o: any) => o.id))
+    if (moveError) { alert('✗ Siparişler taşınamadı.\n\n' + moveError.message); return }
+
+    const { data: closedTab, error: closeError } = await supabase.from('tabs').update({
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      payment_method: paymentMethod,
+      cash_amount: cash,
+      card_amount: card,
+      debt_amount: debtAmount,
+      total: finalTotal,
+      discount_amount: discountAmount,
+      discount_reason: discountAmount > 0 ? discountReason.trim() : null,
+      closed_by: staffName,
+    }).eq('id', newTab.id).select('fatura_no').single()
+
+    if (closeError) { alert('✗ Ödeme kaydedilemedi.\n\n' + closeError.message); return }
+
+    if (discountAmount > 0) {
+      await supabase.from('discounts').insert({
+        tab_id: newTab.id,
+        table_name: paymentTab.table_name,
+        original_amount: selectedTotal,
+        discount_amount: discountAmount,
+        reason: discountReason.trim(),
+        applied_by: staffName,
+      })
+    }
+
+    if (paymentMethod === 'debt' && debtorId) {
+      await supabase.from('debt_transactions').insert({
+        debtor_id: debtorId,
+        tab_id: newTab.id,
+        fatura_no: closedTab?.fatura_no,
+        type: 'borç',
+        amount: finalTotal,
+        created_by: staffName,
+      })
+      await loadDebtors()
+    }
+
+    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, method: paymentMethod, orders: selectedOrders, discountAmount, discountReason: discountReason.trim(), originalTotal: selectedTotal, faturaNo: closedTab?.fatura_no }
+    setPaymentTab(null)
+    await loadTableMapData()
+    if (canPrint) {
+      printReceipt(receiptInfo, autoPrintEnabled)
+    } else {
+      alert('✓ Seçili siparişlerin ödemesi alındı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
     }
   }
 
@@ -1572,8 +1690,14 @@ export default function AdminPage() {
 
             {/* Payment modal - choose method, optionally split, close the tab */}
             {paymentTab && (() => {
-              const discountAmount = computeDiscountAmount(paymentTab.total)
-              const finalTotal = paymentTab.total - discountAmount
+              const selectedOrders = paymentTab.orders.filter((o: any) => selectedOrderIds.has(o.id))
+              const baseTotal = settleMode === 'select' && selectedOrders.length > 0
+                ? selectedOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+                : paymentTab.total
+              const discountAmount = computeDiscountAmount(baseTotal)
+              const finalTotal = baseTotal - discountAmount
+              const peopleCount = Math.max(1, parseInt(splitPeopleCount) || 1)
+              const perPerson = finalTotal / peopleCount
               return (
               <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setPaymentTab(null)}>
                 <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', borderRadius: 0, border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
@@ -1583,13 +1707,53 @@ export default function AdminPage() {
                   </div>
                   <div style={{ padding:'20px' }}>
                     <div style={{ textAlign:'center', marginBottom:16 }}>
-                      <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>ÖDENECEK TUTAR</div>
+                      <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>{settleMode==='select' && selectedOrders.length>0 ? 'SEÇİLİ SİPARİŞLER TUTARI' : 'ÖDENECEK TUTAR'}</div>
                       {discountAmount > 0 && (
-                        <div style={{ color:'#8A8A8A', fontSize:15, fontFamily:"'IBM Plex Mono', monospace", textDecoration:'line-through' }}>₺ {formatTL(paymentTab.total)}</div>
+                        <div style={{ color:'#8A8A8A', fontSize:15, fontFamily:"'IBM Plex Mono', monospace", textDecoration:'line-through' }}>₺ {formatTL(baseTotal)}</div>
                       )}
                       <div style={{ color:'#C9A84C', fontWeight:700, fontSize:36, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(finalTotal)}</div>
                       {discountAmount > 0 && (
                         <div style={{ color:'#e74c3c', fontSize:13, fontFamily:"'IBM Plex Mono', monospace", marginTop:2 }}>-₺{formatTL(discountAmount)} indirim</div>
+                      )}
+                    </div>
+
+                    {/* Equal-split calculator: quick reference only, doesn't change the actual bill */}
+                    <div style={{ marginBottom:16, padding:12, background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.2)', display:'flex', alignItems:'center', gap:10 }}>
+                      <span style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Sans', sans-serif", whiteSpace:'nowrap' }}>👥 Kaç kişi?</span>
+                      <input type="number" min="1" value={splitPeopleCount} onChange={e => setSplitPeopleCount(e.target.value)}
+                        style={{ width:56, height:36, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 8px', fontSize:14, textAlign:'center', fontFamily:"'IBM Plex Mono', monospace" }} />
+                      <span style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Sans', sans-serif" }}>kişi başı</span>
+                      <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace", marginLeft:'auto' }}>₺ {formatTL(perPerson)}</span>
+                    </div>
+
+                    {/* Settle mode: pay the whole tab, or select specific orders (e.g. one guest's rounds) */}
+                    <div style={{ marginBottom:16 }}>
+                      <div style={{ display:'flex', gap:8, marginBottom: settleMode==='select' ? 10 : 0 }}>
+                        <button onClick={() => { setSettleMode('all'); setSelectedOrderIds(new Set()) }}
+                          style={{ flex:1, height:40, background: settleMode==='all' ? 'rgba(39,174,96,.14)' : 'transparent', border: settleMode==='all' ? '1px solid #27ae60' : '1px solid #2A2A2A', color: settleMode==='all' ? '#5FD08C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                          Tüm Hesap
+                        </button>
+                        <button onClick={() => setSettleMode('select')}
+                          style={{ flex:1, height:40, background: settleMode==='select' ? 'rgba(39,174,96,.14)' : 'transparent', border: settleMode==='select' ? '1px solid #27ae60' : '1px solid #2A2A2A', color: settleMode==='select' ? '#5FD08C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                          Belirli Siparişler
+                        </button>
+                      </div>
+                      {settleMode === 'select' && (
+                        <div style={{ border:'1px solid #2A2A2A' }}>
+                          {paymentTab.orders.map((o: any) => (
+                            <label key={o.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderBottom:'1px solid #2A2A2A', cursor:'pointer' }}>
+                              <input type="checkbox" checked={selectedOrderIds.has(o.id)} onChange={() => toggleSelectedOrder(o.id)} style={{ width:18, height:18 }} />
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:'#F0EDE8', fontSize:13 }}>{(o.items||[]).map((it:any)=>`${it.quantity}x ${it.name}`).join(', ')}</div>
+                                <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(o.created_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>
+                              </div>
+                              <span style={{ color:'#C9A84C', fontWeight:700, fontSize:14, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {o.total}</span>
+                            </label>
+                          ))}
+                          {paymentTab.orders.length === 0 && (
+                            <div style={{ padding:14, color:'#8A8A8A', fontSize:13, textAlign:'center' }}>Bu masada aktif sipariş yok.</div>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -1658,12 +1822,14 @@ export default function AdminPage() {
                     )}
 
                     {canPrint && (
-                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason, originalTotal: paymentTab.total }, autoPrintEnabled)}
+                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: settleMode==='select' && selectedOrders.length>0 ? selectedOrders : paymentTab.orders, discountAmount, discountReason, originalTotal: baseTotal }, autoPrintEnabled)}
                         style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
-                    <button onClick={confirmPayment} disabled={!isOnline}
-                      style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, color: isOnline ? '#fff' : '#666', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Ödemeyi Onayla ve Masayı Kapat' : '🔴 Bağlantı Yok'}</button>
+                    <button onClick={settleMode==='select' ? confirmPartialPayment : confirmPayment} disabled={!isOnline || (settleMode==='select' && selectedOrders.length===0)}
+                      style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, color: isOnline ? '#fff' : '#666', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                      {!isOnline ? '🔴 Bağlantı Yok' : settleMode==='select' ? '✓ Seçili Siparişleri Öde ve Yazdır' : '✓ Ödemeyi Onayla ve Masayı Kapat'}
+                    </button>
                   </div>
                 </div>
               </div>
