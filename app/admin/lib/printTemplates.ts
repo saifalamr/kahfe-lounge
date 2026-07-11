@@ -176,8 +176,12 @@ export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', all
 export function exportMonthlyReportPDF(report: any) {
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
+  const title = report.title || `${report.month} ${report.year} Raporu`
   const itemRows = (report.topItems || []).slice(0, 10).map((item: any, i: number) => `
     <tr><td>${i + 1}</td><td>${item.name}</td><td style="text-align:right">${item.count}</td><td style="text-align:right">${item.revenue} ₺</td></tr>
+  `).join('')
+  const categoryRows = (report.categoryStats || []).map((c: any) => `
+    <tr><td>${c.icon} ${c.categoryName}</td><td style="text-align:right">${c.qty}</td><td style="text-align:right">${formatTL(c.revenue)} ₺</td></tr>
   `).join('')
   const tableRows = (report.topTables || []).slice(0, 10).map((t: any, i: number) => `
     <tr><td>${i + 1}</td><td>${t.name}</td><td style="text-align:right">${t.revenue} ₺</td></tr>
@@ -187,7 +191,7 @@ export function exportMonthlyReportPDF(report: any) {
     <html lang="tr">
     <head>
       <meta charset="utf-8" />
-      <title>Kahfe Lounge - ${report.month} ${report.year} Raporu</title>
+      <title>Kahfe Lounge - ${title}</title>
       <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, Helvetica, sans-serif; color:#1A1A1A; padding: 36px; }
@@ -206,11 +210,17 @@ export function exportMonthlyReportPDF(report: any) {
     </head>
     <body>
       <div class="brand">KAHFE LOUNGE</div>
-      <h1>${report.month} ${report.year} Raporu</h1>
+      <h1>${title}</h1>
       <div class="stats">
         <div class="stat"><div class="num">${report.totalOrders}</div><div class="label">Toplam Sipariş</div></div>
         <div class="stat"><div class="num">${formatTL(Number(report.totalRevenue))} ₺</div><div class="label">Toplam Ciro</div></div>
       </div>
+      ${categoryRows ? `
+      <h2>Kategori Bazında Ciro</h2>
+      <table>
+        <tr><th>Kategori</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>
+        ${categoryRows}
+      </table>` : ''}
       <h2>En Çok Satılan Ürünler</h2>
       <table>
         <tr><th>#</th><th>Ürün</th><th style="text-align:right">Adet</th><th style="text-align:right">Ciro</th></tr>

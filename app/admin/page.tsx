@@ -823,61 +823,98 @@ export default function AdminPage() {
   }
 
 
-  async function generateMonthlyReport() {
+  const [showReportPicker, setShowReportPicker] = useState(false)
+
+  async function generatePeriodReport(period: 'week'|'month'|'year') {
+    setShowReportPicker(false)
     const now = new Date()
     const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
-    const month = monthNames[now.getMonth()]
-    const year = now.getFullYear()
-    const firstDay = new Date(year, now.getMonth(), 1).toISOString()
-    const lastDay = new Date(year, now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+    let firstDay: string, lastDay: string, title: string
+    if (period === 'week') {
+      const day = now.getDay() === 0 ? 7 : now.getDay() // Monday-start week
+      const monday = new Date(now); monday.setDate(now.getDate() - day + 1); monday.setHours(0,0,0,0)
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999)
+      firstDay = monday.toISOString(); lastDay = sunday.toISOString()
+      title = `${monday.toLocaleDateString('tr-TR')} - ${sunday.toLocaleDateString('tr-TR')} Haftalık Raporu`
+    } else if (period === 'year') {
+      const year = now.getFullYear()
+      firstDay = new Date(year, 0, 1).toISOString()
+      lastDay = new Date(year, 11, 31, 23, 59, 59).toISOString()
+      title = `${year} Yıllık Raporu`
+    } else {
+      const month = monthNames[now.getMonth()]
+      const year = now.getFullYear()
+      firstDay = new Date(year, now.getMonth(), 1).toISOString()
+      lastDay = new Date(year, now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+      title = `${month} ${year} Raporu`
+    }
 
-    const { data: monthOrders } = await supabase.from('orders').select('*')
+    const { data: periodOrders } = await supabase.from('orders').select('*')
       .gte('created_at', firstDay).lte('created_at', lastDay)
 
-    if (!monthOrders || monthOrders.length === 0) {
-      showMsg('Bu ay hiç sipariş yok')
+    if (!periodOrders || periodOrders.length === 0) {
+      showMsg('Bu dönemde hiç sipariş yok')
       return
     }
 
-    const monthRevenue = await getClosedTabsRevenue(firstDay, lastDay)
-    const totalRevenue = monthRevenue.revenue
+    const periodRevenue = await getClosedTabsRevenue(firstDay, lastDay)
+    const totalRevenue = periodRevenue.revenue
 
     // Top items
-    const itemMap: Record<string, { name: string; count: number; revenue: number }> = {}
-    monthOrders.forEach((o: any) => {
+    const itemMap: Record<string, { name: string; count: number; revenue: number; categoryId: string | null }> = {}
+    periodOrders.forEach((o: any) => {
       o.items?.forEach((item: any) => {
-        if (!itemMap[item.name]) itemMap[item.name] = { name: item.name, count: 0, revenue: 0 }
+        if (!itemMap[item.name]) {
+          const menuItem = items.find((mi: any) => mi.id === item.id)
+          itemMap[item.name] = { name: item.name, count: 0, revenue: 0, categoryId: menuItem?.category_id || null }
+        }
         itemMap[item.name].count += item.quantity
         itemMap[item.name].revenue += item.subtotal
       })
     })
     const topItems = Object.values(itemMap).sort((a, b) => b.count - a.count).slice(0, 10)
 
+    // Category-wise breakdown (which categories sold the most, and how much)
+    const catMap: Record<string, { categoryName: string, icon: string, qty: number, revenue: number }> = {}
+    Object.values(itemMap).forEach((r) => {
+      const cat = categories.find((c: any) => c.id === r.categoryId)
+      const key = r.categoryId || '__other__'
+      if (!catMap[key]) catMap[key] = { categoryName: cat?.name || 'Diğer', icon: cat?.icon || '📦', qty: 0, revenue: 0 }
+      catMap[key].qty += r.count
+      catMap[key].revenue += r.revenue
+    })
+    const categoryStats = Object.values(catMap).sort((a, b) => b.revenue - a.revenue)
+
     // Top tables
     const tableMap: Record<string, number> = {}
-    monthOrders.forEach((o: any) => { tableMap[o.table_name] = (tableMap[o.table_name] || 0) + Number(o.total) })
+    periodOrders.forEach((o: any) => { tableMap[o.table_name] = (tableMap[o.table_name] || 0) + Number(o.total) })
     const topTables = Object.entries(tableMap).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, rev]) => ({ name, revenue: rev }))
 
     // Daily breakdown
     const dayMap: Record<string, { orders: number; revenue: number }> = {}
-    monthOrders.forEach((o: any) => {
+    periodOrders.forEach((o: any) => {
       const day = o.created_at.split('T')[0]
       if (!dayMap[day]) dayMap[day] = { orders: 0, revenue: 0 }
       dayMap[day].orders++
       dayMap[day].revenue += Number(o.total)
     })
 
-    await supabase.from('monthly_reports').insert({
-      month, year,
-      total_orders: monthOrders.length,
-      total_revenue: totalRevenue,
-      top_items: topItems,
-      top_tables: topTables,
-      daily_breakdown: dayMap
-    })
+    // Only the monthly cadence gets persisted to the existing monthly_reports
+    // table (matches its schema); week/year reports are generate-on-demand.
+    if (period === 'month') {
+      const monthNamesForSave = monthNames[now.getMonth()]
+      await supabase.from('monthly_reports').insert({
+        month: monthNamesForSave, year: now.getFullYear(),
+        total_orders: periodOrders.length,
+        total_revenue: totalRevenue,
+        top_items: topItems,
+        top_tables: topTables,
+        daily_breakdown: dayMap
+      })
+    }
 
-    showMsg(`✓ ${month} ${year} raporu kaydedildi!`)
-    setShowMonthlyReport({ month, year, totalOrders: monthOrders.length, totalRevenue, topItems, topTables, dayMap })
+    showMsg(`✓ ${title.replace(' Raporu','')} raporu oluşturuldu!`)
+    setShowMonthlyReport({ title, periodType: period, totalOrders: periodOrders.length, totalRevenue, topItems, topTables, categoryStats, dayMap })
   }
 
 
@@ -1936,7 +1973,22 @@ export default function AdminPage() {
                       <button onClick={() => resetStats(dateFilter as 'today'|'week'|'month')} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#8A8A8A', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
                     )}
                     <button onClick={() => exportOrdersPDF(dateFilter, allOrders, revenueSummary)} style={{ background:'transparent', border:'1px solid #383838', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
-                    <button onClick={generateMonthlyReport} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Aylık Rapor</button>
+                    <div style={{ position:'relative' }}>
+                      <button onClick={() => setShowReportPicker(v => !v)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Rapor</button>
+                      {showReportPicker && (
+                        <>
+                          <div onClick={() => setShowReportPicker(false)} style={{ position:'fixed', inset:0, zIndex:299 }} />
+                          <div style={{ position:'absolute', top:40, left:0, zIndex:300, background:'#1A1A1A', border:'1px solid #383838', minWidth:140, boxShadow:'0 8px 24px rgba(0,0,0,.5)' }}>
+                            {([['week','📅 Haftalık'],['month','🗓️ Aylık'],['year','📈 Yıllık']] as const).map(([period, label]) => (
+                              <button key={period} onClick={() => generatePeriodReport(period)}
+                                style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', borderBottom:'1px solid #2A2A2A', padding:'12px 14px', color:'#F0EDE8', fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                     <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
                     <button onClick={() => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
                     <button onClick={() => openItemReport('today')} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📦 Ürün Raporu</button>
