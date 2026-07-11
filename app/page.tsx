@@ -265,6 +265,59 @@ function MenuCard({ item, qty, index, onOpen, onAdd, onInc, onDec, lang }: { ite
   )
 }
 
+function VipRoomBanner({ lang }: { lang: string }) {
+  return (
+    <button onClick={() => document.getElementById('vip-oda-section')?.scrollIntoView({ behavior: 'smooth' })}
+      style={{ appearance:'none', cursor:'pointer', width:'calc(100% - 32px)', margin:'14px 16px 0', display:'flex', alignItems:'center', gap:12,
+        background:'linear-gradient(135deg,rgba(201,168,76,.14),rgba(192,57,43,.08))', border:'1px solid rgba(201,168,76,.35)', borderRadius:16, padding:'13px 16px', textAlign:'left' }}>
+      <span style={{ fontSize:24, flexShrink:0 }}>🎮</span>
+      <span style={{ flex:1, minWidth:0 }}>
+        <span style={{ display:'block', fontFamily:'var(--sans)', fontWeight:700, fontSize:13.5, color:'#F0EDE8' }}>
+          {lang==='en' ? 'VIP Room — PS5 & More' : lang==='ar' ? 'غرفة VIP — بلايستيشن 5 والمزيد' : 'VİP ODA — PS5 & Daha Fazlası'}
+        </span>
+        <span style={{ display:'block', fontSize:11.5, color:'rgba(240,237,232,.55)', marginTop:1 }}>
+          {lang==='en' ? '400₺/hour · Tap to see more' : lang==='ar' ? '400₺/ساعة · اضغط لمعرفة المزيد' : '400₺/saat · Detaylar için dokun'}
+        </span>
+      </span>
+      <span style={{ color:'#C9A84C', fontSize:18, flexShrink:0 }}>↓</span>
+    </button>
+  )
+}
+
+function VipRoomSection({ lang }: { lang: string }) {
+  return (
+    <section id="vip-oda-section" style={{ padding:'36px 18px 8px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:20 }}>
+        <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.1em', color:'#C9A84C', whiteSpace:'nowrap' }}>
+          {lang==='en' ? 'VIP ROOM' : lang==='ar' ? 'غرفة VIP' : 'V İ P   O D A'}
+        </span>
+        <span style={{ flex:1, height:1, background:'linear-gradient(90deg,rgba(201,168,76,.4),transparent)' }}/>
+      </div>
+
+      <div style={{ background:'linear-gradient(160deg,rgba(201,168,76,.1),rgba(20,20,20,.4))', border:'1px solid rgba(201,168,76,.25)', borderRadius:18, padding:'22px 20px', textAlign:'center' }}>
+        <span style={{ fontSize:38, display:'block', marginBottom:10 }}>🎮</span>
+        <h2 style={{ fontFamily:'var(--serif)', fontWeight:700, fontSize:22, margin:0, color:'#F0EDE8' }}>
+          {lang==='en' ? 'VIP Room' : lang==='ar' ? 'غرفة VIP' : 'VİP Oda'}
+        </h2>
+        <p style={{ color:'rgba(240,237,232,.65)', fontSize:14, lineHeight:1.6, margin:'10px 0 0' }}>
+          {lang==='en'
+            ? 'A private space with a PlayStation 5 and plenty more to keep you entertained — perfect for spending quality time with friends.'
+            : lang==='ar'
+            ? 'مساحة خاصة تحتوي على بلايستيشن 5 والكثير من وسائل الترفيه — مثالية لقضاء وقت ممتع مع الأصدقاء.'
+            : 'PlayStation 5 ve daha bir sürü eğlenceli şeyin bulunduğu özel bir alan — arkadaşlarınızla keyifli vakit geçirmek için birebir.'}
+        </p>
+        <div style={{ margin:'18px 0', display:'flex', alignItems:'baseline', justifyContent:'center', gap:6 }}>
+          <span style={{ fontFamily:'var(--sans)', fontWeight:700, fontSize:28, color:'#C9A84C' }}>400₺</span>
+          <span style={{ fontSize:13, color:'rgba(240,237,232,.55)' }}>/ {lang==='en' ? 'hour' : lang==='ar' ? 'ساعة' : 'saat'}</span>
+        </div>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(201,168,76,.12)', border:'1px solid rgba(201,168,76,.35)', borderRadius:999, padding:'10px 20px', color:'#C9A84C', fontWeight:600, fontSize:13 }}>
+          {lang==='en' ? '💬 Ask our staff to reserve' : lang==='ar' ? '💬 اسأل الموظفين للحجز' : '💬 Rezervasyon için personele sorun'}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Contact({ lang }: { lang: string }) {
   const HOURS = lang==='en'?[['Monday – Sunday','10:00 – 02:00']]:lang==='ar'?[['الاثنين – الأحد','10:00 – 02:00']]:[['Pazartesi – Pazar','10:00 – 02:00']]
   return (
@@ -785,6 +838,7 @@ export default function MenuPage() {
 
       <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
         <Hero lang={lang} onLangChange={changeLang}/>
+        <VipRoomBanner lang={lang}/>
         <div className='gold-divider'/>
         <TabBar cats={categories} recCat={recCat} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
@@ -797,6 +851,7 @@ export default function MenuPage() {
           ))}
         </div>
 
+        <VipRoomSection lang={lang}/>
         <Contact lang={lang}/>
 
         <footer style={{ textAlign:'center', padding:'28px 16px 120px', marginTop:14, borderTop:'1px solid rgba(240,237,232,.05)' }}>
