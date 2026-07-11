@@ -1,11 +1,23 @@
 import { formatTL } from './format'
+import { buildKitchenTicketEscPos, buildReceiptEscPos, printViaRawBT } from './escpos'
 
 // Print/export templates for the admin panel. These are pure functions:
 // given data, they open a print window and write an HTML document to it.
 // Kept separate from app/admin/page.tsx so the main component file isn't
 // carrying this much presentational/string-building code.
+//
+// `autoPrint` (Ayarlar toggle, Touchscreen role only) switches the two
+// thermal-ticket functions (kitchen ticket + receipt) from "open an HTML
+// preview + browser print dialog" to "send raw ESC/POS bytes to RawBT",
+// which prints silently with no dialog. Everything else (reports, day
+// close) stays as a normal browser print — those go to a regular printer,
+// not the thermal one, so a dialog there is fine/expected.
 
-export function printKitchenTicket(tableName: string, orders: any[]) {
+export function printKitchenTicket(tableName: string, orders: any[], autoPrint: boolean = false) {
+  if (autoPrint) {
+    printViaRawBT(buildKitchenTicketEscPos(tableName, orders))
+    return
+  }
   const win = window.open('', '_blank', 'width=420,height=700')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const activeItems = orders.filter((o: any) => o.status === 'pending')
@@ -47,7 +59,11 @@ export function printKitchenTicket(tableName: string, orders: any[]) {
   win.document.close()
 }
 
-export function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed'|'debt', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number, faturaNo?: number }) {
+export function printReceipt(info: { table_name: string, total: number, cash: number, card: number, method: 'cash'|'card'|'mixed'|'debt', orders: any[], discountAmount?: number, discountReason?: string, originalTotal?: number, faturaNo?: number }, autoPrint: boolean = false) {
+  if (autoPrint) {
+    printViaRawBT(buildReceiptEscPos(info))
+    return
+  }
   const win = window.open('', '_blank', 'width=460,height=750')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const itemRows = (info.orders || []).flatMap((o: any) => o.items || []).map((it: any) =>

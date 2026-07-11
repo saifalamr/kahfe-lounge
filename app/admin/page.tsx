@@ -124,6 +124,7 @@ export default function AdminPage() {
   const [ALL_TABLES, setAllTables] = useState<string[]>(DEFAULT_TABLES)
   const [telegramRecipients, setTelegramRecipients] = useState<{ name: string, chat_id: string }[]>([])
   const [telegramEnabled, setTelegramEnabled] = useState(true)
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false)
   const [categoryStations, setCategoryStations] = useState<Record<string, 'kitchen'|'nargile'>>({})
   const [notifSoundOn, setNotifSoundOn] = useState(true)
   const [newTableName, setNewTableName] = useState('')
@@ -136,21 +137,29 @@ export default function AdminPage() {
   }, [])
 
   async function loadSettings() {
-    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations'])
+    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations', 'auto_print_enabled'])
     const tablesRow = data?.find((r: any) => r.key === 'tables')
     const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
     const telegramEnabledRow = data?.find((r: any) => r.key === 'telegram_enabled')
     const stationsRow = data?.find((r: any) => r.key === 'category_stations')
+    const autoPrintRow = data?.find((r: any) => r.key === 'auto_print_enabled')
     setAllTables(Array.isArray(tablesRow?.value) && tablesRow.value.length > 0 ? tablesRow.value : DEFAULT_TABLES)
     setTelegramRecipients(Array.isArray(recipientsRow?.value) ? recipientsRow.value : [])
     setTelegramEnabled(telegramEnabledRow?.value !== false)
     setCategoryStations(stationsRow?.value && typeof stationsRow.value === 'object' ? stationsRow.value : {})
+    setAutoPrintEnabled(autoPrintRow?.value === true)
   }
 
   async function toggleTelegramEnabled() {
     const next = !telegramEnabled
     await supabase.from('settings').upsert({ key: 'telegram_enabled', value: next, updated_at: new Date().toISOString() })
     setTelegramEnabled(next)
+  }
+
+  async function toggleAutoPrintEnabled() {
+    const next = !autoPrintEnabled
+    await supabase.from('settings').upsert({ key: 'auto_print_enabled', value: next, updated_at: new Date().toISOString() })
+    setAutoPrintEnabled(next)
   }
 
   async function setCategoryStation(categoryId: string, station: 'kitchen'|'nargile') {
@@ -509,7 +518,7 @@ export default function AdminPage() {
     setActiveTableModal(null)
     await loadTableMapData()
     if (canPrint) {
-      printReceipt(receiptInfo)
+      printReceipt(receiptInfo, autoPrintEnabled)
     } else {
       alert('✓ Ödeme alındı, masa kapatıldı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
     }
@@ -1432,10 +1441,10 @@ export default function AdminPage() {
                       {activeOrders.length > 0 && (
                         <div style={{ display:'flex', gap:8, marginBottom:12 }}>
                           {filterOrdersByStation(activeOrders, 'kitchen').length > 0 && (
-                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'kitchen'))} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'kitchen'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
                           )}
                           {filterOrdersByStation(activeOrders, 'nargile').length > 0 && (
-                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'nargile'))} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'nargile'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
                           )}
                         </div>
                       )}
@@ -1649,7 +1658,7 @@ export default function AdminPage() {
                     )}
 
                     {canPrint && (
-                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason, originalTotal: paymentTab.total })}
+                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason, originalTotal: paymentTab.total }, autoPrintEnabled)}
                         style={{ width:'100%', height:48, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
@@ -2096,6 +2105,18 @@ export default function AdminPage() {
               <button onClick={toggleNotifSound} style={{ height: 48, padding: '0 20px', background: notifSoundOn ? 'rgba(39,174,96,.14)' : 'transparent', border: notifSoundOn ? '1px solid #27ae60' : '1px solid #383838', color: notifSoundOn ? '#5FD08C' : '#8A8A8A', fontSize: 14, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
                 {notifSoundOn ? '🔊 Açık — Kapatmak için tıkla' : '🔇 Kapalı — Açmak için tıkla'}
               </button>
+            </div>
+
+            {/* Auto print via RawBT */}
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 4 }}>
+                <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>🖨️ Otomatik Yazdırma (RawBT)</div>
+                <button onClick={toggleAutoPrintEnabled} style={{ height: 36, padding: '0 14px', background: autoPrintEnabled ? 'rgba(39,174,96,.14)' : 'transparent', border: autoPrintEnabled ? '1px solid #27ae60' : '1px solid #383838', color: autoPrintEnabled ? '#5FD08C' : '#8A8A8A', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                  {autoPrintEnabled ? '⚡ Aktif (Dialogsuz)' : '🖱️ Kapalı (Tarayıcı Dialogu)'}
+                </button>
+              </div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 4 }}>Açıkken Mutfak/Nargile fişi ve makbuz, tarayıcı yazdırma penceresi açmadan doğrudan RawBT uygulamasına gönderilir — sessiz yazdırma.</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12 }}>Gerekli: tablette Play Store'dan "RawBT Print Service" kurulu ve yazıcı RawBT içinde seçili olmalı. Kurulu değilse veya yazıcı henüz yoksa, bunu KAPALI bırakın — normal tarayıcı yazdırma çalışmaya devam eder.</div>
             </div>
 
             {/* Telegram recipients */}
