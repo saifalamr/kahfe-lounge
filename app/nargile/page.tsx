@@ -33,39 +33,85 @@ export default function NargilePage() {
 
   // Reuses the same login session as /admin — if someone's already logged
   // into the admin panel on this device, the nargile screen opens straight up
+  const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+  function clearSession() {
+    localStorage.removeItem('kahfe_admin_role')
+    localStorage.removeItem('kahfe_admin')
+    localStorage.removeItem('kahfe_staff_name')
+    localStorage.removeItem('kahfe_session_started_at')
+    localStorage.removeItem('kahfe_session_epoch')
+    setAuth(false); setStaffName('')
+  }
+
+  async function getCurrentSessionEpoch(): Promise<string> {
+    const { data } = await supabase.from('settings').select('value').eq('key', 'session_epoch').maybeSingle()
+    return String(data?.value ?? '0')
+  }
+
   useEffect(() => {
-    const savedRole = localStorage.getItem('kahfe_admin_role')
-    const savedName = localStorage.getItem('kahfe_staff_name')
-    if (savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen') {
+    (async () => {
+      const savedRole = localStorage.getItem('kahfe_admin_role')
+      const savedName = localStorage.getItem('kahfe_staff_name')
+      const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
+      const savedEpoch = localStorage.getItem('kahfe_session_epoch')
+      if (!(savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen')) return
+      if (!savedAt || Date.now() - savedAt > SESSION_MAX_AGE_MS) { clearSession(); return }
+      const currentEpoch = await getCurrentSessionEpoch()
+      if (savedEpoch !== currentEpoch) { clearSession(); return }
       setAuth(true)
       setStaffName(savedName || 'Nargile')
-    }
+    })()
   }, [])
+
+  useEffect(() => {
+    if (!auth) return
+    const interval = setInterval(async () => {
+      const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
+      if (!savedAt || Date.now() - savedAt > SESSION_MAX_AGE_MS) { clearSession(); return }
+      const savedEpoch = localStorage.getItem('kahfe_session_epoch')
+      const currentEpoch = await getCurrentSessionEpoch()
+      if (savedEpoch !== currentEpoch) clearSession()
+    }, 2 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [auth])
 
   async function login() {
     const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
     if (staffMatch) {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', staffMatch.name)
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setAuth(true); setStaffName(staffMatch.name)
       return
     }
     const { data: accessRole } = await supabase.rpc('verify_access_pin', { p_pin: pw }) as { data: string | null }
     if (accessRole === 'manager') {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'manager')
       localStorage.setItem('kahfe_staff_name', 'Yönetici')
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setAuth(true); setStaffName('Yönetici')
       return
     }
     if (accessRole === 'touchscreen') {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'touchscreen')
       localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setAuth(true); setStaffName('Dokunmatik Ekran')
       return
     }
     if (accessRole === 'staff_shared') {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setAuth(true); setStaffName('Personel (Genel)')
       return
     }
@@ -199,7 +245,7 @@ export default function NargilePage() {
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 40 }}>
-        <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_staff_name'); setAuth(false) }}
+        <button onClick={clearSession}
           style={{ background: 'transparent', border: '1px solid #383838', color: '#8A8A8A', fontSize: 13, padding: '8px 16px', cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>Çıkış</button>
       </div>
     </div>

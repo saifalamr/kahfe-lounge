@@ -1271,15 +1271,62 @@ export default function AdminPage() {
   const [croppedPreview, setCroppedPreview] = useState('')
   const [existingImageUrl, setExistingImageUrl] = useState('')
 
+  // Sessions auto-expire after this long regardless of anything else, so a
+  // lost/stolen tablet stops working on its own even if nobody notices
+  const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+  function clearSession() {
+    localStorage.removeItem('kahfe_admin_role')
+    localStorage.removeItem('kahfe_admin')
+    localStorage.removeItem('kahfe_staff_name')
+    localStorage.removeItem('kahfe_session_started_at')
+    localStorage.removeItem('kahfe_session_epoch')
+    setAuth(false); setRole(null); setStaffName('')
+  }
+
+  async function getCurrentSessionEpoch(): Promise<string> {
+    const { data } = await supabase.from('settings').select('value').eq('key', 'session_epoch').maybeSingle()
+    return String(data?.value ?? '0')
+  }
+
+  async function logoutAllDevices() {
+    if (!confirm('Bu, şu anda giriş yapmış olan TÜM cihazları (kendi cihazınız dahil) oturumdan çıkaracak. Herkesin tekrar PIN girmesi gerekecek. Devam edilsin mi?')) return
+    const current = await getCurrentSessionEpoch()
+    const next = String(Number(current) + 1)
+    await supabase.from('settings').upsert({ key: 'session_epoch', value: next, updated_at: new Date().toISOString() })
+    clearSession()
+  }
+
   useEffect(() => {
-    const savedRole = localStorage.getItem('kahfe_admin_role')
-    const savedName = localStorage.getItem('kahfe_staff_name')
-    if (savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen') {
+    (async () => {
+      const savedRole = localStorage.getItem('kahfe_admin_role')
+      const savedName = localStorage.getItem('kahfe_staff_name')
+      const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
+      const savedEpoch = localStorage.getItem('kahfe_session_epoch')
+      if (!(savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen')) return
+      if (!savedAt || Date.now() - savedAt > SESSION_MAX_AGE_MS) { clearSession(); return }
+      const currentEpoch = await getCurrentSessionEpoch()
+      if (savedEpoch !== currentEpoch) { clearSession(); return }
       setRole(savedRole)
       setAuth(true)
       setStaffName(savedName || (savedRole === 'manager' ? 'Yönetici' : savedRole === 'touchscreen' ? 'Dokunmatik Ekran' : 'Personel'))
-    }
+    })()
   }, [])
+
+  // Re-check every 2 minutes so a remote "log out all devices" (or the 24h
+  // expiry) takes effect promptly on a tablet that stays on-screen for days
+  // rather than only being caught on the next full page reload
+  useEffect(() => {
+    if (!auth) return
+    const interval = setInterval(async () => {
+      const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
+      if (!savedAt || Date.now() - savedAt > SESSION_MAX_AGE_MS) { clearSession(); return }
+      const savedEpoch = localStorage.getItem('kahfe_session_epoch')
+      const currentEpoch = await getCurrentSessionEpoch()
+      if (savedEpoch !== currentEpoch) clearSession()
+    }, 2 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [auth])
 
   // Staff and the shared Touchscreen account can only ever see the orders tab
   useEffect(() => { if (role === 'staff' || role === 'touchscreen') setTab('orders') }, [role])
@@ -1369,8 +1416,11 @@ export default function AdminPage() {
     // Individual staff PIN lookup — via RPC so PINs are never fetchable in bulk
     const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
     if (staffMatch) {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', staffMatch.name)
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setRole('staff'); setStaffName(staffMatch.name); setAuth(true)
       return
     }
@@ -1378,20 +1428,29 @@ export default function AdminPage() {
     // server-side now, nothing sensitive lives in this file
     const { data: accessRole } = await supabase.rpc('verify_access_pin', { p_pin: pw }) as { data: string | null }
     if (accessRole === 'manager') {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'manager')
       localStorage.setItem('kahfe_staff_name', 'Yönetici')
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setRole('manager'); setStaffName('Yönetici'); setAuth(true)
       return
     }
     if (accessRole === 'touchscreen') {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'touchscreen')
       localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setRole('touchscreen'); setStaffName('Dokunmatik Ekran'); setAuth(true)
       return
     }
     if (accessRole === 'staff_shared') {
+      const epoch = await getCurrentSessionEpoch()
       localStorage.setItem('kahfe_admin_role', 'staff')
       localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
+      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+      localStorage.setItem('kahfe_session_epoch', epoch)
       setRole('staff'); setStaffName('Personel (Genel)'); setAuth(true)
       return
     }
@@ -1592,7 +1651,7 @@ export default function AdminPage() {
                 <span style={{ position: 'absolute', top: -4, right: -4, background: '#C0392B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notifications.length}</span>
               )}
             </button>
-            <button onClick={() => { localStorage.removeItem('kahfe_admin_role'); localStorage.removeItem('kahfe_admin'); localStorage.removeItem('kahfe_staff_name'); setAuth(false); setRole(null); setStaffName('') }} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 0, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+            <button onClick={clearSession} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 0, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
           </div>
         </div>
 
@@ -2467,6 +2526,10 @@ export default function AdminPage() {
                   )}
                 </div>
               ))}
+              <div style={{ borderTop: '1px solid #2A2A2A', marginTop: 14, paddingTop: 14 }}>
+                <div style={{ color: '#B5B0A8', fontSize: 12, marginBottom: 8 }}>Oturum Güvenliği: girişler 24 saat sonra otomatik sona erer. Bir cihaz kaybolduysa veya çalındıysa, aşağıdaki düğme tüm cihazları anında oturumdan çıkarır.</div>
+                <button onClick={logoutAllDevices} style={{ height: 44, padding: '0 16px', background: 'transparent', border: '1px solid #C0392B', color: '#e74c3c', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>🚪 Tüm Cihazlardan Çıkış Yap</button>
+              </div>
             </div>
 
             {/* Auto print via RawBT */}
