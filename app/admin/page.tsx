@@ -1919,7 +1919,7 @@ export default function AdminPage() {
                         return (
                           <button key={tableName} onClick={() => setActiveTableModal(tableName)}
                             style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 0, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
-                            <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace(/^(MASA|KİTAPLIK|OKEY|KAHFE)-/, '')}</div>
+                            <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
                             <div style={{ color:p.labelText, fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase', marginTop:6 }}>
                               {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}
                             </div>
@@ -2035,7 +2035,7 @@ export default function AdminPage() {
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                       <span style={{ background:statusColor, color:'#fff', borderRadius: 0, padding:'4px 10px', fontSize:11, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
-                      <span style={{ color:'#F0EDE8', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>Masa {order.table_name.replace(/^(MASA|KİTAPLIK|OKEY|KAHFE)-/, '')}</span>
+                      <span style={{ color:'#F0EDE8', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{order.table_name.replace('-', ' ')}</span>
                     </div>
                     <span style={{ color:'#8A8A8A', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
                   </div>
