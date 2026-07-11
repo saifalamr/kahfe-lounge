@@ -240,7 +240,8 @@ export default function AdminPage() {
       setAccessPinMsg(prev => ({ ...prev, [role]: '✗ 4-6 haneli bir sayı girin' }))
       return
     }
-    const { error } = await supabase.rpc('update_access_pin', { p_role: role, p_new_pin: newPin })
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    const { error } = await supabase.rpc('update_access_pin', { p_session_token: sessionToken, p_role: role, p_new_pin: newPin })
     if (error) {
       setAccessPinMsg(prev => ({ ...prev, [role]: '✗ Güncellenemedi: ' + error.message }))
       return
@@ -1281,6 +1282,7 @@ export default function AdminPage() {
     localStorage.removeItem('kahfe_staff_name')
     localStorage.removeItem('kahfe_session_started_at')
     localStorage.removeItem('kahfe_session_epoch')
+    localStorage.removeItem('kahfe_session_token')
     setAuth(false); setRole(null); setStaffName('')
   }
 
@@ -1413,48 +1415,22 @@ export default function AdminPage() {
   }
 
   async function login() {
-    // Individual staff PIN lookup — via RPC so PINs are never fetchable in bulk
-    const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
-    if (staffMatch) {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'staff')
-      localStorage.setItem('kahfe_staff_name', staffMatch.name)
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setRole('staff'); setStaffName(staffMatch.name); setAuth(true)
-      return
-    }
-    // Manager / Touchscreen / legacy shared-staff-code — all checked
-    // server-side now, nothing sensitive lives in this file
-    const { data: accessRole } = await supabase.rpc('verify_access_pin', { p_pin: pw }) as { data: string | null }
-    if (accessRole === 'manager') {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'manager')
-      localStorage.setItem('kahfe_staff_name', 'Yönetici')
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setRole('manager'); setStaffName('Yönetici'); setAuth(true)
-      return
-    }
-    if (accessRole === 'touchscreen') {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'touchscreen')
-      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setRole('touchscreen'); setStaffName('Dokunmatik Ekran'); setAuth(true)
-      return
-    }
-    if (accessRole === 'staff_shared') {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'staff')
-      localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setRole('staff'); setStaffName('Personel (Genel)'); setAuth(true)
-      return
-    }
-    setPwError(true)
+    // One atomic server-side call: checks the PIN (staff PIN or manager/
+    // touchscreen/staff-shared PIN) and, only on success, mints a session
+    // token — nobody can obtain a token without passing a real PIN check
+    // inside this same database call.
+    const { data } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null }
+    if (!data) { setPwError(true); return }
+    const normalizedRole: 'manager' | 'staff' | 'touchscreen' = data.role === 'manager' ? 'manager' : data.role === 'touchscreen' ? 'touchscreen' : 'staff'
+    localStorage.setItem('kahfe_admin_role', normalizedRole)
+    localStorage.setItem('kahfe_staff_name', data.staff_name)
+    localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+    localStorage.setItem('kahfe_session_token', data.token)
+    const epoch = await getCurrentSessionEpoch()
+    localStorage.setItem('kahfe_session_epoch', epoch)
+    setRole(normalizedRole)
+    setStaffName(data.staff_name)
+    setAuth(true)
   }
 
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }

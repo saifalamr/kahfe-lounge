@@ -41,6 +41,7 @@ export default function NargilePage() {
     localStorage.removeItem('kahfe_staff_name')
     localStorage.removeItem('kahfe_session_started_at')
     localStorage.removeItem('kahfe_session_epoch')
+    localStorage.removeItem('kahfe_session_token')
     setAuth(false); setStaffName('')
   }
 
@@ -77,45 +78,16 @@ export default function NargilePage() {
   }, [auth])
 
   async function login() {
-    const { data: staffMatch } = await supabase.rpc('verify_staff_pin', { p_pin: pw }).maybeSingle() as { data: { id: string, name: string } | null }
-    if (staffMatch) {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'staff')
-      localStorage.setItem('kahfe_staff_name', staffMatch.name)
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setAuth(true); setStaffName(staffMatch.name)
-      return
-    }
-    const { data: accessRole } = await supabase.rpc('verify_access_pin', { p_pin: pw }) as { data: string | null }
-    if (accessRole === 'manager') {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'manager')
-      localStorage.setItem('kahfe_staff_name', 'Yönetici')
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setAuth(true); setStaffName('Yönetici')
-      return
-    }
-    if (accessRole === 'touchscreen') {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'touchscreen')
-      localStorage.setItem('kahfe_staff_name', 'Dokunmatik Ekran')
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setAuth(true); setStaffName('Dokunmatik Ekran')
-      return
-    }
-    if (accessRole === 'staff_shared') {
-      const epoch = await getCurrentSessionEpoch()
-      localStorage.setItem('kahfe_admin_role', 'staff')
-      localStorage.setItem('kahfe_staff_name', 'Personel (Genel)')
-      localStorage.setItem('kahfe_session_started_at', String(Date.now()))
-      localStorage.setItem('kahfe_session_epoch', epoch)
-      setAuth(true); setStaffName('Personel (Genel)')
-      return
-    }
-    setPwError(true)
+    const { data } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null }
+    if (!data) { setPwError(true); return }
+    const normalizedRole = data.role === 'manager' ? 'manager' : data.role === 'touchscreen' ? 'touchscreen' : 'staff'
+    localStorage.setItem('kahfe_admin_role', normalizedRole)
+    localStorage.setItem('kahfe_staff_name', data.staff_name)
+    localStorage.setItem('kahfe_session_started_at', String(Date.now()))
+    localStorage.setItem('kahfe_session_token', data.token)
+    const epoch = await getCurrentSessionEpoch()
+    localStorage.setItem('kahfe_session_epoch', epoch)
+    setAuth(true); setStaffName(data.staff_name)
   }
 
   async function loadStationMap() {
