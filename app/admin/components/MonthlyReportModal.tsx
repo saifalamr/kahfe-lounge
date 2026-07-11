@@ -26,6 +26,10 @@ export default function MonthlyReportModal({ report, onExportPDF, onClose }: {
               <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{formatTL(Number(report.totalRevenue))} ₺</div>
               <div style={{ color:'#8A8A8A', fontSize:11 }}>Ciro</div>
             </div>
+            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(231,76,60,.25)' }}>
+              <div style={{ color:'#e74c3c', fontWeight:800, fontSize:22 }}>{formatTL(Number(report.totalDebt || 0))} ₺</div>
+              <div style={{ color:'#8A8A8A', fontSize:11 }}>Borç</div>
+            </div>
           </div>
           <div style={{ color:'#8A8A8A', fontSize:11, letterSpacing:1, marginBottom:10 }}>EN ÇOK SATILAN ÜRÜNLER</div>
           {report.topItems?.slice(0,5).map((item:any, i:number) => (

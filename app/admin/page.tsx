@@ -171,7 +171,7 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
@@ -883,20 +883,30 @@ export default function AdminPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   }
 
-  const [revenueSummary, setRevenueSummary] = useState({ revenue: 0, cash: 0, card: 0, count: 0 })
+  const [revenueSummary, setRevenueSummary] = useState({ revenue: 0, cash: 0, card: 0, debt: 0, count: 0 })
 
   // Revenue should reflect money actually collected (closed/paid tabs),
   // not every order placed — an order can be placed and still be open/unpaid.
+  // Debt is tracked separately since it's the opposite of collected: money
+  // owed, not received, so it shouldn't be folded into "revenue".
   async function getClosedTabsRevenue(fromDate: string, toDate?: string) {
-    let query = supabase.from('tabs').select('total,cash_amount,card_amount')
+    let query = supabase.from('tabs').select('total,cash_amount,card_amount,transfer_amount,debt_amount')
       .eq('status', 'closed').gte('closed_at', fromDate)
     if (toDate) query = query.lte('closed_at', toDate)
     const { data } = await query
     const tabs = data || []
+    const cash = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0)
+    const card = tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0)
+    const transfer = tabs.reduce((s: number, t: any) => s + Number(t.transfer_amount || 0), 0)
     return {
-      revenue: tabs.reduce((s: number, t: any) => s + Number(t.total), 0),
-      cash: tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0),
-      card: tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0),
+      // "Tahsil edilen" (collected) means money that actually came in —
+      // cash + card + transfer. A tab paid on debt (Borç) hasn't actually
+      // been collected yet, so it's tracked separately below rather than
+      // folded into revenue, even though its `total` column is set the
+      // same as any other closed tab.
+      revenue: cash + card + transfer,
+      cash, card,
+      debt: tabs.reduce((s: number, t: any) => s + Number(t.debt_amount || 0), 0),
       count: tabs.length,
     }
   }
@@ -957,6 +967,7 @@ export default function AdminPage() {
 
     const periodRevenue = await getClosedTabsRevenue(firstDay, lastDay)
     const totalRevenue = periodRevenue.revenue
+    const totalDebt = periodRevenue.debt
 
     // Top items
     const itemMap: Record<string, { name: string; count: number; revenue: number; categoryId: string | null }> = {}
@@ -1012,7 +1023,7 @@ export default function AdminPage() {
     }
 
     showMsg(`✓ ${title.replace(' Raporu','')} raporu oluşturuldu!`)
-    setShowMonthlyReport({ title, periodType: period, totalOrders: periodOrders.length, totalRevenue, topItems, topTables, categoryStats, dayMap })
+    setShowMonthlyReport({ title, periodType: period, totalOrders: periodOrders.length, totalRevenue, totalDebt, topItems, topTables, categoryStats, dayMap })
   }
 
 
@@ -1130,17 +1141,66 @@ export default function AdminPage() {
   const [dayCloseData, setDayCloseData] = useState<any>(null)
   const [countedCash, setCountedCash] = useState('')
 
+  // Fiş Geçmişi (receipt history) — lets the manager find and reprint a
+  // receipt from any point in the past (a week ago, a year ago, etc.),
+  // not just at the moment a tab is closed.
+  const today = new Date().toISOString().split('T')[0]
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const [receiptFrom, setReceiptFrom] = useState(weekAgo)
+  const [receiptTo, setReceiptTo] = useState(today)
+  const [receiptQuery, setReceiptQuery] = useState('')
+  const [receiptResults, setReceiptResults] = useState<any[]>([])
+  const [receiptSearching, setReceiptSearching] = useState(false)
+
+  async function searchReceipts() {
+    setReceiptSearching(true)
+    let query = supabase.from('tabs').select('*').eq('status', 'closed')
+      .gte('closed_at', `${receiptFrom}T00:00:00`)
+      .lte('closed_at', `${receiptTo}T23:59:59.999`)
+      .order('closed_at', { ascending: false })
+      .limit(200)
+    const q = receiptQuery.trim()
+    if (q) {
+      if (/^\d+$/.test(q)) query = query.eq('fatura_no', Number(q))
+      else query = query.ilike('table_name', `%${q}%`)
+    }
+    const { data } = await query
+    setReceiptResults(data || [])
+    setReceiptSearching(false)
+  }
+
+  async function reprintReceipt(tabRow: any) {
+    const { data: orders } = await supabase.from('orders').select('*').eq('tab_id', tabRow.id).order('created_at', { ascending: true })
+    printReceipt({
+      table_name: tabRow.table_name,
+      total: Number(tabRow.total),
+      cash: Number(tabRow.cash_amount || 0),
+      card: Number(tabRow.card_amount || 0),
+      transfer: Number(tabRow.transfer_amount || 0),
+      method: tabRow.payment_method,
+      orders: orders || [],
+      discountAmount: Number(tabRow.discount_amount || 0),
+      discountReason: tabRow.discount_reason || '',
+      originalTotal: Number(tabRow.total) + Number(tabRow.discount_amount || 0),
+      faturaNo: tabRow.fatura_no,
+    }, autoPrintEnabled)
+  }
+
   async function openDayClose() {
     const todayStart = new Date().toISOString().split('T')[0]
     const { data: closedTabs } = await supabase.from('tabs').select('*')
       .eq('status', 'closed').gte('closed_at', todayStart)
     const tabs = closedTabs || []
-    const totalRevenue = tabs.reduce((s: number, t: any) => s + Number(t.total), 0)
     const cashTotal = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0)
     const cardTotal = tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0)
     const transferTotal = tabs.reduce((s: number, t: any) => s + Number(t.transfer_amount || 0), 0)
+    const debtTotal = tabs.reduce((s: number, t: any) => s + Number(t.debt_amount || 0), 0)
     const discountTotal = tabs.reduce((s: number, t: any) => s + Number(t.discount_amount || 0), 0)
-    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, transferTotal, discountTotal, tabCount: tabs.length })
+    // Same principle as the main stats bar: "Ciro" is money actually
+    // collected today (cash+card+transfer) — a Borç sale isn't collected
+    // yet, so it's shown as its own figure rather than folded in here.
+    const totalRevenue = cashTotal + cardTotal + transferTotal
+    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, transferTotal, debtTotal, discountTotal, tabCount: tabs.length })
     setCountedCash('')
     setShowDayClose(true)
   }
@@ -1155,6 +1215,7 @@ export default function AdminPage() {
       cash_total: dayCloseData.cashTotal,
       card_total: dayCloseData.cardTotal,
       transfer_total: dayCloseData.transferTotal,
+      debt_total: dayCloseData.debtTotal,
       tab_count: dayCloseData.tabCount,
       counted_cash: isNaN(counted) ? null : counted,
       cash_difference: diff,
@@ -1165,7 +1226,7 @@ export default function AdminPage() {
       return
     }
     setShowDayClose(false)
-    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit: ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺\nHavale: ${formatTL(dayCloseData.transferTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
+    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit: ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺\nHavale: ${formatTL(dayCloseData.transferTotal)} ₺\nBorç: ${formatTL(dayCloseData.debtTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
   }
 
 
@@ -1648,10 +1709,10 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A', overflowX: 'auto' }}>
-          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings', 'debts'] as const) : (['orders'] as const)).map(t => (
-            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter); if(t==='debts') loadDebtTransactions() }}
+          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings', 'debts', 'receipts'] as const) : (['orders'] as const)).map(t => (
+            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter); if(t==='debts') loadDebtTransactions(); if(t==='receipts') searchReceipts() }}
               style={{ flex: '1 0 auto', minWidth: 80, padding: '16px 8px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#8A8A8A', fontWeight: tab === t ? 600 : 500, fontSize: 13, cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap' }}>
-              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : 'Siparişler'}
+              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : t === 'receipts' ? 'Fiş Geçmişi' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
                 <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
               )}
@@ -2160,6 +2221,10 @@ export default function AdminPage() {
                   <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(revenueSummary.revenue)}</div>
                   <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Ciro (Tahsil Edilen)</div>
                 </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#e74c3c', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(revenueSummary.debt)}</div>
+                  <div style={{ color:'#8A8A8A', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Borç (Tahsil Edilmeyen)</div>
+                </div>
               </div>
             )}
 
@@ -2646,6 +2711,50 @@ export default function AdminPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* RECEIPT HISTORY — search and reprint any past receipt */}
+        {isManager && tab === 'receipts' && (
+          <div className="kahfe-section" style={s.section}>
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🧾 Fiş Geçmişi</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Geçmişteki herhangi bir tarihten (bir hafta önce, bir yıl önce, fark etmez) fiş bulup yeniden yazdırın.</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: '#8A8A8A', fontSize: 11, display: 'block', marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace" }}>BAŞLANGIÇ</label>
+                  <input type="date" value={receiptFrom} onChange={e => setReceiptFrom(e.target.value)} style={{ ...s.input, height: 44, width: '100%' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: '#8A8A8A', fontSize: 11, display: 'block', marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace" }}>BİTİŞ</label>
+                  <input type="date" value={receiptTo} onChange={e => setReceiptTo(e.target.value)} style={{ ...s.input, height: 44, width: '100%' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={receiptQuery} onChange={e => setReceiptQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchReceipts()}
+                  placeholder="Masa adı (örn. MASA-3) veya fiş numarası" style={{ ...s.input, flex: 1, height: 48 }} />
+                <button onClick={searchReceipts} style={{ height: 48, padding: '0 20px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  {receiptSearching ? '...' : '🔍 Ara'}
+                </button>
+              </div>
+            </div>
+
+            {receiptResults.length === 0 && !receiptSearching && (
+              <div style={{ textAlign: 'center', color: '#8A8A8A', padding: 20 }}>Bu aralıkta sonuç bulunamadı. Tarih aralığını genişletmeyi deneyin.</div>
+            )}
+
+            {receiptResults.map((r: any) => (
+              <div key={r.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', padding: '14px 16px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <div>
+                  <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 15, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{r.table_name.replace('-', ' ')} {r.fatura_no ? `· Fiş #${String(r.fatura_no).padStart(6, '0')}` : ''}</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{new Date(r.closed_at).toLocaleString('tr-TR')} · {r.payment_method === 'cash' ? 'Nakit' : r.payment_method === 'card' ? 'Kart' : r.payment_method === 'transfer' ? 'Havale' : r.payment_method === 'debt' ? 'Borç' : 'Karma'}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 16, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(Number(r.total))}</div>
+                  <button onClick={() => reprintReceipt(r)} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid #383838', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>🖨️ Yazdır</button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

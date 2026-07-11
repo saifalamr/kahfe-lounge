@@ -119,7 +119,7 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
   win.document.close()
 }
 
-export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', allOrders: any[], revenueSummary: { revenue: number }) {
+export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', allOrders: any[], revenueSummary: { revenue: number, debt?: number }) {
   const win = window.open('', '_blank', 'width=900,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : dateFilter === 'custom' ? 'Özel Aralık' : 'Bu Ay'
@@ -158,6 +158,7 @@ export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', all
         <div class="stat"><div class="num">${allOrders.length}</div><div class="label">Toplam Sipariş</div></div>
         <div class="stat"><div class="num">${pending}</div><div class="label">Bekliyor</div></div>
         <div class="stat"><div class="num">${formatTL(totalRevenue)} ₺</div><div class="label">Ciro (Tahsil Edilen)</div></div>
+        <div class="stat"><div class="num">${formatTL(revenueSummary.debt || 0)} ₺</div><div class="label">Borç (Tahsil Edilmeyen)</div></div>
       </div>
       <div style="font-size:10px; color:#8A8A8A; margin-bottom:10px;">Not: Ciro yalnızca ödemesi alınıp kapatılmış masaları sayar. Aşağıdaki liste, henüz ödenmemiş olanlar dahil bu aralıktaki tüm siparişleri gösterir.</div>
       <table>
@@ -214,6 +215,7 @@ export function exportMonthlyReportPDF(report: any) {
       <div class="stats">
         <div class="stat"><div class="num">${report.totalOrders}</div><div class="label">Toplam Sipariş</div></div>
         <div class="stat"><div class="num">${formatTL(Number(report.totalRevenue))} ₺</div><div class="label">Toplam Ciro</div></div>
+        <div class="stat"><div class="num">${formatTL(Number(report.totalDebt || 0))} ₺</div><div class="label">Toplam Borç</div></div>
       </div>
       ${categoryRows ? `
       <h2>Kategori Bazında Ciro</h2>
@@ -364,6 +366,7 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
         <div class="stat"><div class="num">${formatTL(dayCloseData.cashTotal)} ₺</div><div class="label">Nakit</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.cardTotal)} ₺</div><div class="label">Kart</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.transferTotal || 0)} ₺</div><div class="label">Havale</div></div>
+        <div class="stat"><div class="num">${formatTL(dayCloseData.debtTotal || 0)} ₺</div><div class="label">Borç</div></div>
         ${diff !== null ? `<div class="stat"><div class="num" style="color:${diff===0?'#27ae60':diff>0?'#3498db':'#e74c3c'}">${diff>=0?'+':''}${formatTL(diff)} ₺</div><div class="label">Kasa Farkı</div></div>` : ''}
       </div>
       <h2>Kapanan Masalar</h2>
