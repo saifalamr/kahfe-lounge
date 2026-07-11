@@ -228,6 +228,28 @@ export default function AdminPage() {
     setAutoPrintEnabled(next)
   }
 
+  // Manager-only PIN changes for Yönetici/Dokunmatik Ekran/Personel(Genel) —
+  // the actual current PIN is never fetched or shown (matches how it's
+  // stored server-side with no select policy); this only ever writes a new
+  // one. Gated to isManager in the UI below, same as the rest of Ayarlar.
+  const [accessPinInputs, setAccessPinInputs] = useState<Record<string, string>>({})
+  const [accessPinMsg, setAccessPinMsg] = useState<Record<string, string>>({})
+  async function updateAccessPin(role: 'manager'|'touchscreen'|'staff_shared') {
+    const newPin = (accessPinInputs[role] || '').trim()
+    if (!/^\d{4,6}$/.test(newPin)) {
+      setAccessPinMsg(prev => ({ ...prev, [role]: '✗ 4-6 haneli bir sayı girin' }))
+      return
+    }
+    const { error } = await supabase.rpc('update_access_pin', { p_role: role, p_new_pin: newPin })
+    if (error) {
+      setAccessPinMsg(prev => ({ ...prev, [role]: '✗ Güncellenemedi: ' + error.message }))
+      return
+    }
+    setAccessPinInputs(prev => ({ ...prev, [role]: '' }))
+    setAccessPinMsg(prev => ({ ...prev, [role]: '✓ Şifre güncellendi' }))
+    setTimeout(() => setAccessPinMsg(prev => ({ ...prev, [role]: '' })), 3000)
+  }
+
   async function setCategoryStation(categoryId: string, station: 'kitchen'|'nargile') {
     const next = { ...categoryStations, [categoryId]: station }
     await supabase.from('settings').upsert({ key: 'category_stations', value: next, updated_at: new Date().toISOString() })
@@ -2425,6 +2447,26 @@ export default function AdminPage() {
               <button onClick={toggleNotifSound} style={{ height: 48, padding: '0 20px', background: notifSoundOn ? 'rgba(39,174,96,.14)' : 'transparent', border: notifSoundOn ? '1px solid #27ae60' : '1px solid #383838', color: notifSoundOn ? '#5FD08C' : '#8A8A8A', fontSize: 14, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
                 {notifSoundOn ? '🔊 Açık — Kapatmak için tıkla' : '🔇 Kapalı — Açmak için tıkla'}
               </button>
+            </div>
+
+            {/* Access PINs — manager-only, write-only (current values are never fetched/shown) */}
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🔐 Erişim Şifreleri</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Yönetici, Dokunmatik Ekran ve Genel Personel giriş şifrelerini buradan değiştirebilirsiniz. Mevcut şifreler güvenlik nedeniyle burada gösterilmez — sadece yenisini girip güncelleyebilirsiniz.</div>
+              {([['manager','Yönetici Şifresi'],['touchscreen','Dokunmatik Ekran Şifresi'],['staff_shared','Personel (Genel) Şifresi']] as const).map(([role, label]) => (
+                <div key={role} style={{ marginBottom: 12 }}>
+                  <div style={{ color: '#B5B0A8', fontSize: 12, marginBottom: 6 }}>{label}</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input type="text" inputMode="numeric" value={accessPinInputs[role] || ''} onChange={e => setAccessPinInputs(prev => ({ ...prev, [role]: e.target.value.replace(/\D/g, '') }))}
+                      onKeyDown={e => e.key === 'Enter' && updateAccessPin(role)}
+                      placeholder="Yeni şifre (4-6 hane)" maxLength={6} style={{ ...s.input, height: 44, flex: 1, fontFamily: "'IBM Plex Mono', monospace" }} />
+                    <button onClick={() => updateAccessPin(role)} style={{ height: 44, padding: '0 16px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontSize: 13, cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>Güncelle</button>
+                  </div>
+                  {accessPinMsg[role] && (
+                    <div style={{ color: accessPinMsg[role].startsWith('✓') ? '#5FD08C' : '#e74c3c', fontSize: 12, marginTop: 6 }}>{accessPinMsg[role]}</div>
+                  )}
+                </div>
+              ))}
             </div>
 
             {/* Auto print via RawBT */}
