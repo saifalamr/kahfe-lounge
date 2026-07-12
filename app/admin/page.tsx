@@ -1763,14 +1763,19 @@ export default function AdminPage() {
   useEffect(() => { if (auth) { loadData(); loadSettings(); loadDebtors(); loadActiveShift() } }, [auth])
 
   async function loadData() {
-    const [{ data: cats }, { data: its }, { data: staffData }] = await Promise.all([
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    const [{ data: cats }, { data: its }, staffResult] = await Promise.all([
       supabase.from('categories').select('*').order('order_index'),
       supabase.from('menu_items').select('*').order('order_index'),
-      supabase.rpc('list_staff'),
+      // Only Manager ever needs the full staff list (with PINs) — this now
+      // requires a valid manager session token server-side too, since
+      // list_staff previously returned every staff member's plaintext PIN
+      // to anyone holding the anon key, no login required at all.
+      isManager ? supabase.rpc('list_staff', { p_session_token: sessionToken }) : Promise.resolve({ data: [] }),
     ])
     setCategories(cats || [])
     setItems(its || [])
-    setStaffList(staffData || [])
+    setStaffList(staffResult.data || [])
 
     const itemIds = (its || []).map((x: any) => x.id)
     if (itemIds.length > 0) {
@@ -1825,20 +1830,23 @@ export default function AdminPage() {
       alert(`Bu PIN zaten ${dup.name} adlı personelde kullanılıyor. Başka bir PIN seçin.`)
       return
     }
-    const { error } = await supabase.rpc('upsert_staff', { p_id: editingStaffId, p_name: name, p_pin: pin, p_permission: staffFormPermission })
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    const { error } = await supabase.rpc('upsert_staff', { p_session_token: sessionToken, p_id: editingStaffId, p_name: name, p_pin: pin, p_permission: staffFormPermission })
     if (error) { alert('✗ Kaydedilemedi.\n\n' + error.message); return }
     resetStaffForm()
     await loadData()
   }
 
   async function toggleStaffActive(s: any) {
-    await supabase.rpc('set_staff_active', { p_id: s.id, p_active: !s.active })
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    await supabase.rpc('set_staff_active', { p_session_token: sessionToken, p_id: s.id, p_active: !s.active })
     await loadData()
   }
 
   async function deleteStaff(id: string) {
     if (!confirm('Bu personeli silmek istediğinizden emin misiniz?')) return
-    await supabase.rpc('delete_staff', { p_id: id })
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    await supabase.rpc('delete_staff', { p_session_token: sessionToken, p_id: id })
     await loadData()
   }
 

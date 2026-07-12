@@ -58,20 +58,21 @@ alter table public.orders add column if not exists handled_by text;
 
 -- Invoice numbers, assigned automatically by the DB
 create sequence if not exists fatura_seq start 1;
-create or replace function assign_fatura_no() returns trigger as $$
+create or replace function assign_fatura_no() returns trigger
+language plpgsql set search_path = public as $$
 begin
   if new.status = 'closed' and new.fatura_no is null then
     new.fatura_no := nextval('fatura_seq');
   end if;
   return new;
-end; $$ language plpgsql;
+end; $$;
 drop trigger if exists trg_assign_fatura_no on public.tabs;
 create trigger trg_assign_fatura_no before update on public.tabs
 for each row execute function assign_fatura_no();
 
 -- Atomic tab creation/transfer/merge (race-condition safe)
 create or replace function get_or_create_open_tab(p_table_name text)
-returns uuid language plpgsql security definer as $$
+returns uuid language plpgsql security definer set search_path = public as $$
 declare v_tab_id uuid;
 begin
   perform pg_advisory_xact_lock(hashtext(p_table_name));
@@ -83,7 +84,7 @@ end; $$;
 grant execute on function get_or_create_open_tab(text) to anon, authenticated;
 
 create or replace function merge_or_transfer_tab(p_source_tab_id uuid, p_destination_table_name text)
-returns uuid language plpgsql security definer as $$
+returns uuid language plpgsql security definer set search_path = public as $$
 declare v_dest_tab_id uuid;
 begin
   perform pg_advisory_xact_lock(hashtext(p_destination_table_name));
@@ -112,33 +113,69 @@ alter table public.staff enable row level security;
 -- (no direct select/insert/update/delete policies - all access via RPCs below)
 
 create or replace function verify_staff_pin(p_pin text) returns table(id uuid, name text)
-language sql security definer as $$ select id, name from staff where pin = p_pin and active = true limit 1; $$;
+language sql security definer set search_path = public as $$ select id, name from staff where pin = p_pin and active = true limit 1; $$;
 grant execute on function verify_staff_pin(text) to anon, authenticated;
 
-create or replace function list_staff() returns setof staff
-language sql security definer as $$ select * from staff order by created_at; $$;
-grant execute on function list_staff() to anon, authenticated;
+-- Small helper reused by every staff-management function below so a valid
+-- manager session is required before any of them will do anything.
+create or replace function assert_manager_session(p_session_token uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (
+    select 1 from device_sessions
+    where token = p_session_token and role = 'manager' and expires_at > now()
+  ) then
+    raise exception 'not authorized';
+  end if;
+end; $$;
+grant execute on function assert_manager_session(uuid) to anon, authenticated;
+
+-- list_staff previously took no arguments and returned every staff member's
+-- name + PIN + permission to ANYONE holding the anon key, no login required
+-- at all — arguably a bigger exposure than the original hardcoded-password
+-- issue, since it needed zero interaction with the app to hit directly.
+-- Now requires a valid manager session, same as everything else here.
+drop function if exists list_staff();
+create or replace function list_staff(p_session_token uuid) returns setof staff
+language plpgsql security definer set search_path = public as $$
+begin
+  perform assert_manager_session(p_session_token);
+  return query select * from staff order by created_at;
+end; $$;
+grant execute on function list_staff(uuid) to anon, authenticated;
 
 drop function if exists upsert_staff(uuid, text, text);
-create or replace function upsert_staff(p_id uuid, p_name text, p_pin text, p_permission text default 'full') returns staff
-language plpgsql security definer as $$
+drop function if exists upsert_staff(uuid, text, text, text);
+create or replace function upsert_staff(p_session_token uuid, p_id uuid, p_name text, p_pin text, p_permission text default 'full') returns staff
+language plpgsql security definer set search_path = public as $$
 declare result staff;
 begin
+  perform assert_manager_session(p_session_token);
   if p_id is null then insert into staff(name, pin, active, permission) values (p_name, p_pin, true, p_permission) returning * into result;
   else update staff set name = p_name, pin = p_pin, permission = p_permission where id = p_id returning * into result; end if;
   return result;
 end; $$;
-grant execute on function upsert_staff(uuid, text, text, text) to anon, authenticated;
+grant execute on function upsert_staff(uuid, uuid, text, text, text) to anon, authenticated;
 
-create or replace function set_staff_active(p_id uuid, p_active boolean) returns staff
-language plpgsql security definer as $$
+drop function if exists set_staff_active(uuid, boolean);
+create or replace function set_staff_active(p_session_token uuid, p_id uuid, p_active boolean) returns staff
+language plpgsql security definer set search_path = public as $$
 declare result staff;
-begin update staff set active = p_active where id = p_id returning * into result; return result; end; $$;
-grant execute on function set_staff_active(uuid, boolean) to anon, authenticated;
+begin
+  perform assert_manager_session(p_session_token);
+  update staff set active = p_active where id = p_id returning * into result;
+  return result;
+end; $$;
+grant execute on function set_staff_active(uuid, uuid, boolean) to anon, authenticated;
 
-create or replace function delete_staff(p_id uuid) returns void
-language plpgsql security definer as $$ begin delete from staff where id = p_id; end; $$;
-grant execute on function delete_staff(uuid) to anon, authenticated;
+drop function if exists delete_staff(uuid);
+create or replace function delete_staff(p_session_token uuid, p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform assert_manager_session(p_session_token);
+  delete from staff where id = p_id;
+end; $$;
+grant execute on function delete_staff(uuid, uuid) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- day_close_reports (Gün Sonu)
@@ -285,13 +322,13 @@ insert into public.access_pins (role, pin) values
 on conflict (role) do nothing;
 
 create or replace function verify_access_pin(p_pin text) returns text
-language sql security definer as $$
+language sql security definer set search_path = public as $$
   select role from access_pins where pin = p_pin limit 1;
 $$;
 grant execute on function verify_access_pin(text) to anon, authenticated;
 
 create or replace function pin_is_reserved(p_pin text) returns boolean
-language sql security definer as $$
+language sql security definer set search_path = public as $$
   select exists(select 1 from access_pins where pin = p_pin);
 $$;
 grant execute on function pin_is_reserved(text) to anon, authenticated;
@@ -309,7 +346,7 @@ alter table public.login_attempts enable row level security;
 -- No policies — RPC access only.
 
 create or replace function get_client_ip() returns text
-language sql stable as $$
+language sql stable set search_path = public as $$
   select split_part(coalesce((current_setting('request.headers', true)::json->>'x-forwarded-for'), 'unknown'), ',', 1);
 $$;
 grant execute on function get_client_ip() to anon, authenticated;
@@ -336,7 +373,7 @@ alter table public.device_sessions enable row level security;
 drop function if exists login_with_pin(text);
 create or replace function login_with_pin(p_pin text)
 returns table(role text, token uuid, staff_name text, permission text)
-language plpgsql security definer as $$
+language plpgsql security definer set search_path = public as $$
 declare
   v_role text;
   v_staff_id uuid;
@@ -374,14 +411,9 @@ grant execute on function login_with_pin(text) to anon, authenticated;
 -- closes the hole where anyone with the anon key could call it directly and
 -- set their own manager PIN without ever logging in.
 create or replace function update_access_pin(p_session_token uuid, p_role text, p_new_pin text) returns void
-language plpgsql security definer as $$
+language plpgsql security definer set search_path = public as $$
 begin
-  if not exists (
-    select 1 from device_sessions
-    where token = p_session_token and role = 'manager' and expires_at > now()
-  ) then
-    raise exception 'not authorized';
-  end if;
+  perform assert_manager_session(p_session_token);
   update access_pins set pin = p_new_pin where role = p_role;
 end; $$;
 grant execute on function update_access_pin(uuid, text, text) to anon, authenticated;
