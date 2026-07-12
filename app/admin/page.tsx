@@ -1229,6 +1229,136 @@ export default function AdminPage() {
     return Object.entries(map).sort((a, b) => b[1].total - a[1].total)
   }
 
+  // Full accounting export (Muhasebe İçin Excel) — a multi-sheet workbook
+  // covering everything a muhasebeci would want for a date range: every
+  // closed sale with its items, every discount/void/debt movement/manual
+  // cash movement, plus a summary sheet. Reuses the same date range as
+  // Fiş Geçmişi above.
+  const [exportingAccounting, setExportingAccounting] = useState(false)
+  async function exportAccountingExcel() {
+    setExportingAccounting(true)
+    try {
+      const fromISO = `${receiptFrom}T00:00:00`
+      const toISO = `${receiptTo}T23:59:59.999`
+
+      const { data: tabs } = await supabase.from('tabs').select('*').eq('status', 'closed')
+        .gte('closed_at', fromISO).lte('closed_at', toISO).order('closed_at', { ascending: true })
+      const tabIds = (tabs || []).map((t: any) => t.id)
+      const { data: orders } = tabIds.length > 0
+        ? await supabase.from('orders').select('*').in('tab_id', tabIds)
+        : { data: [] as any[] }
+      const ordersByTab: Record<string, any[]> = {}
+      ;(orders || []).forEach((o: any) => { (ordersByTab[o.tab_id] ||= []).push(o) })
+
+      const { data: discounts } = await supabase.from('discounts').select('*').gte('created_at', fromISO).lte('created_at', toISO).order('created_at', { ascending: true })
+      const { data: voids } = await supabase.from('voids').select('*').gte('created_at', fromISO).lte('created_at', toISO).order('created_at', { ascending: true })
+      const { data: debtTx } = await supabase.from('debt_transactions').select('*').gte('created_at', fromISO).lte('created_at', toISO).order('created_at', { ascending: true })
+      const { data: cashMoves } = await supabase.from('cash_movements').select('*').gte('created_at', fromISO).lte('created_at', toISO).order('created_at', { ascending: true })
+      const debtorNameById: Record<string, string> = {}
+      debtors.forEach((d: any) => { debtorNameById[d.id] = d.name })
+
+      const methodLabel = (m: string) => m === 'cash' ? 'Nakit' : m === 'card' ? 'Kart' : m === 'transfer' ? 'Havale' : m === 'debt' ? 'Borç' : 'Karma'
+
+      const salesSheet = (tabs || []).map((t: any) => {
+        const items = (ordersByTab[t.id] || []).flatMap((o: any) => o.items || [])
+        return {
+          'Fiş No': t.fatura_no ? String(t.fatura_no).padStart(6, '0') : '',
+          'Tarih': new Date(t.closed_at).toLocaleDateString('tr-TR'),
+          'Saat': new Date(t.closed_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+          'Masa': t.table_name,
+          'Ürünler': items.map((it: any) => `${it.quantity}x ${it.name}`).join(', '),
+          'Ara Toplam': Number(t.total) + Number(t.discount_amount || 0),
+          'İndirim': Number(t.discount_amount || 0),
+          'Toplam': Number(t.total),
+          'Nakit': Number(t.cash_amount || 0),
+          'Kart': Number(t.card_amount || 0),
+          'Havale': Number(t.transfer_amount || 0),
+          'Borç': Number(t.debt_amount || 0),
+          'Ödeme Yöntemi': methodLabel(t.payment_method),
+          'Kapatan': t.closed_by || '',
+        }
+      })
+
+      const discountSheet = (discounts || []).map((d: any) => ({
+        'Tarih': new Date(d.created_at).toLocaleString('tr-TR'),
+        'Masa': d.table_name,
+        'Orijinal Tutar': Number(d.original_amount || 0),
+        'İndirim Tutarı': Number(d.discount_amount || 0),
+        'Neden': d.reason || '',
+        'Uygulayan': d.applied_by || '',
+      }))
+
+      const voidSheet = (voids || []).map((v: any) => ({
+        'Tarih': new Date(v.created_at).toLocaleString('tr-TR'),
+        'Masa': v.table_name,
+        'Ürün': v.item_name || 'Tüm Sipariş',
+        'Adet': v.quantity || '',
+        'Tutar': Number(v.amount || 0),
+        'Neden': v.reason || '',
+        'İptal Eden': v.voided_by || '',
+      }))
+
+      const debtSheet = (debtTx || []).map((d: any) => ({
+        'Tarih': new Date(d.created_at).toLocaleString('tr-TR'),
+        'Borçlu': debtorNameById[d.debtor_id] || 'Bilinmiyor',
+        'Tür': d.type === 'borç' ? 'Borç Verildi' : 'Ödeme Alındı',
+        'Tutar': Number(d.amount || 0),
+        'Fiş No': d.fatura_no ? String(d.fatura_no).padStart(6, '0') : '',
+        'Not': d.note || '',
+        'İşlemi Yapan': d.created_by || '',
+      }))
+
+      const cashMoveSheet = (cashMoves || []).map((m: any) => ({
+        'Tarih': new Date(m.created_at).toLocaleString('tr-TR'),
+        'Tür': m.type === 'in' ? 'Kasaya Giriş' : 'Kasadan Çıkış',
+        'Tutar': Number(m.amount || 0),
+        'Açıklama': m.reason || '',
+        'İşlemi Yapan': m.created_by || '',
+      }))
+
+      const totalCash = salesSheet.reduce((s, r) => s + r['Nakit'], 0)
+      const totalCard = salesSheet.reduce((s, r) => s + r['Kart'], 0)
+      const totalTransfer = salesSheet.reduce((s, r) => s + r['Havale'], 0)
+      const totalDebtFromSales = salesSheet.reduce((s, r) => s + r['Borç'], 0)
+      const totalDiscount = discountSheet.reduce((s, r) => s + r['İndirim Tutarı'], 0)
+      const totalVoid = voidSheet.reduce((s, r) => s + r['Tutar'], 0)
+      const totalDebtGiven = debtSheet.filter(r => r['Tür'] === 'Borç Verildi').reduce((s, r) => s + r['Tutar'], 0)
+      const totalDebtPaid = debtSheet.filter(r => r['Tür'] === 'Ödeme Alındı').reduce((s, r) => s + r['Tutar'], 0)
+      const totalCashIn = cashMoveSheet.filter(r => r['Tür'] === 'Kasaya Giriş').reduce((s, r) => s + r['Tutar'], 0)
+      const totalCashOut = cashMoveSheet.filter(r => r['Tür'] === 'Kasadan Çıkış').reduce((s, r) => s + r['Tutar'], 0)
+
+      const summarySheet = [
+        { 'Kalem': 'Tarih Aralığı', 'Değer': `${receiptFrom} - ${receiptTo}` },
+        { 'Kalem': 'Toplam Kapanan Masa', 'Değer': salesSheet.length },
+        { 'Kalem': 'Toplam Ciro (Tahsil Edilen: Nakit+Kart+Havale)', 'Değer': totalCash + totalCard + totalTransfer },
+        { 'Kalem': 'Nakit', 'Değer': totalCash },
+        { 'Kalem': 'Kart', 'Değer': totalCard },
+        { 'Kalem': 'Havale', 'Değer': totalTransfer },
+        { 'Kalem': 'Satışlardan Doğan Borç', 'Değer': totalDebtFromSales },
+        { 'Kalem': 'Toplam İndirim', 'Değer': totalDiscount },
+        { 'Kalem': 'Toplam İptal (₺ Değer)', 'Değer': totalVoid },
+        { 'Kalem': 'Yeni Borç Verilen (Tüm Borçlular)', 'Değer': totalDebtGiven },
+        { 'Kalem': 'Tahsil Edilen Borç', 'Değer': totalDebtPaid },
+        { 'Kalem': 'Kasaya Manuel Giriş', 'Değer': totalCashIn },
+        { 'Kalem': 'Kasadan Manuel Çıkış', 'Değer': totalCashOut },
+      ]
+
+      const XLSX = await import('xlsx')
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summarySheet), 'Özet')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesSheet), 'Satışlar')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discountSheet), 'İndirimler')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(voidSheet), 'İptaller')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(debtSheet), 'Borç Hareketleri')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cashMoveSheet), 'Kasa Hareketleri')
+      XLSX.writeFile(wb, `Kahfe_Lounge_Muhasebe_${receiptFrom}_${receiptTo}.xlsx`)
+    } catch (e: any) {
+      alert('✗ Excel oluşturulamadı.\n\n' + (e?.message || String(e)))
+    } finally {
+      setExportingAccounting(false)
+    }
+  }
+
   async function computeClosedTabsSummary(fromISO: string, toISO: string) {
     const { data: closedTabs } = await supabase.from('tabs').select('*')
       .eq('status', 'closed').gte('closed_at', fromISO).lte('closed_at', toISO)
@@ -3134,13 +3264,16 @@ export default function AdminPage() {
                   <input type="date" value={receiptTo} onChange={e => setReceiptTo(e.target.value)} style={{ ...s.input, height: 44, width: '100%' }} />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <input value={receiptQuery} onChange={e => setReceiptQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchReceipts()}
                   placeholder="Masa adı (örn. MASA-3) veya fiş numarası" style={{ ...s.input, flex: 1, height: 48 }} />
                 <button onClick={searchReceipts} style={{ height: 48, padding: '0 20px', background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                   {receiptSearching ? '...' : '🔍 Ara'}
                 </button>
               </div>
+              <button onClick={exportAccountingExcel} disabled={exportingAccounting} style={{ width: '100%', height: 46, background: 'transparent', border: '1px solid #27ae60', color: '#5FD08C', fontWeight: 700, fontSize: 13, cursor: exportingAccounting ? 'not-allowed' : 'pointer', opacity: exportingAccounting ? 0.6 : 1 }}>
+                {exportingAccounting ? 'Hazırlanıyor...' : '📊 Muhasebe İçin Excel İndir (Bu Tarih Aralığı)'}
+              </button>
             </div>
 
             {receiptResults.length === 0 && !receiptSearching && (
