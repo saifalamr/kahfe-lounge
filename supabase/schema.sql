@@ -25,6 +25,10 @@ create table if not exists public.reset_markers (
   key text primary key, reset_at timestamptz not null, updated_at timestamptz not null default now()
 );
 alter table public.reset_markers enable row level security;
+-- Only ONE set of policies should ever exist here — an old manually-created
+-- "Allow public *" set duplicated these once and was cleaned up; if you
+-- ever see both sets again (check pg_policies), drop the "Allow public *"
+-- ones, not these.
 drop policy if exists "reset public read" on public.reset_markers;
 create policy "reset public read" on public.reset_markers for select using (true);
 drop policy if exists "reset public insert" on public.reset_markers;
@@ -67,8 +71,15 @@ begin
   return new;
 end; $$;
 drop trigger if exists trg_assign_fatura_no on public.tabs;
-create trigger trg_assign_fatura_no before update on public.tabs
+create trigger trg_assign_fatura_no before insert or update on public.tabs
 for each row execute function assign_fatura_no();
+
+-- Defensive backfill, safe to run every time: a live audit found 20 closed
+-- tabs with no fatura_no at all (root cause not fully pinned down, possibly
+-- a rare update path that bypassed the trigger before it covered INSERT
+-- too) — this catches any tab that's closed but missing one, whenever it
+-- runs. A no-op once everything is already assigned.
+update tabs set fatura_no = nextval('fatura_seq') where status = 'closed' and fatura_no is null;
 
 -- Atomic tab creation/transfer/merge (race-condition safe)
 create or replace function get_or_create_open_tab(p_table_name text)
@@ -482,6 +493,16 @@ create index if not exists idx_tabs_status on public.tabs(status);
 create index if not exists idx_tabs_closed_at on public.tabs(closed_at);
 create index if not exists idx_tabs_table_name on public.tabs(table_name);
 create index if not exists idx_debt_tx_debtor_id on public.debt_transactions(debtor_id);
+-- Added after a live database audit found these foreign keys had no
+-- covering index, which matters for Fiş Geçmişi, Ürün Raporu, İndirim &
+-- İptal Raporu, and the customer menu's item-options picker, all of which
+-- join through these columns
+create index if not exists idx_debt_transactions_tab_id on public.debt_transactions(tab_id);
+create index if not exists idx_discounts_tab_id on public.discounts(tab_id);
+create index if not exists idx_item_option_choices_group_id on public.item_option_choices(group_id);
+create index if not exists idx_item_option_groups_menu_item_id on public.item_option_groups(menu_item_id);
+create index if not exists idx_menu_items_category_id on public.menu_items(category_id);
+create index if not exists idx_voids_order_id on public.voids(order_id);
 
 -- =============================================================================
 -- END — if this whole file ran without errors, the database is fully caught up.
