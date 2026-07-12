@@ -410,6 +410,15 @@ grant execute on function login_with_pin(text) to anon, authenticated;
 -- update_access_pin requires proof of a valid, non-expired manager session —
 -- closes the hole where anyone with the anon key could call it directly and
 -- set their own manager PIN without ever logging in.
+--
+-- IMPORTANT: an old 2-argument version (p_role, p_new_pin — no session
+-- token) was created before session tokens existed, and simply adding the
+-- new 3-argument version alongside it (via create-or-replace) never removed
+-- it, since Postgres treats different argument lists as different
+-- overloaded functions. That old signature had ZERO auth check and was
+-- still directly callable, completely bypassing the fix below, until this
+-- explicit drop.
+drop function if exists update_access_pin(text, text);
 create or replace function update_access_pin(p_session_token uuid, p_role text, p_new_pin text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
