@@ -332,7 +332,7 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const counted = parseFloat(countedCash)
-  const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
+  const diff = isNaN(counted) ? null : (counted - dayCloseData.expectedCash)
   const rows = dayCloseData.tabs.map((t: any, i: number) => `
     <tr><td>${i + 1}</td><td>${t.table_name}</td><td>${new Date(t.closed_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</td><td>${t.payment_method === 'cash' ? 'Nakit' : t.payment_method === 'card' ? 'Kart' : t.payment_method === 'transfer' ? 'Havale' : t.payment_method === 'debt' ? 'Borç' : 'Karma'}</td><td>${t.closed_by || '—'}</td><td style="text-align:right">${formatTL(Number(t.total))} ₺</td></tr>
   `).join('')
@@ -363,7 +363,8 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
       <div class="stats">
         <div class="stat"><div class="num">${dayCloseData.tabCount}</div><div class="label">Kapanan Masa</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.totalRevenue)} ₺</div><div class="label">Toplam Ciro</div></div>
-        <div class="stat"><div class="num">${formatTL(dayCloseData.cashTotal)} ₺</div><div class="label">Nakit</div></div>
+        <div class="stat"><div class="num">${formatTL(dayCloseData.cashTotal)} ₺</div><div class="label">Nakit (Satış)</div></div>
+        <div class="stat"><div class="num" style="color:#C9A84C">${formatTL(dayCloseData.expectedCash)} ₺</div><div class="label">Beklenen Kasa</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.cardTotal)} ₺</div><div class="label">Kart</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.transferTotal || 0)} ₺</div><div class="label">Havale</div></div>
         <div class="stat"><div class="num">${formatTL(dayCloseData.debtTotal || 0)} ₺</div><div class="label">Borç</div></div>

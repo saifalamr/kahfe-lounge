@@ -1204,7 +1204,20 @@ export default function AdminPage() {
     const debtTotal = tabs.reduce((s: number, t: any) => s + Number(t.debt_amount || 0), 0)
     const discountTotal = tabs.reduce((s: number, t: any) => s + Number(t.discount_amount || 0), 0)
     const totalRevenue = cashTotal + cardTotal + transferTotal
-    return { tabs, cashTotal, cardTotal, transferTotal, debtTotal, discountTotal, totalRevenue, tabCount: tabs.length }
+
+    // Manual cash movements (Kasa Hareketi) — cash going in/out of the
+    // drawer for reasons other than a sale (buying supplies, starting
+    // float, owner withdrawal, etc). Without these, counted cash vs sales
+    // cash looks like a "discrepancy" when it's really just an untracked
+    // legitimate movement.
+    const { data: movements } = await supabase.from('cash_movements').select('*')
+      .gte('created_at', fromISO).lte('created_at', toISO)
+    const moves = movements || []
+    const cashInTotal = moves.filter((m: any) => m.type === 'in').reduce((s: number, m: any) => s + Number(m.amount), 0)
+    const cashOutTotal = moves.filter((m: any) => m.type === 'out').reduce((s: number, m: any) => s + Number(m.amount), 0)
+    const expectedCash = cashTotal + cashInTotal - cashOutTotal
+
+    return { tabs, cashTotal, cardTotal, transferTotal, debtTotal, discountTotal, totalRevenue, tabCount: tabs.length, cashInTotal, cashOutTotal, expectedCash, movements: moves }
   }
 
   async function openDayClose() {
@@ -1224,6 +1237,41 @@ export default function AdminPage() {
   const [showShiftClose, setShowShiftClose] = useState(false)
   const [shiftCloseData, setShiftCloseData] = useState<any>(null)
   const [shiftCountedCash, setShiftCountedCash] = useState('')
+
+  // Kasa Hareketi — manual cash in/out unrelated to sales (buying supplies,
+  // starting float, owner withdrawal, etc). Feeds into the expectedCash
+  // calculation above so Gün Sonü/Vardiya differences reflect reality
+  // instead of flagging legitimate movements as discrepancies.
+  const [showCashMovement, setShowCashMovement] = useState(false)
+  const [cashMoveType, setCashMoveType] = useState<'in'|'out'>('out')
+  const [cashMoveAmount, setCashMoveAmount] = useState('')
+  const [cashMoveReason, setCashMoveReason] = useState('')
+  const [recentCashMovements, setRecentCashMovements] = useState<any[]>([])
+
+  async function loadRecentCashMovements() {
+    const todayStart = new Date().toISOString().split('T')[0]
+    const { data } = await supabase.from('cash_movements').select('*').gte('created_at', todayStart).order('created_at', { ascending: false }).limit(20)
+    setRecentCashMovements(data || [])
+  }
+
+  function openCashMovement() {
+    setCashMoveType('out')
+    setCashMoveAmount('')
+    setCashMoveReason('')
+    loadRecentCashMovements()
+    setShowCashMovement(true)
+  }
+
+  async function saveCashMovement() {
+    const amount = parseFloat(cashMoveAmount)
+    if (isNaN(amount) || amount <= 0) { alert('Lütfen geçerli bir tutar girin.'); return }
+    if (!cashMoveReason.trim()) { alert('Lütfen bir açıklama girin (örn. Süt alımı).'); return }
+    const { error } = await supabase.from('cash_movements').insert({ type: cashMoveType, amount, reason: cashMoveReason.trim(), created_by: staffName })
+    if (error) { alert('✗ Kaydedilemedi.\n\n' + error.message + '\n\ncash_movements tablosunun Supabase\'de oluşturulduğundan emin olun.'); return }
+    setCashMoveAmount('')
+    setCashMoveReason('')
+    await loadRecentCashMovements()
+  }
 
   async function loadActiveShift() {
     const { data } = await supabase.from('shifts').select('*').is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle()
@@ -1248,7 +1296,7 @@ export default function AdminPage() {
   async function saveShiftClose() {
     if (!shiftCloseData || !activeShift) return
     const counted = parseFloat(shiftCountedCash)
-    const diff = isNaN(counted) ? null : (counted - shiftCloseData.cashTotal)
+    const diff = isNaN(counted) ? null : (counted - shiftCloseData.expectedCash)
     const { error } = await supabase.from('shifts').update({
       ended_at: new Date().toISOString(),
       counted_cash: isNaN(counted) ? null : counted,
@@ -1257,6 +1305,8 @@ export default function AdminPage() {
       card_total: shiftCloseData.cardTotal,
       transfer_total: shiftCloseData.transferTotal,
       debt_total: shiftCloseData.debtTotal,
+      cash_in_total: shiftCloseData.cashInTotal,
+      cash_out_total: shiftCloseData.cashOutTotal,
       total_revenue: shiftCloseData.totalRevenue,
       tab_count: shiftCloseData.tabCount,
     }).eq('id', activeShift.id)
@@ -1267,13 +1317,13 @@ export default function AdminPage() {
     const hrs = Math.floor(durationMin / 60), mins = durationMin % 60
     setShowShiftClose(false)
     setActiveShift(null)
-    alert(`✓ Vardiya kapatıldı.\n\nPersonel: ${closedStaffName}\nSüre: ${hrs}s ${mins}dk\nCiro: ${formatTL(shiftCloseData.totalRevenue)} ₺\nNakit: ${formatTL(shiftCloseData.cashTotal)} ₺\nKart: ${formatTL(shiftCloseData.cardTotal)} ₺\nHavale: ${formatTL(shiftCloseData.transferTotal)} ₺\nBorç: ${formatTL(shiftCloseData.debtTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
+    alert(`✓ Vardiya kapatıldı.\n\nPersonel: ${closedStaffName}\nSüre: ${hrs}s ${mins}dk\nCiro: ${formatTL(shiftCloseData.totalRevenue)} ₺\nNakit (Satış): ${formatTL(shiftCloseData.cashTotal)} ₺\nKart: ${formatTL(shiftCloseData.cardTotal)} ₺\nHavale: ${formatTL(shiftCloseData.transferTotal)} ₺\nBorç: ${formatTL(shiftCloseData.debtTotal)} ₺\nBeklenen Kasa: ${formatTL(shiftCloseData.expectedCash)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
   }
 
   async function saveDayClose() {
     if (!dayCloseData) return
     const counted = parseFloat(countedCash)
-    const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
+    const diff = isNaN(counted) ? null : (counted - dayCloseData.expectedCash)
     const { error } = await supabase.from('day_close_reports').insert({
       report_date: new Date().toISOString().split('T')[0],
       total_revenue: dayCloseData.totalRevenue,
@@ -1281,6 +1331,8 @@ export default function AdminPage() {
       card_total: dayCloseData.cardTotal,
       transfer_total: dayCloseData.transferTotal,
       debt_total: dayCloseData.debtTotal,
+      cash_in_total: dayCloseData.cashInTotal,
+      cash_out_total: dayCloseData.cashOutTotal,
       tab_count: dayCloseData.tabCount,
       counted_cash: isNaN(counted) ? null : counted,
       cash_difference: diff,
@@ -1291,7 +1343,7 @@ export default function AdminPage() {
       return
     }
     setShowDayClose(false)
-    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit: ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺\nHavale: ${formatTL(dayCloseData.transferTotal)} ₺\nBorç: ${formatTL(dayCloseData.debtTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
+    alert(`✓ Gün sonu kaydedildi.\n\nToplam Ciro: ${formatTL(dayCloseData.totalRevenue)} ₺\nNakit (Satış): ${formatTL(dayCloseData.cashTotal)} ₺\nKart: ${formatTL(dayCloseData.cardTotal)} ₺\nHavale: ${formatTL(dayCloseData.transferTotal)} ₺\nBorç: ${formatTL(dayCloseData.debtTotal)} ₺\nBeklenen Kasa: ${formatTL(dayCloseData.expectedCash)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
   }
 
 
@@ -1847,19 +1899,61 @@ export default function AdminPage() {
         {/* Shift (Vardiya) status bar — anyone can start/end their own shift */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px', background: activeShift ? 'rgba(39,174,96,.08)' : '#111111', borderBottom: '1px solid #2A2A2A' }}>
           {activeShift ? (
-            <>
-              <div style={{ color: '#8A8A8A', fontSize: 12 }}>
-                <span style={{ color: '#5FD08C', fontWeight: 700 }}>⏱ {activeShift.staff_name}</span> · {new Date(activeShift.started_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'den beri
-              </div>
-              <button onClick={openShiftClose} style={{ height: 34, padding: '0 14px', background: 'transparent', border: '1px solid #383838', color: '#e74c3c', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>⏹ Vardiyayı Bitir</button>
-            </>
+            <div style={{ color: '#8A8A8A', fontSize: 12 }}>
+              <span style={{ color: '#5FD08C', fontWeight: 700 }}>⏱ {activeShift.staff_name}</span> · {new Date(activeShift.started_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'den beri
+            </div>
           ) : (
-            <>
-              <div style={{ color: '#8A8A8A', fontSize: 12 }}>Aktif vardiya yok</div>
-              <button onClick={startShift} style={{ height: 34, padding: '0 14px', background: 'rgba(201,168,76,.14)', border: '1px solid #C9A84C', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>▶ Vardiyamı Başlat</button>
-            </>
+            <div style={{ color: '#8A8A8A', fontSize: 12 }}>Aktif vardiya yok</div>
           )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {!isLimitedStaff && (
+              <button onClick={openCashMovement} style={{ height: 34, padding: '0 14px', background: 'transparent', border: '1px solid #383838', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>💰 Kasa Hareketi</button>
+            )}
+            {activeShift ? (
+              <button onClick={openShiftClose} style={{ height: 34, padding: '0 14px', background: 'transparent', border: '1px solid #383838', color: '#e74c3c', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>⏹ Vardiyayı Bitir</button>
+            ) : (
+              <button onClick={startShift} style={{ height: 34, padding: '0 14px', background: 'rgba(201,168,76,.14)', border: '1px solid #C9A84C', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>▶ Vardiyamı Başlat</button>
+            )}
+          </div>
         </div>
+
+        {/* Kasa Hareketi (manual cash in/out) modal */}
+        {showCashMovement && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowCashMovement(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: '#141414', border: '1px solid rgba(201,168,76,.35)', borderBottom: 'none' }}>
+              <div style={{ padding: '18px 20px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>💰 Kasa Hareketi</div>
+                <button onClick={() => setShowCashMovement(false)} style={{ background: '#2A2A2A', border: 'none', width: 36, height: 36, color: '#8A8A8A', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              </div>
+              <div style={{ padding: 20, maxHeight: '75vh', overflowY: 'auto' }}>
+                <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Satış dışı nakit hareketlerini kaydedin (malzeme alımı, kasa açılış parası, vb.) — Gün Sonü ve Vardiya hesaplamalarında dikkate alınır.</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button onClick={() => setCashMoveType('out')} style={{ flex: 1, height: 44, background: cashMoveType === 'out' ? 'rgba(231,76,60,.14)' : 'transparent', border: cashMoveType === 'out' ? '1px solid #e74c3c' : '1px solid #383838', color: cashMoveType === 'out' ? '#e74c3c' : '#8A8A8A', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>➖ Kasadan Çıkış</button>
+                  <button onClick={() => setCashMoveType('in')} style={{ flex: 1, height: 44, background: cashMoveType === 'in' ? 'rgba(39,174,96,.14)' : 'transparent', border: cashMoveType === 'in' ? '1px solid #27ae60' : '1px solid #383838', color: cashMoveType === 'in' ? '#5FD08C' : '#8A8A8A', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>➕ Kasaya Giriş</button>
+                </div>
+                <input type="number" value={cashMoveAmount} onChange={e => setCashMoveAmount(e.target.value)} placeholder="Tutar (₺)"
+                  style={{ width: '100%', height: 50, background: '#0A0A0A', border: '1px solid #383838', color: '#F0EDE8', padding: '0 14px', fontSize: 16, marginBottom: 10, fontFamily: "'IBM Plex Mono', monospace" }} />
+                <input value={cashMoveReason} onChange={e => setCashMoveReason(e.target.value)} placeholder="Açıklama (örn. Süt alımı, kasa açılış parası)"
+                  style={{ width: '100%', height: 50, background: '#0A0A0A', border: '1px solid #383838', color: '#F0EDE8', padding: '0 14px', fontSize: 14, marginBottom: 16 }} />
+                <button onClick={saveCashMovement} style={{ width: '100%', height: 52, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 20 }}>✓ Kaydet</button>
+
+                <div style={{ color: '#8A8A8A', fontSize: 11, letterSpacing: '0.08em', marginBottom: 10, textTransform: 'uppercase' }}>Bugünkü Hareketler</div>
+                {recentCashMovements.length === 0 && (
+                  <div style={{ color: '#8A8A8A', fontSize: 13, textAlign: 'center', padding: 14 }}>Bugün henüz kasa hareketi yok.</div>
+                )}
+                {recentCashMovements.map((m: any) => (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #2A2A2A' }}>
+                    <div>
+                      <div style={{ color: '#F0EDE8', fontSize: 13 }}>{m.reason}</div>
+                      <div style={{ color: '#8A8A8A', fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>{m.created_by} · {new Date(m.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <div style={{ color: m.type === 'in' ? '#5FD08C' : '#e74c3c', fontWeight: 700, fontSize: 14, fontFamily: "'IBM Plex Mono', monospace" }}>{m.type === 'in' ? '+' : '-'}{formatTL(Number(m.amount))} ₺</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Shift close (Vardiya Sonu) modal */}
         {showShiftClose && shiftCloseData && (
@@ -1879,8 +1973,12 @@ export default function AdminPage() {
                     <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.totalRevenue)} ₺</div>
                   </div>
                   <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 14, textAlign: 'center' }}>
-                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>💵 NAKİT</div>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>💵 NAKİT (SATIŞ)</div>
                     <div style={{ color: '#F0EDE8', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.cashTotal)} ₺</div>
+                  </div>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid rgba(201,168,76,.35)', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>🗄️ BEKLENEN KASA</div>
+                    <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.expectedCash)} ₺</div>
                   </div>
                   <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 14, textAlign: 'center' }}>
                     <div style={{ color: '#8A8A8A', fontSize: 11 }}>💳 KART</div>
@@ -1899,7 +1997,7 @@ export default function AdminPage() {
                     <div style={{ color: '#F0EDE8', fontWeight: 800, fontSize: 18 }}>{shiftCloseData.tabCount}</div>
                   </div>
                 </div>
-                <label style={{ color: '#8A8A8A', fontSize: 12, display: 'block', marginBottom: 8 }}>Sayılan Nakit (kasada gerçekte olan) — opsiyonel</label>
+                <label style={{ color: '#8A8A8A', fontSize: 12, display: 'block', marginBottom: 8 }}>Sayılan Nakit (kasada gerçekte olan) — Beklenen Kasa ile karşılaştırılır, opsiyonel</label>
                 <input type="number" value={shiftCountedCash} onChange={e => setShiftCountedCash(e.target.value)} placeholder="Örn. 3200"
                   style={{ width: '100%', height: 50, background: '#0A0A0A', border: '1px solid #383838', color: '#F0EDE8', padding: '0 14px', fontSize: 16, marginBottom: 20, fontFamily: "'IBM Plex Mono', monospace" }} />
                 <button onClick={saveShiftClose} style={{ width: '100%', height: 54, background: '#e74c3c', border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>✓ Vardiyayı Kapat</button>

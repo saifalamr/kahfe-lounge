@@ -10,7 +10,7 @@ export default function DayCloseModal({ dayCloseData, countedCash, onCountedCash
   onClose: () => void
 }) {
   const counted = parseFloat(countedCash)
-  const diff = isNaN(counted) ? null : (counted - dayCloseData.cashTotal)
+  const diff = isNaN(counted) ? null : (counted - dayCloseData.expectedCash)
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={onClose}>
@@ -33,8 +33,12 @@ export default function DayCloseModal({ dayCloseData, countedCash, onCountedCash
               <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{formatTL(dayCloseData.totalRevenue)} ₺</div>
             </div>
             <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>💵 NAKİT</div>
+              <div style={{ color:'#8A8A8A', fontSize:11 }}>💵 NAKİT (SATIŞ)</div>
               <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cashTotal)} ₺</div>
+            </div>
+            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid rgba(201,168,76,.35)', borderRadius: 0, padding:14, textAlign:'center' }}>
+              <div style={{ color:'#8A8A8A', fontSize:11 }}>🗄️ BEKLENEN KASA</div>
+              <div style={{ color:'#C9A84C', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.expectedCash)} ₺</div>
             </div>
             <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:14, textAlign:'center' }}>
               <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
@@ -56,7 +60,7 @@ export default function DayCloseModal({ dayCloseData, countedCash, onCountedCash
             )}
           </div>
 
-          <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺)</label>
+          <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺) — Beklenen Kasa ile karşılaştırılır</label>
           <input type="number" value={countedCash} onChange={e => onCountedCashChange(e.target.value)} placeholder="Örn. 3450"
             style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 0, padding:'12px', color:'#F0EDE8', fontSize:16, marginBottom:10 }} />
 
