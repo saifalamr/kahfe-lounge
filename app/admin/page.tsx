@@ -177,7 +177,7 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts' | 'accountability'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
@@ -1194,6 +1194,41 @@ export default function AdminPage() {
     }, autoPrintEnabled)
   }
 
+  // İndirim & İptal Raporu — surfaces who's granting discounts and who's
+  // voiding/cancelling items, for loss prevention (catches both honest
+  // mistakes and actual patterns worth asking about). Data was already
+  // being recorded in discounts/voids for every operation - this just
+  // makes it visible instead of sitting unused in the database.
+  const [accFrom, setAccFrom] = useState(weekAgo)
+  const [accTo, setAccTo] = useState(today)
+  const [accDiscounts, setAccDiscounts] = useState<any[]>([])
+  const [accVoids, setAccVoids] = useState<any[]>([])
+  const [accSearching, setAccSearching] = useState(false)
+
+  async function searchAccountability() {
+    setAccSearching(true)
+    const fromISO = `${accFrom}T00:00:00`
+    const toISO = `${accTo}T23:59:59.999`
+    const [{ data: discounts }, { data: voids }] = await Promise.all([
+      supabase.from('discounts').select('*').gte('created_at', fromISO).lte('created_at', toISO).order('created_at', { ascending: false }),
+      supabase.from('voids').select('*').gte('created_at', fromISO).lte('created_at', toISO).order('created_at', { ascending: false }),
+    ])
+    setAccDiscounts(discounts || [])
+    setAccVoids(voids || [])
+    setAccSearching(false)
+  }
+
+  function groupByStaff(rows: any[], staffField: string, amountField: string) {
+    const map: Record<string, { count: number, total: number }> = {}
+    rows.forEach(r => {
+      const name = r[staffField] || 'Bilinmiyor'
+      if (!map[name]) map[name] = { count: 0, total: 0 }
+      map[name].count++
+      map[name].total += Number(r[amountField] || 0)
+    })
+    return Object.entries(map).sort((a, b) => b[1].total - a[1].total)
+  }
+
   async function computeClosedTabsSummary(fromISO: string, toISO: string) {
     const { data: closedTabs } = await supabase.from('tabs').select('*')
       .eq('status', 'closed').gte('closed_at', fromISO).lte('closed_at', toISO)
@@ -2009,10 +2044,10 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid #2A2A2A', overflowX: 'auto' }}>
-          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings', 'debts', 'receipts'] as const) : (['orders'] as const)).map(t => (
-            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter); if(t==='debts') loadDebtTransactions(); if(t==='receipts') searchReceipts() }}
+          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings', 'debts', 'receipts', 'accountability'] as const) : (['orders'] as const)).map(t => (
+            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter); if(t==='debts') loadDebtTransactions(); if(t==='receipts') searchReceipts(); if(t==='accountability') searchAccountability() }}
               style={{ flex: '1 0 auto', minWidth: 80, padding: '16px 8px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? '#F0EDE8' : '#8A8A8A', fontWeight: tab === t ? 600 : 500, fontSize: 13, cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap' }}>
-              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : t === 'receipts' ? 'Fiş Geçmişi' : 'Siparişler'}
+              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : t === 'receipts' ? 'Fiş Geçmişi' : t === 'accountability' ? 'İndirim/İptal' : 'Siparişler'}
               {t === 'orders' && notifications.length > 0 && (
                 <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
               )}
@@ -3126,6 +3161,94 @@ export default function AdminPage() {
             ))}
           </div>
         )}
+
+        {/* İNDİRİM & İPTAL RAPORU — loss prevention: who's discounting/voiding, how much, how often */}
+        {isManager && tab === 'accountability' && (() => {
+          const discountByStaff = groupByStaff(accDiscounts, 'applied_by', 'discount_amount')
+          const voidByStaff = groupByStaff(accVoids, 'voided_by', 'amount')
+          const totalDiscount = accDiscounts.reduce((s, d) => s + Number(d.discount_amount || 0), 0)
+          const totalVoid = accVoids.reduce((s, v) => s + Number(v.amount || 0), 0)
+          return (
+          <div className="kahfe-section" style={s.section}>
+            <div style={{ background: '#1A1A1A', borderRadius: 0, padding: 20, border: '1px solid #2A2A2A', marginBottom: 20 }}>
+              <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🏷️ İndirim & İptal Raporu</div>
+              <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 14 }}>Kim ne kadar indirim veriyor, kim ne kadar ürün/sipariş iptal ediyor — hem dürüst hatalar hem de dikkat edilmesi gereken örüntüler için.</div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: '#8A8A8A', fontSize: 11, display: 'block', marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace" }}>BAŞLANGIÇ</label>
+                  <input type="date" value={accFrom} onChange={e => setAccFrom(e.target.value)} style={{ ...s.input, height: 44, width: '100%' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: '#8A8A8A', fontSize: 11, display: 'block', marginBottom: 6, fontFamily: "'IBM Plex Mono', monospace" }}>BİTİŞ</label>
+                  <input type="date" value={accTo} onChange={e => setAccTo(e.target.value)} style={{ ...s.input, height: 44, width: '100%' }} />
+                </div>
+              </div>
+              <button onClick={searchAccountability} style={{ width: '100%', height: 48, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                {accSearching ? '...' : '🔍 Ara'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+              <div style={{ flex: 1, background: '#1A1A1A', border: '1px solid rgba(231,76,60,.25)', padding: 14, textAlign: 'center' }}>
+                <div style={{ color: '#8A8A8A', fontSize: 11 }}>TOPLAM İNDİRİM</div>
+                <div style={{ color: '#e74c3c', fontWeight: 800, fontSize: 20 }}>{formatTL(totalDiscount)} ₺</div>
+                <div style={{ color: '#8A8A8A', fontSize: 11, marginTop: 2 }}>{accDiscounts.length} işlem</div>
+              </div>
+              <div style={{ flex: 1, background: '#1A1A1A', border: '1px solid rgba(231,76,60,.25)', padding: 14, textAlign: 'center' }}>
+                <div style={{ color: '#8A8A8A', fontSize: 11 }}>TOPLAM İPTAL</div>
+                <div style={{ color: '#e74c3c', fontWeight: 800, fontSize: 20 }}>{formatTL(totalVoid)} ₺</div>
+                <div style={{ color: '#8A8A8A', fontSize: 11, marginTop: 2 }}>{accVoids.length} işlem</div>
+              </div>
+            </div>
+
+            <div style={{ color: '#C9A84C', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 10, textTransform: 'uppercase' }}>🏷️ Personel Bazında İndirim</div>
+            {discountByStaff.length === 0 && <div style={{ color: '#8A8A8A', fontSize: 13, textAlign: 'center', padding: 14 }}>Bu aralıkta indirim yok.</div>}
+            {discountByStaff.map(([name, stat]) => (
+              <div key={name} style={{ display: 'flex', justifyContent: 'space-between', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: '12px 16px', marginBottom: 8 }}>
+                <div style={{ color: '#F0EDE8', fontWeight: 600, fontSize: 14 }}>{name}</div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 15, fontFamily: "'IBM Plex Mono', monospace" }}>{formatTL(stat.total)} ₺</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 11 }}>{stat.count} işlem</div>
+                </div>
+              </div>
+            ))}
+
+            <div style={{ color: '#C9A84C', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', margin: '20px 0 10px', textTransform: 'uppercase' }}>🚫 Personel Bazında İptal</div>
+            {voidByStaff.length === 0 && <div style={{ color: '#8A8A8A', fontSize: 13, textAlign: 'center', padding: 14 }}>Bu aralıkta iptal yok.</div>}
+            {voidByStaff.map(([name, stat]) => (
+              <div key={name} style={{ display: 'flex', justifyContent: 'space-between', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: '12px 16px', marginBottom: 8 }}>
+                <div style={{ color: '#F0EDE8', fontWeight: 600, fontSize: 14 }}>{name}</div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 15, fontFamily: "'IBM Plex Mono', monospace" }}>{formatTL(stat.total)} ₺</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 11 }}>{stat.count} işlem</div>
+                </div>
+              </div>
+            ))}
+
+            <div style={{ color: '#8A8A8A', fontSize: 11, letterSpacing: '0.08em', margin: '20px 0 10px', textTransform: 'uppercase' }}>Detaylı Kayıtlar — İndirimler</div>
+            {accDiscounts.map((d: any) => (
+              <div key={d.id} style={{ padding: '10px 0', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ color: '#F0EDE8', fontSize: 13 }}>{d.table_name} — {d.reason || 'Neden belirtilmemiş'}</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>{d.applied_by} · {new Date(d.created_at).toLocaleString('tr-TR')}</div>
+                </div>
+                <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", whiteSpace: 'nowrap' }}>-{formatTL(Number(d.discount_amount))} ₺</div>
+              </div>
+            ))}
+
+            <div style={{ color: '#8A8A8A', fontSize: 11, letterSpacing: '0.08em', margin: '20px 0 10px', textTransform: 'uppercase' }}>Detaylı Kayıtlar — İptaller</div>
+            {accVoids.map((v: any) => (
+              <div key={v.id} style={{ padding: '10px 0', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ color: '#F0EDE8', fontSize: 13 }}>{v.table_name} — {v.item_name ? `${v.quantity}x ${v.item_name}` : 'Tüm Sipariş'} · {v.reason || 'Neden belirtilmemiş'}</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }}>{v.voided_by} · {new Date(v.created_at).toLocaleString('tr-TR')}</div>
+                </div>
+                <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", whiteSpace: 'nowrap' }}>-{formatTL(Number(v.amount))} ₺</div>
+              </div>
+            ))}
+          </div>
+          )
+        })()}
 
         {/* Debtor detail modal */}
         {debtDetailId && (() => {
