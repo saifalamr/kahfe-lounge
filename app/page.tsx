@@ -597,8 +597,15 @@ export default function MenuPage() {
       }
     } catch (e) { /* fall back to the hardcoded list above if settings isn't reachable */ }
     const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    const itemLines = items.map(i => `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`).join('\n')
-    const noteSection = note.trim() ? `\n\n📝 <b>Not:</b> ${note.trim()}` : ''
+    // Items with a selected option (e.g. "Türk Kahvesi (Orta Şekerli)") get
+    // bold+italic so they stand out at a glance — easy to miss a sugar-level
+    // or similar note in a long order otherwise. Plain items stay plain.
+    const hasOption = (name: string) => /\s\([^)]+\)\s*$/.test(name)
+    const itemLines = items.map(i => {
+      const line = `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`
+      return hasOption(i.name) ? `<b><i>${line}</i></b>` : line
+    }).join('\n')
+    const noteSection = note.trim() ? `\n\n📝 <b><i>Not: ${note.trim()}</i></b>` : ''
     const message = `🔔 <b>YENİ SİPARİŞ #${orderNum}!</b>\n\n🪑 <b>Masa:</b> ${mesa}\n🕐 <b>Saat:</b> ${now}\n\n${itemLines}${noteSection}\n\n💰 <b>TOPLAM: ${total} ₺</b>`
     try {
       await Promise.all(CHAT_IDS.map(chat_id =>
