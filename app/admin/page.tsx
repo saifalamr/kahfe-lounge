@@ -38,8 +38,14 @@ export default function AdminPage() {
 
   const [auth, setAuth] = useState(false)
   const [role, setRole] = useState<'manager' | 'staff' | 'touchscreen' | null>(null)
+  const [staffPermission, setStaffPermission] = useState<'full' | 'limited'>('full')
   const isManager = role === 'manager'
   const canPrint = role === 'touchscreen'
+  // A 'Kısıtlı' staff member can only add orders and take payment — no
+  // voids, no order cancellation, no discounts, no debt (Borç), no table
+  // transfer/merge. Doesn't apply to manager or touchscreen, only to
+  // individual staff PINs marked limited in Personel.
+  const isLimitedStaff = role === 'staff' && staffPermission === 'limited'
   const [staffName, setStaffName] = useState<string>('')
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotif, setShowNotif] = useState(false)
@@ -1310,6 +1316,7 @@ export default function AdminPage() {
   const [staffList, setStaffList] = useState<any[]>([])
   const [staffFormName, setStaffFormName] = useState('')
   const [staffFormPin, setStaffFormPin] = useState('')
+  const [staffFormPermission, setStaffFormPermission] = useState<'full'|'limited'>('full')
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
@@ -1409,10 +1416,11 @@ export default function AdminPage() {
     localStorage.removeItem('kahfe_admin_role')
     localStorage.removeItem('kahfe_admin')
     localStorage.removeItem('kahfe_staff_name')
+    localStorage.removeItem('kahfe_staff_permission')
     localStorage.removeItem('kahfe_session_started_at')
     localStorage.removeItem('kahfe_session_epoch')
     localStorage.removeItem('kahfe_session_token')
-    setAuth(false); setRole(null); setStaffName('')
+    setAuth(false); setRole(null); setStaffName(''); setStaffPermission('full')
   }
 
   async function getCurrentSessionEpoch(): Promise<string> {
@@ -1432,6 +1440,7 @@ export default function AdminPage() {
     (async () => {
       const savedRole = localStorage.getItem('kahfe_admin_role')
       const savedName = localStorage.getItem('kahfe_staff_name')
+      const savedPermission = localStorage.getItem('kahfe_staff_permission')
       const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
       const savedEpoch = localStorage.getItem('kahfe_session_epoch')
       if (!(savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen')) return
@@ -1441,6 +1450,7 @@ export default function AdminPage() {
       setRole(savedRole)
       setAuth(true)
       setStaffName(savedName || (savedRole === 'manager' ? 'Yönetici' : savedRole === 'touchscreen' ? 'Dokunmatik Ekran' : 'Personel'))
+      setStaffPermission(savedPermission === 'limited' ? 'limited' : 'full')
     })()
   }, [])
 
@@ -1565,12 +1575,14 @@ export default function AdminPage() {
     setEditingStaffId(s.id)
     setStaffFormName(s.name)
     setStaffFormPin(s.pin)
+    setStaffFormPermission(s.permission === 'limited' ? 'limited' : 'full')
   }
 
   function resetStaffForm() {
     setEditingStaffId(null)
     setStaffFormName('')
     setStaffFormPin('')
+    setStaffFormPermission('full')
   }
 
   async function saveStaff() {
@@ -1590,7 +1602,7 @@ export default function AdminPage() {
       alert(`Bu PIN zaten ${dup.name} adlı personelde kullanılıyor. Başka bir PIN seçin.`)
       return
     }
-    const { error } = await supabase.rpc('upsert_staff', { p_id: editingStaffId, p_name: name, p_pin: pin })
+    const { error } = await supabase.rpc('upsert_staff', { p_id: editingStaffId, p_name: name, p_pin: pin, p_permission: staffFormPermission })
     if (error) { alert('✗ Kaydedilemedi.\n\n' + error.message); return }
     resetStaffForm()
     await loadData()
@@ -1612,17 +1624,20 @@ export default function AdminPage() {
     // touchscreen/staff-shared PIN) and, only on success, mints a session
     // token — nobody can obtain a token without passing a real PIN check
     // inside this same database call.
-    const { data } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null }
+    const { data } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null } | null }
     if (!data) { setPwError(true); return }
     const normalizedRole: 'manager' | 'staff' | 'touchscreen' = data.role === 'manager' ? 'manager' : data.role === 'touchscreen' ? 'touchscreen' : 'staff'
+    const permission: 'full' | 'limited' = data.permission === 'limited' ? 'limited' : 'full'
     localStorage.setItem('kahfe_admin_role', normalizedRole)
     localStorage.setItem('kahfe_staff_name', data.staff_name)
+    localStorage.setItem('kahfe_staff_permission', permission)
     localStorage.setItem('kahfe_session_started_at', String(Date.now()))
     localStorage.setItem('kahfe_session_token', data.token)
     const epoch = await getCurrentSessionEpoch()
     localStorage.setItem('kahfe_session_epoch', epoch)
     setRole(normalizedRole)
     setStaffName(data.staff_name)
+    setStaffPermission(permission)
     setAuth(true)
   }
 
@@ -1967,7 +1982,7 @@ export default function AdminPage() {
                                 <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
                                 <span style={{ display:'flex', alignItems:'center', gap:8 }}>
                                   <span style={{ color:'#B5B0A8', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
-                                  <button onClick={() => openVoid(order, i)} title="Ürünü iptal et" style={{ background:'transparent', border:'1px solid #383838', color:'#8A8A8A', width:26, height:26, cursor:'pointer', fontSize:12, lineHeight:1 }}>✕</button>
+                                  {!isLimitedStaff && <button onClick={() => openVoid(order, i)} title="Ürünü iptal et" style={{ background:'transparent', border:'1px solid #383838', color:'#8A8A8A', width:26, height:26, cursor:'pointer', fontSize:12, lineHeight:1 }}>✕</button>}
                                 </span>
                               </div>
                             ))}
@@ -1977,7 +1992,7 @@ export default function AdminPage() {
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
                               <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
                               <div style={{ display:'flex', gap:6 }}>
-                                {order.status === 'pending' && <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et" style={{ background:'transparent', border:'1px solid #383838', color:'#e74c3c', height:40, padding:'0 10px', cursor:'pointer', fontSize:16 }}>🚫</button>}
+                                {!isLimitedStaff && order.status === 'pending' && <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et" style={{ background:'transparent', border:'1px solid #383838', color:'#e74c3c', height:40, padding:'0 10px', cursor:'pointer', fontSize:16 }}>🚫</button>}
                                 {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline} style={{ background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, height:40, padding:'0 16px', color: isOnline ? '#fff' : '#666', fontSize:13, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴'}</button>}
                               </div>
                             </div>
@@ -2013,7 +2028,7 @@ export default function AdminPage() {
                           ) : (
                             <button onClick={() => cancelBillRequest(info.tabData.id)} title="Hesap isteğini iptal et" style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✕ Hesap İsteğini İptal Et</button>
                           )}
-                          <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#B5B0A8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>
+                          {!isLimitedStaff && <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#B5B0A8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>}
                           {activeOrders.length > 0 && (
                             <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 0, color:'#0A0A0A', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
                           )}
@@ -2196,28 +2211,30 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    {/* Discount */}
-                    <div style={{ marginBottom:16 }}>
-                      <div style={{ display:'flex', gap:8, marginBottom: discountType !== 'none' ? 10 : 0 }}>
-                        {(['none','percent','amount'] as const).map(d => (
-                          <button key={d} onClick={() => { setDiscountType(d); if (d === 'none') setDiscountValue('') }}
-                            style={{ flex:1, height:40, background: discountType===d ? 'rgba(201,168,76,.14)' : 'transparent', border: discountType===d ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: discountType===d ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                            {d==='none' ? 'İndirim Yok' : d==='percent' ? '% İndirim' : '₺ İndirim'}
-                          </button>
-                        ))}
-                      </div>
-                      {discountType !== 'none' && (
-                        <div style={{ display:'flex', gap:8 }}>
-                          <input type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)} placeholder={discountType==='percent' ? 'Örn. 10' : 'Örn. 50'}
-                            style={{ width:90, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }} />
-                          <input value={discountReason} onChange={e => setDiscountReason(e.target.value)} placeholder="İndirim nedeni (zorunlu)"
-                            style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                    {/* Discount — not available to limited staff */}
+                    {!isLimitedStaff && (
+                      <div style={{ marginBottom:16 }}>
+                        <div style={{ display:'flex', gap:8, marginBottom: discountType !== 'none' ? 10 : 0 }}>
+                          {(['none','percent','amount'] as const).map(d => (
+                            <button key={d} onClick={() => { setDiscountType(d); if (d === 'none') setDiscountValue('') }}
+                              style={{ flex:1, height:40, background: discountType===d ? 'rgba(201,168,76,.14)' : 'transparent', border: discountType===d ? '1px solid #C9A84C' : '1px solid #2A2A2A', color: discountType===d ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                              {d==='none' ? 'İndirim Yok' : d==='percent' ? '% İndirim' : '₺ İndirim'}
+                            </button>
+                          ))}
                         </div>
-                      )}
-                    </div>
+                        {discountType !== 'none' && (
+                          <div style={{ display:'flex', gap:8 }}>
+                            <input type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)} placeholder={discountType==='percent' ? 'Örn. 10' : 'Örn. 50'}
+                              style={{ width:90, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }} />
+                            <input value={discountReason} onChange={e => setDiscountReason(e.target.value)} placeholder="İndirim nedeni (zorunlu)"
+                              style={{ flex:1, height:48, background:'#0A0A0A', border:'1px solid #383838', color:'#F0EDE8', padding:'0 12px', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif" }} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, marginBottom:16 }}>
-                      {(['cash','card','transfer','mixed','debt'] as const).map(m => (
+                      {(isLimitedStaff ? (['cash','card','transfer','mixed'] as const) : (['cash','card','transfer','mixed','debt'] as const)).map(m => (
                         <button key={m} onClick={() => setPaymentMethod(m)}
                           style={{ height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid #2A2A2A', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : '#B5B0A8', fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
                           <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : m==='transfer' ? '🏦' : m==='mixed' ? '🔀' : '🧾'}</span>
@@ -2513,8 +2530,10 @@ export default function AdminPage() {
                   </div>
                   {order.status === 'pending' && (
                     <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                      <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et"
-                        style={{ width:56, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#e74c3c', fontSize:18, cursor:'pointer' }}>🚫</button>
+                      {!isLimitedStaff && (
+                        <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et"
+                          style={{ width:56, background:'transparent', border:'1px solid #383838', borderRadius: 0, color:'#e74c3c', fontSize:18, cursor:'pointer' }}>🚫</button>
+                      )}
                       <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
                         style={{ flex:1, background: isOnline ? '#27ae60' : '#2A2A2A', border:'none', borderRadius: 0, padding:0, height:48, color: isOnline ? '#fff' : '#666', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
                     </div>
@@ -2760,6 +2779,17 @@ export default function AdminPage() {
               <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
               <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
               <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="4-6 haneli PIN (örn. 4821)" inputMode="numeric" style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.15em', marginBottom: 10 }} />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <button onClick={() => setStaffFormPermission('full')}
+                  style={{ flex: 1, height: 48, background: staffFormPermission === 'full' ? 'rgba(39,174,96,.14)' : 'transparent', border: staffFormPermission === 'full' ? '1px solid #27ae60' : '1px solid #383838', color: staffFormPermission === 'full' ? '#5FD08C' : '#8A8A8A', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                  Tam Yetkili
+                </button>
+                <button onClick={() => setStaffFormPermission('limited')}
+                  style={{ flex: 1, height: 48, background: staffFormPermission === 'limited' ? 'rgba(243,156,18,.14)' : 'transparent', border: staffFormPermission === 'limited' ? '1px solid #f39c12' : '1px solid #383838', color: staffFormPermission === 'limited' ? '#f39c12' : '#8A8A8A', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                  Kısıtlı (Sadece Sipariş + Ödeme)
+                </button>
+              </div>
+              <div style={{ color: '#8A8A8A', fontSize: 11.5, marginBottom: 10 }}>Kısıtlı personel sadece sipariş ekleyebilir ve ödeme alabilir — ürün iptali, sipariş iptali, indirim, borç ve masa taşıma yapamaz.</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={saveStaff} style={{ flex: 1, height: 52, background: '#C9A84C', border: 'none', borderRadius: 0, color: '#0A0A0A', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>{editingStaffId ? '✓ Kaydet' : '+ Ekle'}</button>
                 {editingStaffId && (
@@ -2776,7 +2806,7 @@ export default function AdminPage() {
               <div key={s.id} style={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: 0, padding: '16px 18px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
                 <div>
                   <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{s.name}</div>
-                  <div style={{ color: '#8A8A8A', fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>PIN: {s.pin} {!s.active && '· Pasif'}</div>
+                  <div style={{ color: '#8A8A8A', fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>PIN: {s.pin} {!s.active && '· Pasif'} {s.permission === 'limited' && <span style={{ color: '#f39c12' }}>· Kısıtlı</span>}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => startEditStaff(s)} style={{ background: 'transparent', border: '1px solid #383838', borderRadius: 0, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
