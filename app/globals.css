@@ -10,6 +10,40 @@
   --gold-light: #E2C97E;
   --white: #F0EDE8;
   --gray: #888888;
+
+  /* Admin panel theme tokens — dark is the default/original look.
+     Accent/status colors (gold, green, red, orange, blue, purple) are
+     intentionally the same in both themes; only neutral surfaces and
+     text need to flip for light mode to be legible. */
+  --a-bg0: #0A0A0A;
+  --a-bg1: #1A1A1A;
+  --a-bg2: #141414;
+  --a-bg3: #111111;
+  --a-bg4: #0f0f0f;
+  --a-border: #2A2A2A;
+  --a-border2: #383838;
+  --a-text: #F0EDE8;
+  --a-text2: #8A8A8A;
+  --a-text3: #B5B0A8;
+  --a-text4: #6E6E6E;
+  --a-disabled: #666666;
+  --a-disabled2: #555555;
+}
+
+[data-theme="light"] {
+  --a-bg0: #F5F3EF;
+  --a-bg1: #FFFFFF;
+  --a-bg2: #FFFFFF;
+  --a-bg3: #FFFFFF;
+  --a-bg4: #EDEAE3;
+  --a-border: #E3DFD6;
+  --a-border2: #CFC9BC;
+  --a-text: #2B2620;
+  --a-text2: #6B6560;
+  --a-text3: #8D8778;
+  --a-text4: #9C9688;
+  --a-disabled: #B8B2A6;
+  --a-disabled2: #C4BEB2;
 }
 
 * {
