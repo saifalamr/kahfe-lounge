@@ -175,7 +175,7 @@ export default function AdminPage() {
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'map'|'list'>('map')
+  const [viewMode, setViewMode] = useState<'map'|'list'|'floor'>('map')
   const [openTabs, setOpenTabs] = useState<any[]>([])
   const [tabOrders, setTabOrders] = useState<any[]>([])
   const [activeTableModal, setActiveTableModal] = useState<string | null>(null)
@@ -203,17 +203,19 @@ export default function AdminPage() {
   }, [])
 
   async function loadSettings() {
-    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations', 'auto_print_enabled'])
+    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations', 'auto_print_enabled', 'table_positions'])
     const tablesRow = data?.find((r: any) => r.key === 'tables')
     const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
     const telegramEnabledRow = data?.find((r: any) => r.key === 'telegram_enabled')
     const stationsRow = data?.find((r: any) => r.key === 'category_stations')
     const autoPrintRow = data?.find((r: any) => r.key === 'auto_print_enabled')
+    const positionsRow = data?.find((r: any) => r.key === 'table_positions')
     setAllTables(Array.isArray(tablesRow?.value) && tablesRow.value.length > 0 ? tablesRow.value : DEFAULT_TABLES)
     setTelegramRecipients(Array.isArray(recipientsRow?.value) ? recipientsRow.value : [])
     setTelegramEnabled(telegramEnabledRow?.value !== false)
     setCategoryStations(stationsRow?.value && typeof stationsRow.value === 'object' ? stationsRow.value : {})
     setAutoPrintEnabled(autoPrintRow?.value === true)
+    setTablePositions(positionsRow?.value && typeof positionsRow.value === 'object' ? positionsRow.value : {})
   }
 
   async function toggleTelegramEnabled() {
@@ -1416,6 +1418,58 @@ export default function AdminPage() {
     return Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 60000))
   }
 
+  // Visual floor plan: free-form table positions instead of the fixed
+  // category grid, so the layout can match real seating. Positions persist
+  // in settings (table_positions), same pattern as everything else here.
+  const FLOOR_TILE = 100
+  const FLOOR_COLS = 6
+  const [tablePositions, setTablePositions] = useState<Record<string, { x: number, y: number }>>({})
+  const [floorEditMode, setFloorEditMode] = useState(false)
+  const [dragPreview, setDragPreview] = useState<{ table: string, x: number, y: number } | null>(null)
+  const dragStartRef = useRef<{ table: string, startX: number, startY: number, origX: number, origY: number } | null>(null)
+
+  const floorCanvasHeight = Math.max(400, Math.ceil(ALL_TABLES.length / FLOOR_COLS) * 130 + 60)
+  const floorCanvasWidth = FLOOR_COLS * 130
+
+  function getTablePosition(tableName: string): { x: number, y: number } {
+    if (tablePositions[tableName]) return tablePositions[tableName]
+    const idx = ALL_TABLES.indexOf(tableName)
+    const col = idx % FLOOR_COLS
+    const row = Math.floor(idx / FLOOR_COLS)
+    return { x: 20 + col * 130, y: 20 + row * 130 }
+  }
+
+  async function saveTablePositions(next: Record<string, { x: number, y: number }>) {
+    setTablePositions(next)
+    await supabase.from('settings').upsert({ key: 'table_positions', value: next, updated_at: new Date().toISOString() })
+  }
+
+  function clampFloorPos(x: number, y: number) {
+    return { x: Math.min(Math.max(0, x), floorCanvasWidth - FLOOR_TILE), y: Math.min(Math.max(0, y), floorCanvasHeight - FLOOR_TILE) }
+  }
+
+  function handleFloorPointerDown(e: React.PointerEvent, tableName: string) {
+    if (!floorEditMode) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const pos = getTablePosition(tableName)
+    dragStartRef.current = { table: tableName, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y }
+    setDragPreview({ table: tableName, ...pos })
+  }
+  function handleFloorPointerMove(e: React.PointerEvent) {
+    const d = dragStartRef.current
+    if (!d) return
+    const next = clampFloorPos(d.origX + (e.clientX - d.startX), d.origY + (e.clientY - d.startY))
+    setDragPreview({ table: d.table, ...next })
+  }
+  function handleFloorPointerUp(e: React.PointerEvent) {
+    const d = dragStartRef.current
+    if (!d) return
+    const finalPos = clampFloorPos(d.origX + (e.clientX - d.startX), d.origY + (e.clientY - d.startY))
+    dragStartRef.current = null
+    setDragPreview(null)
+    saveTablePositions({ ...tablePositions, [d.table]: finalPos })
+  }
+
   useEffect(() => { if (auth) { loadData(); loadSettings(); loadDebtors() } }, [auth])
 
   async function loadData() {
@@ -2106,6 +2160,8 @@ export default function AdminPage() {
                 style={{ flex:1, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: viewMode==='map' ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
               <button onClick={() => setViewMode('list')}
                 style={{ flex:1, height:48, background: viewMode==='list' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='list' ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: viewMode==='list' ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📋 Liste</button>
+              <button onClick={() => setViewMode('floor')}
+                style={{ flex:1, height:48, background: viewMode==='floor' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='floor' ? '1px solid #C9A84C' : '1px solid #2A2A2A', borderRadius: 0, color: viewMode==='floor' ? '#C9A84C' : '#8A8A8A', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📐 Kat Planı</button>
             </div>
 
             {viewMode === 'map' && (
@@ -2151,6 +2207,57 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {viewMode === 'floor' && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:12, marginBottom:12, fontSize:11, color:'#8A8A8A', fontFamily:"'IBM Plex Mono', monospace" }}>
+                  <span>🔴 Sipariş Bekliyor</span>
+                  <span>🔵 Hesap İstendi</span>
+                  <span>🟡 Dolu</span>
+                  <span>⚪ Boş</span>
+                </div>
+                {isManager && (
+                  <button onClick={() => setFloorEditMode(v => !v)}
+                    style={{ marginBottom: 12, height: 44, padding: '0 16px', background: floorEditMode ? 'rgba(39,174,96,.14)' : 'transparent', border: floorEditMode ? '1px solid #27ae60' : '1px solid #383838', color: floorEditMode ? '#5FD08C' : '#C9A84C', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                    {floorEditMode ? '✓ Bitti' : '✏️ Düzeni Düzenle'}
+                  </button>
+                )}
+                {floorEditMode && (
+                  <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 12 }}>Masaları sürükleyerek gerçek oturma düzeninizi oluşturun. Konumlar otomatik kaydedilir.</div>
+                )}
+                <div style={{ position: 'relative', width: '100%', overflow: 'auto', border: '1px solid #2A2A2A', background: '#0F0F0F' }}>
+                  <div style={{ position: 'relative', width: floorCanvasWidth, height: floorCanvasHeight }}>
+                    {ALL_TABLES.map(tableName => {
+                      const info = getTableInfo(tableName)
+                      const palette: Record<string, { bg:string, border:string, text:string, labelText:string, label:string }> = {
+                        empty:     { bg:'#161616', border:'#2A2A2A', text:'#8A8A8A', labelText:'#6E6E6E', label:'Boş' },
+                        occupied:  { bg:'#221E12', border:'rgba(201,168,76,.6)', text:'#F0EDE8', labelText:'#C9A84C', label:'Dolu' },
+                        pending:   { bg:'#241413', border:'rgba(192,57,43,.65)', text:'#F0EDE8', labelText:'#E8756A', label:'Bekliyor' },
+                        bill:      { bg:'#12202A', border:'rgba(52,152,219,.65)', text:'#F0EDE8', labelText:'#6FB9E8', label:'Hesap' },
+                      }
+                      const p = palette[info.status]
+                      const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
+                      const openedMinutesAgo = info.status !== 'empty' && info.tabData?.opened_at ? minutesSince(info.tabData.opened_at) : null
+                      const pos = dragPreview?.table === tableName ? dragPreview : getTablePosition(tableName)
+                      const isDragging = dragPreview?.table === tableName
+                      return (
+                        <div key={tableName}
+                          onPointerDown={e => handleFloorPointerDown(e, tableName)}
+                          onPointerMove={handleFloorPointerMove}
+                          onPointerUp={handleFloorPointerUp}
+                          onClick={() => { if (!floorEditMode) setActiveTableModal(tableName) }}
+                          style={{ position:'absolute', left:pos.x, top:pos.y, width:FLOOR_TILE, height:FLOOR_TILE, background:p.bg, border:`2px solid ${p.border}`, borderRadius:12, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:6, cursor: floorEditMode ? 'grab' : 'pointer', userSelect:'none', touchAction:'none', zIndex: isDragging ? 10 : 1, boxShadow: isDragging ? '0 8px 20px rgba(0,0,0,.5)' : 'none' }}>
+                          <div style={{ color:p.text, fontWeight:700, fontSize:13, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
+                          <div style={{ color:p.labelText, fontSize:9, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>
+                            {p.label}{itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo}dk` : ''}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
             )}
 
