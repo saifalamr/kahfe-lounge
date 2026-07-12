@@ -672,7 +672,7 @@ export default function MenuPage() {
     async function load() {
       const [{data:cats},{data:its}] = await Promise.all([
         supabase.from('categories').select('*').order('order_index'),
-        supabase.from('menu_items').select('*').eq('available',true).order('order_index'),
+        supabase.from('menu_items').select('*').eq('available',true).eq('staff_only',false).order('order_index'),
       ])
       const c=cats||[]; const i=its||[]
       setCategories(c); setAllItems(i)

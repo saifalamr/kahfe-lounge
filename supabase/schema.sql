@@ -225,6 +225,13 @@ drop policy if exists "debt_tx public insert" on public.debt_transactions;
 create policy "debt_tx public insert" on public.debt_transactions for insert with check (true);
 
 -- ---------------------------------------------------------------------------
+-- menu_items.staff_only — items marked this way are hidden from the customer
+-- QR menu but still selectable by staff in Sipariş Ekle (e.g. VİP Oda
+-- (Saatlik), or anything else that should only ever be added by staff)
+-- ---------------------------------------------------------------------------
+alter table public.menu_items add column if not exists staff_only boolean not null default false;
+
+-- ---------------------------------------------------------------------------
 -- item options (e.g. Şeker Oranı: Sade/Az Şekerli/Orta Şekerli/Şekerli)
 -- name_en/name_ar let the customer menu show translated option names
 -- ---------------------------------------------------------------------------

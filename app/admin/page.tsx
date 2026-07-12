@@ -1558,6 +1558,7 @@ export default function AdminPage() {
   const [itemPrice, setItemPrice] = useState('')
   const [itemCat, setItemCat] = useState('')
   const [itemAvail, setItemAvail] = useState(true)
+  const [itemStaffOnly, setItemStaffOnly] = useState(false)
   const [itemRec, setItemRec] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
 
@@ -1907,12 +1908,12 @@ export default function AdminPage() {
       if (croppedBlob) imageUrl = await uploadBlob(croppedBlob)
 
       if (editingItem) {
-        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec }).eq('id', editingItem.id)
+        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly }).eq('id', editingItem.id)
         showMsg('Ürün güncellendi ✓')
         await loadData()
       } else {
         const maxOrder = items.length ? Math.max(...items.map(i => i.order_index)) + 1 : 0
-        const { data: newItem } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, order_index: maxOrder }).select().single()
+        const { data: newItem } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, order_index: maxOrder }).select().single()
         showMsg('✓ Ürün eklendi. Şimdi isterseniz seçenek (şeker oranı vb.) ekleyebilirsiniz.')
         await loadData()
         if (newItem) { startEditItem(newItem as MenuItem); setLoading(false); return }
@@ -1957,7 +1958,7 @@ export default function AdminPage() {
   function startEditItem(item: MenuItem) {
     setEditingItem(item); setItemName(item.name); setItemDesc(item.description || '')
     setItemPrice(item.price.toString()); setItemCat(item.category_id); setItemAvail(item.available)
-    setItemRec(item.recommended || false)
+    setItemRec(item.recommended || false); setItemStaffOnly(item.staff_only || false)
     setExistingImageUrl(item.image_url || ''); setCroppedBlob(null); setCroppedPreview(item.image_url || '')
     setRawImageSrc(''); setShowCropper(false)
     loadItemOptionGroups(item.id)
@@ -1965,6 +1966,7 @@ export default function AdminPage() {
 
   function resetItemForm() {
     setItemName(''); setItemDesc(''); setItemPrice(''); setItemCat(''); setItemAvail(true); setItemRec(false)
+    setItemStaffOnly(false)
     setEditingItem(null); setCroppedBlob(null); setCroppedPreview(''); setRawImageSrc('')
     setExistingImageUrl(''); setShowCropper(false)
     setItemOptionGroups([]); setNewGroupName(''); setNewChoiceText({})
@@ -2920,6 +2922,14 @@ export default function AdminPage() {
                 <label htmlFor="rec" style={{ color: '#C9A84C', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>⭐ Öne Çıkan (Önerilen)</label>
               </div>
 
+              <div style={{ marginBottom: 16, background: itemStaffOnly ? 'rgba(243,156,18,.08)' : 'transparent', border: itemStaffOnly ? '1px solid rgba(243,156,18,.3)' : '1px solid #2A2A2A', borderRadius: 0, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input type="checkbox" id="staffOnly" checked={itemStaffOnly} onChange={e => setItemStaffOnly(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#f39c12' }} />
+                  <label htmlFor="staffOnly" style={{ color: '#f39c12', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>👤 Personel İçin (Müşteri Menüsünde Gizli)</label>
+                </div>
+                <div style={{ color: '#8A8A8A', fontSize: 11.5, marginTop: 6, marginLeft: 28 }}>Müşteri QR menüsünde görünmez, ama Sipariş Ekle ile siz masaya ekleyebilirsiniz. Örn. VİP Oda (Saatlik).</div>
+              </div>
+
               {editingItem && (
                 <div style={{ marginBottom: 16, border: '1px solid #2A2A2A', padding: 14 }}>
                   <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>SEÇENEKLER</div>
@@ -3029,8 +3039,8 @@ export default function AdminPage() {
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: 22 }}>📷</div>}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.recommended && <span style={{ marginRight: 4 }}>⭐</span>}{item.name}</div>
-                      <div style={{ color: '#8A8A8A', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}</div>
+                      <div style={{ color: '#F0EDE8', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.recommended && <span style={{ marginRight: 4 }}>⭐</span>}{item.staff_only && <span style={{ marginRight: 4 }}>👤</span>}{item.name}</div>
+                      <div style={{ color: '#8A8A8A', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}{item.staff_only && <span style={{ color: '#f39c12', marginLeft: 6 }}>· Personel İçin</span>}</div>
                       <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 14 }}>{item.price} ₺</div>
                     </div>
                     {!bulkMode && (

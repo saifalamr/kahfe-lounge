@@ -17,6 +17,7 @@ export type MenuItem = {
   price: number
   image_url: string
   available: boolean
+  staff_only: boolean
   recommended: boolean
   order_index: number
   created_at: string
