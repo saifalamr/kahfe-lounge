@@ -1188,23 +1188,80 @@ export default function AdminPage() {
     }, autoPrintEnabled)
   }
 
-  async function openDayClose() {
-    const todayStart = new Date().toISOString().split('T')[0]
+  async function computeClosedTabsSummary(fromISO: string, toISO: string) {
     const { data: closedTabs } = await supabase.from('tabs').select('*')
-      .eq('status', 'closed').gte('closed_at', todayStart)
+      .eq('status', 'closed').gte('closed_at', fromISO).lte('closed_at', toISO)
     const tabs = closedTabs || []
     const cashTotal = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0), 0)
     const cardTotal = tabs.reduce((s: number, t: any) => s + Number(t.card_amount || 0), 0)
     const transferTotal = tabs.reduce((s: number, t: any) => s + Number(t.transfer_amount || 0), 0)
     const debtTotal = tabs.reduce((s: number, t: any) => s + Number(t.debt_amount || 0), 0)
     const discountTotal = tabs.reduce((s: number, t: any) => s + Number(t.discount_amount || 0), 0)
-    // Same principle as the main stats bar: "Ciro" is money actually
-    // collected today (cash+card+transfer) — a Borç sale isn't collected
-    // yet, so it's shown as its own figure rather than folded in here.
     const totalRevenue = cashTotal + cardTotal + transferTotal
-    setDayCloseData({ tabs, totalRevenue, cashTotal, cardTotal, transferTotal, debtTotal, discountTotal, tabCount: tabs.length })
+    return { tabs, cashTotal, cardTotal, transferTotal, debtTotal, discountTotal, totalRevenue, tabCount: tabs.length }
+  }
+
+  async function openDayClose() {
+    const todayStart = new Date().toISOString().split('T')[0]
+    const summary = await computeClosedTabsSummary(todayStart, new Date().toISOString())
+    setDayCloseData(summary)
     setCountedCash('')
     setShowDayClose(true)
+  }
+
+  // Shift-based cash drawer reconciliation — separate from Gün Sonu (which
+  // is a whole-day reconciliation). Whoever starts a shift owns the drawer
+  // until they end it, at which point they reconcile just their own
+  // shift's cash rather than everyone's for the whole day. Only one shift
+  // is active system-wide at a time, matching a single physical drawer.
+  const [activeShift, setActiveShift] = useState<any>(null)
+  const [showShiftClose, setShowShiftClose] = useState(false)
+  const [shiftCloseData, setShiftCloseData] = useState<any>(null)
+  const [shiftCountedCash, setShiftCountedCash] = useState('')
+
+  async function loadActiveShift() {
+    const { data } = await supabase.from('shifts').select('*').is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle()
+    setActiveShift(data || null)
+  }
+
+  async function startShift() {
+    if (activeShift) return
+    const { data, error } = await supabase.from('shifts').insert({ staff_name: staffName, started_at: new Date().toISOString() }).select('*').single()
+    if (error) { alert('✗ Vardiya başlatılamadı.\n\n' + error.message + '\n\nshifts tablosunun Supabase\'de oluşturulduğundan emin olun.'); return }
+    setActiveShift(data)
+  }
+
+  async function openShiftClose() {
+    if (!activeShift) return
+    const summary = await computeClosedTabsSummary(activeShift.started_at, new Date().toISOString())
+    setShiftCloseData(summary)
+    setShiftCountedCash('')
+    setShowShiftClose(true)
+  }
+
+  async function saveShiftClose() {
+    if (!shiftCloseData || !activeShift) return
+    const counted = parseFloat(shiftCountedCash)
+    const diff = isNaN(counted) ? null : (counted - shiftCloseData.cashTotal)
+    const { error } = await supabase.from('shifts').update({
+      ended_at: new Date().toISOString(),
+      counted_cash: isNaN(counted) ? null : counted,
+      cash_difference: diff,
+      cash_total: shiftCloseData.cashTotal,
+      card_total: shiftCloseData.cardTotal,
+      transfer_total: shiftCloseData.transferTotal,
+      debt_total: shiftCloseData.debtTotal,
+      total_revenue: shiftCloseData.totalRevenue,
+      tab_count: shiftCloseData.tabCount,
+    }).eq('id', activeShift.id)
+    if (error) { alert('✗ Vardiya kapatılamadı.\n\n' + error.message); return }
+    const closedStaffName = activeShift.staff_name
+    const startedAt = new Date(activeShift.started_at)
+    const durationMin = Math.round((Date.now() - startedAt.getTime()) / 60000)
+    const hrs = Math.floor(durationMin / 60), mins = durationMin % 60
+    setShowShiftClose(false)
+    setActiveShift(null)
+    alert(`✓ Vardiya kapatıldı.\n\nPersonel: ${closedStaffName}\nSüre: ${hrs}s ${mins}dk\nCiro: ${formatTL(shiftCloseData.totalRevenue)} ₺\nNakit: ${formatTL(shiftCloseData.cashTotal)} ₺\nKart: ${formatTL(shiftCloseData.cardTotal)} ₺\nHavale: ${formatTL(shiftCloseData.transferTotal)} ₺\nBorç: ${formatTL(shiftCloseData.debtTotal)} ₺${diff !== null ? `\nKasa Farkı: ${diff >= 0 ? '+' : ''}${formatTL(diff)} ₺` : ''}`)
   }
 
   async function saveDayClose() {
@@ -1470,7 +1527,7 @@ export default function AdminPage() {
     saveTablePositions({ ...tablePositions, [d.table]: finalPos })
   }
 
-  useEffect(() => { if (auth) { loadData(); loadSettings(); loadDebtors() } }, [auth])
+  useEffect(() => { if (auth) { loadData(); loadSettings(); loadDebtors(); loadActiveShift() } }, [auth])
 
   async function loadData() {
     const [{ data: cats }, { data: its }, { data: staffData }] = await Promise.all([
@@ -1770,6 +1827,70 @@ export default function AdminPage() {
         {/* Notification Panel */}
         {showNotif && (
           <NotificationPopup notifications={notifications} onClose={() => setShowNotif(false)} onDismiss={dismissOrder} onAccept={acceptOrder} />
+        )}
+
+        {/* Shift (Vardiya) status bar — anyone can start/end their own shift */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px', background: activeShift ? 'rgba(39,174,96,.08)' : '#111111', borderBottom: '1px solid #2A2A2A' }}>
+          {activeShift ? (
+            <>
+              <div style={{ color: '#8A8A8A', fontSize: 12 }}>
+                <span style={{ color: '#5FD08C', fontWeight: 700 }}>⏱ {activeShift.staff_name}</span> · {new Date(activeShift.started_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'den beri
+              </div>
+              <button onClick={openShiftClose} style={{ height: 34, padding: '0 14px', background: 'transparent', border: '1px solid #383838', color: '#e74c3c', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>⏹ Vardiyayı Bitir</button>
+            </>
+          ) : (
+            <>
+              <div style={{ color: '#8A8A8A', fontSize: 12 }}>Aktif vardiya yok</div>
+              <button onClick={startShift} style={{ height: 34, padding: '0 14px', background: 'rgba(201,168,76,.14)', border: '1px solid #C9A84C', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>▶ Vardiyamı Başlat</button>
+            </>
+          )}
+        </div>
+
+        {/* Shift close (Vardiya Sonu) modal */}
+        {showShiftClose && shiftCloseData && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowShiftClose(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: '#141414', border: '1px solid rgba(231,76,60,.35)', borderBottom: 'none' }}>
+              <div style={{ padding: '18px 20px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>⏹ Vardiya Sonu — {activeShift?.staff_name}</div>
+                <button onClick={() => setShowShiftClose(false)} style={{ background: '#2A2A2A', border: 'none', width: 36, height: 36, color: '#8A8A8A', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              </div>
+              <div style={{ padding: 20, maxHeight: '75vh', overflowY: 'auto' }}>
+                <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 16 }}>
+                  {activeShift && new Date(activeShift.started_at).toLocaleString('tr-TR')} — {new Date().toLocaleString('tr-TR')}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid rgba(201,168,76,.2)', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>CİRO</div>
+                    <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.totalRevenue)} ₺</div>
+                  </div>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>💵 NAKİT</div>
+                    <div style={{ color: '#F0EDE8', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.cashTotal)} ₺</div>
+                  </div>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>💳 KART</div>
+                    <div style={{ color: '#F0EDE8', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.cardTotal)} ₺</div>
+                  </div>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>🏦 HAVALE</div>
+                    <div style={{ color: '#F0EDE8', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.transferTotal)} ₺</div>
+                  </div>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid rgba(231,76,60,.25)', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>🧾 BORÇ</div>
+                    <div style={{ color: '#e74c3c', fontWeight: 800, fontSize: 18 }}>{formatTL(shiftCloseData.debtTotal)} ₺</div>
+                  </div>
+                  <div style={{ flex: '1 1 45%', background: '#1A1A1A', border: '1px solid #2A2A2A', padding: 14, textAlign: 'center' }}>
+                    <div style={{ color: '#8A8A8A', fontSize: 11 }}>SİPARİŞ SAYISI</div>
+                    <div style={{ color: '#F0EDE8', fontWeight: 800, fontSize: 18 }}>{shiftCloseData.tabCount}</div>
+                  </div>
+                </div>
+                <label style={{ color: '#8A8A8A', fontSize: 12, display: 'block', marginBottom: 8 }}>Sayılan Nakit (kasada gerçekte olan) — opsiyonel</label>
+                <input type="number" value={shiftCountedCash} onChange={e => setShiftCountedCash(e.target.value)} placeholder="Örn. 3200"
+                  style={{ width: '100%', height: 50, background: '#0A0A0A', border: '1px solid #383838', color: '#F0EDE8', padding: '0 14px', fontSize: 16, marginBottom: 20, fontFamily: "'IBM Plex Mono', monospace" }} />
+                <button onClick={saveShiftClose} style={{ width: '100%', height: 54, background: '#e74c3c', border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>✓ Vardiyayı Kapat</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
