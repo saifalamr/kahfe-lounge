@@ -177,6 +177,11 @@ export default function AdminPage() {
   }
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
+  // Distinct from pwError: this fires when the login RPC itself fails
+  // (missing/broken function, e.g. a SQL migration that never got run) —
+  // without this, that failure looked identical to "wrong password" and
+  // was genuinely undiagnosable from the login screen alone.
+  const [loginSystemError, setLoginSystemError] = useState('')
   const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts' | 'accountability'>('orders')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
@@ -1841,7 +1846,12 @@ export default function AdminPage() {
     // touchscreen/staff-shared PIN) and, only on success, mints a session
     // token — nobody can obtain a token without passing a real PIN check
     // inside this same database call.
-    const { data } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null } | null }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null } | null, error: any }
+    if (error) {
+      setLoginSystemError(error.message || 'Bilinmeyen hata')
+      return
+    }
+    setLoginSystemError('')
     if (!data) { setPwError(true); return }
     const normalizedRole: 'manager' | 'staff' | 'touchscreen' = data.role === 'manager' ? 'manager' : data.role === 'touchscreen' ? 'touchscreen' : 'staff'
     const permission: 'full' | 'limited' = data.permission === 'limited' ? 'limited' : 'full'
@@ -1997,6 +2007,7 @@ export default function AdminPage() {
           style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.2em', borderColor: pwError ? '#C0392B' : '#383838', boxShadow: pwError ? 'none' : 'none', marginBottom: 8 }}
           placeholder="Şifrenizi girin" />
         {pwError && <div style={{ color: '#C0392B', fontSize: 12, marginBottom: 12 }}>Hatalı şifre</div>}
+        {loginSystemError && <div style={{ color: '#f39c12', fontSize: 12, marginBottom: 12, padding: 10, background: 'rgba(243,156,18,.1)', border: '1px solid rgba(243,156,18,.3)' }}>⚠️ Sistem hatası (şifre yanlış değil): {loginSystemError}<br/>Bu genellikle çalıştırılmamış bir SQL migration'ı gösterir — Claude'a bu mesajı gösterin.</div>}
         <button onClick={login} style={{ ...s.btn, height: 56, fontSize: 16, marginTop: 8 }}>Giriş Yap</button>
       </div>
     </div>

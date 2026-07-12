@@ -25,6 +25,7 @@ export default function NargilePage() {
   const [staffName, setStaffName] = useState('')
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
+  const [loginSystemError, setLoginSystemError] = useState('')
   const [orders, setOrders] = useState<any[]>([])
   const [now, setNow] = useState(Date.now())
   // Maps a menu item id -> its printer station, built from menu_items +
@@ -78,7 +79,9 @@ export default function NargilePage() {
   }, [auth])
 
   async function login() {
-    const { data } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null, error: any }
+    if (error) { setLoginSystemError(error.message || 'Bilinmeyen hata'); return }
+    setLoginSystemError('')
     if (!data) { setPwError(true); return }
     const normalizedRole = data.role === 'manager' ? 'manager' : data.role === 'touchscreen' ? 'touchscreen' : 'staff'
     localStorage.setItem('kahfe_admin_role', normalizedRole)
@@ -169,6 +172,7 @@ export default function NargilePage() {
           placeholder="Şifre veya PIN"
           style={{ width: '100%', height: 52, background: '#0A0A0A', border: pwError ? '1px solid #C0392B' : '1px solid #383838', color: '#F0EDE8', padding: '0 16px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.2em', outline: 'none', marginBottom: 8 }} />
         {pwError && <div style={{ color: '#C0392B', fontSize: 12, marginBottom: 12 }}>Hatalı şifre</div>}
+        {loginSystemError && <div style={{ color: '#f39c12', fontSize: 12, marginBottom: 12, padding: 10, background: 'rgba(243,156,18,.1)', border: '1px solid rgba(243,156,18,.3)' }}>⚠️ Sistem hatası (şifre yanlış değil): {loginSystemError}</div>}
         <button onClick={login} style={{ width: '100%', height: 56, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 600, fontSize: 16, cursor: 'pointer', marginTop: 8, fontFamily: "'IBM Plex Sans', sans-serif" }}>Giriş Yap</button>
       </div>
     </div>
