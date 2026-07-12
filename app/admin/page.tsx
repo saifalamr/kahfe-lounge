@@ -1404,6 +1404,18 @@ export default function AdminPage() {
   useEffect(() => { if (role === 'staff' || role === 'touchscreen') setTab('orders') }, [role])
   useEffect(() => { if ((role === 'staff' || role === 'touchscreen') && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
 
+  // Ticks every 30s purely so table occupancy timers ("· 42 dk") update
+  // live on screen without needing a full data reload
+  const [clockTick, setClockTick] = useState(0)
+  useEffect(() => {
+    const interval = setInterval(() => setClockTick(t => t + 1), 30 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  function minutesSince(isoString: string): number {
+    return Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 60000))
+  }
+
   useEffect(() => { if (auth) { loadData(); loadSettings(); loadDebtors() } }, [auth])
 
   async function loadData() {
@@ -2125,12 +2137,13 @@ export default function AdminPage() {
                         }
                         const p = palette[info.status]
                         const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
+                        const openedMinutesAgo = info.status !== 'empty' && info.tabData?.opened_at ? minutesSince(info.tabData.opened_at) : null
                         return (
                           <button key={tableName} onClick={() => setActiveTableModal(tableName)}
                             style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 0, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
                             <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
                             <div style={{ color:p.labelText, fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase', marginTop:6 }}>
-                              {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}
+                              {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo} dk` : ''}
                             </div>
                           </button>
                         )
