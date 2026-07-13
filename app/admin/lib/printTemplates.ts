@@ -14,6 +14,16 @@ import { buildKitchenTicketEscPos, buildReceiptEscPos, printViaRawBT } from './e
 // not the thermal one, so a dialog there is fine/expected.
 
 export function printKitchenTicket(tableName: string, orders: any[], autoPrint: boolean = false) {
+  // Defense in depth: the caller (admin/page.tsx) already filters to
+  // pending-only items before getting here, but if that ever changes or a
+  // future caller forgets, this stops a blank ticket from silently printing
+  // (or cutting blank thermal paper via RawBT with zero warning) instead of
+  // just doing nothing useful.
+  const hasPendingItems = orders.some((o: any) => o.status === 'pending' && (o.items || []).length > 0)
+  if (!hasPendingItems) {
+    if (!autoPrint) alert('Bu masada bu istasyon için bekleyen ürün yok — fiş yazdırılmadı.')
+    return
+  }
   if (autoPrint) {
     printViaRawBT(buildKitchenTicketEscPos(tableName, orders))
     return

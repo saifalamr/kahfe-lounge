@@ -2365,11 +2365,19 @@ export default function AdminPage() {
                       </div>
                       {activeOrders.length > 0 && (
                         <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                          {filterOrdersByStation(activeOrders, 'kitchen').length > 0 && (
-                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'kitchen'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
+                          {/* Gated on PENDING items specifically, not just
+                              "not dismissed" - the ticket itself only ever
+                              includes pending items (that's the whole point:
+                              it tells the station what still needs making).
+                              Previously the button stayed visible even once
+                              every item for that station was already served,
+                              so tapping it printed a blank ticket with zero
+                              lines - no error, just silently empty paper. */}
+                          {filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'kitchen').length > 0 && (
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'kitchen'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
                           )}
-                          {filterOrdersByStation(activeOrders, 'nargile').length > 0 && (
-                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders, 'nargile'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
+                          {filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'nargile').length > 0 && (
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'nargile'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
                           )}
                         </div>
                       )}
