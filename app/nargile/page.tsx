@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
+import { buildKitchenTicketEscPos, printViaRawBT } from '@/app/admin/lib/escpos'
 
 // Manager/Touchscreen/shared-staff-code PINs are verified server-side via
 // the verify_access_pin RPC (see access_pins table, shared with /admin) -
@@ -31,6 +32,12 @@ export default function NargilePage() {
   // Maps a menu item id -> its printer station, built from menu_items +
   // the category_stations setting configured in Ayarlar
   const [itemStationMap, setItemStationMap] = useState<Record<string, 'kitchen'|'nargile'>>({})
+  // Same global toggle as Ayarlar > Otomatik Yazdırma (admin panel). This
+  // device needs RawBT installed and configured to point at the physical
+  // nargile-room printer for this to do anything - there's no in-app way
+  // to verify that from here, so the toggle staying on with a printer
+  // that's misconfigured/offline will silently do nothing rather than error.
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false)
 
   // Reuses the same login session as /admin — if someone's already logged
   // into the admin panel on this device, the nargile screen opens straight up
@@ -98,9 +105,12 @@ export default function NargilePage() {
   async function loadStationMap() {
     const [{ data: menuItems }, { data: settingsRows }] = await Promise.all([
       supabase.from('menu_items').select('id,category_id'),
-      supabase.from('settings').select('key,value').eq('key', 'category_stations'),
+      supabase.from('settings').select('key,value').in('key', ['category_stations', 'auto_print_enabled']),
     ])
-    const categoryStations: Record<string, 'kitchen'|'nargile'> = settingsRows?.[0]?.value || {}
+    const categoryStationsRow = settingsRows?.find((r: any) => r.key === 'category_stations')
+    const autoPrintRow = settingsRows?.find((r: any) => r.key === 'auto_print_enabled')
+    const categoryStations: Record<string, 'kitchen'|'nargile'> = categoryStationsRow?.value || {}
+    setAutoPrintEnabled(autoPrintRow?.value === true)
     const map: Record<string, 'kitchen'|'nargile'> = {}
     ;(menuItems || []).forEach((mi: any) => {
       map[mi.id] = categoryStations[mi.category_id] || 'kitchen'
@@ -133,6 +143,16 @@ export default function NargilePage() {
     } catch (e) {}
   }
 
+  // Refs, not the state values directly - the INSERT subscription below is
+  // set up once (effect only re-runs on [auth]) and its callback closure
+  // would otherwise capture whatever itemStationMap/autoPrintEnabled were
+  // AT SETUP TIME forever (React stale-closure trap), silently ignoring
+  // every later update - including the toggle switching itself off.
+  const autoPrintEnabledRef = useRef(false)
+  const itemStationMapRef = useRef<Record<string, 'kitchen'|'nargile'>>({})
+  useEffect(() => { autoPrintEnabledRef.current = autoPrintEnabled }, [autoPrintEnabled])
+  useEffect(() => { itemStationMapRef.current = itemStationMap }, [itemStationMap])
+
   useEffect(() => {
     if (!auth) return
     loadStationMap()
@@ -143,6 +163,17 @@ export default function NargilePage() {
         if (payload.new.status === 'pending') {
           setOrders(prev => [...prev, payload.new])
           beep()
+          // Auto-print straight to this device's RawBT-connected printer -
+          // only the nargile-station items from this new order, and only
+          // once per order (INSERT fires exactly once; the UPDATE handler
+          // below never re-triggers a print, so marking Hazır/reconnecting
+          // can't cause a reprint).
+          if (autoPrintEnabledRef.current) {
+            const nargileItems = (payload.new.items || []).filter((it: any) => itemStationMapRef.current[it.id] === 'nargile')
+            if (nargileItems.length > 0) {
+              printViaRawBT(buildKitchenTicketEscPos(payload.new.table_name, [{ ...payload.new, items: nargileItems }]))
+            }
+          }
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
@@ -184,7 +215,12 @@ export default function NargilePage() {
     <div style={{ background: '#0A0A0A', minHeight: '100vh', padding: '24px 32px', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <ConnectivityBanner />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
-        <div style={{ color: '#F0EDE8', fontSize: 30, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>💨 Nargile Ekranı</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ color: '#F0EDE8', fontSize: 30, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>💨 Nargile Ekranı</div>
+          <div title="Ayarlar > Otomatik Yazdırma'dan kontrol edilir" style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.05em', color: autoPrintEnabled ? '#5FD08C' : '#8A8A8A', background: autoPrintEnabled ? 'rgba(39,174,96,.14)' : 'transparent', border: autoPrintEnabled ? '1px solid #27ae60' : '1px solid #383838' }}>
+            {autoPrintEnabled ? '🖨️ OTO YAZDIRMA AKTİF' : '🖨️ OTO YAZDIRMA KAPALI'}
+          </div>
+        </div>
         <div style={{ color: '#8A8A8A', fontSize: 17, fontFamily: "'IBM Plex Mono', monospace" }}>{nargileOrders.length} bekleyen sipariş</div>
       </div>
 
