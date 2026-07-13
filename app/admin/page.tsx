@@ -2318,7 +2318,7 @@ export default function AdminPage() {
                               <span style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
                             </div>
                             {order.items?.map((item:any, i:number) => (
-                              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:14, color:'rgba(240,237,232,.85)', padding:'3px 0' }}>
+                              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:14, color:'var(--a-text)', padding:'3px 0' }}>
                                 <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
                                 <span style={{ display:'flex', alignItems:'center', gap:8 }}>
                                   <span style={{ color:'var(--a-text3)', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
@@ -2327,7 +2327,7 @@ export default function AdminPage() {
                               </div>
                             ))}
                             {order.note && (
-                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'rgba(240,237,232,.7)' }}>📝 {order.note}</div>
+                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'var(--a-text2)' }}>📝 {order.note}</div>
                             )}
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
                               <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
@@ -2852,14 +2852,14 @@ export default function AdminPage() {
                   </div>
 
                   {order.items?.map((item:any, i:number) => (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:15, color:'var(--a-text)', padding:'4px 0', borderBottom:'1px solid rgba(240,237,232,.05)' }}>
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:15, color:'var(--a-text)', padding:'4px 0', borderBottom:'1px solid var(--a-border)' }}>
                       <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
                       <span style={{ color:'var(--a-text3)', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
                     </div>
                   ))}
 
                   {order.note && (
-                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'rgba(240,237,232,.7)' }}>
+                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'var(--a-text2)' }}>
                       📝 {order.note}
                     </div>
                   )}
