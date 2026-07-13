@@ -315,7 +315,11 @@ export default function AdminPage() {
   }
 
   async function addTable() {
-    const name = newTableName.trim().toUpperCase()
+    // toLocaleUpperCase('tr-TR'), not .toUpperCase() - same Turkish-İ issue
+    // as the QR menu's masa param (see app/page.tsx). Typing "kitaplik-1"
+    // here should produce "KİTAPLIK-1", matching what real customer QR
+    // codes for that table resolve to - not a mismatched ASCII "I" version.
+    const name = newTableName.trim().toLocaleUpperCase('tr-TR')
     if (!name) return
     if (ALL_TABLES.includes(name)) { alert('Bu masa adı zaten var.'); return }
     await saveTables([...ALL_TABLES, name])

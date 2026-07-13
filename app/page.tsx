@@ -595,10 +595,16 @@ export default function MenuPage() {
   const [orderNumber, setOrderNumber] = useState<number|null>(null)
 
   // Read table from URL ?masa=X
+  // toLocaleUpperCase('tr-TR') matters here: plain .toUpperCase() maps
+  // lowercase 'i' to ASCII 'I', not Turkish 'İ' - since real table names
+  // like KİTAPLIK-1 use the dotted İ, a lowercase QR param ("kitaplik-1")
+  // would otherwise resolve to a table name that matches nothing on the
+  // map, silently stranding the order. This happened for real (KITAPLIK-1/
+  // KITAPLIK-3 ghost tabs) before this fix.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const masa = params.get('masa')
-    if (masa) setTableName(decodeURIComponent(masa).toUpperCase())
+    if (masa) setTableName(decodeURIComponent(masa).toLocaleUpperCase('tr-TR'))
   }, [])
 
   async function sendTelegramNotification(mesa: string, items: any[], total: number, note: string, orderNum: number) {
