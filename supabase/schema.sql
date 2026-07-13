@@ -489,6 +489,7 @@ declare
   v_permission text;
   v_token uuid;
   v_ip text;
+  v_expires_at timestamptz;
 begin
   v_ip := get_client_ip();
   if (select count(*) from login_attempts where ip = v_ip and attempted_at > now() - interval '10 minutes') >= 15 then
@@ -507,7 +508,13 @@ begin
     return;
   end if;
 
-  insert into device_sessions(role, expires_at) values (v_role, now() + interval '24 hours') returning device_sessions.token into v_token;
+  -- Manager (1234) and Touchscreen (9000) are fixed, trusted devices that
+  -- should basically never need re-login. Staff PINs (individual + the
+  -- shared 5678) keep the original 24h expiry - those change hands more
+  -- often and are the more likely-to-be-compromised case.
+  v_expires_at := case when v_role in ('manager', 'touchscreen') then now() + interval '100 years' else now() + interval '24 hours' end;
+
+  insert into device_sessions(role, expires_at) values (v_role, v_expires_at) returning device_sessions.token into v_token;
   return query select v_role,
     v_token,
     coalesce(v_staff_name, case v_role when 'manager' then 'Yönetici' when 'touchscreen' then 'Dokunmatik Ekran' else 'Personel (Genel)' end),

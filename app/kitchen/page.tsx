@@ -30,6 +30,7 @@ export default function KitchenPage() {
   const [now, setNow] = useState(Date.now())
 
   const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24 hours
+  const sessionMaxAgeFor = (r: string | null) => (r === 'manager' || r === 'touchscreen') ? Infinity : SESSION_MAX_AGE_MS
 
   function clearSession() {
     localStorage.removeItem('kahfe_admin_role')
@@ -55,7 +56,7 @@ export default function KitchenPage() {
       const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
       const savedEpoch = localStorage.getItem('kahfe_session_epoch')
       if (!(savedRole === 'manager' || savedRole === 'staff' || savedRole === 'touchscreen')) return
-      if (!savedAt || Date.now() - savedAt > SESSION_MAX_AGE_MS) { clearSession(); return }
+      if (!savedAt || Date.now() - savedAt > sessionMaxAgeFor(savedRole)) { clearSession(); return }
       const currentEpoch = await getCurrentSessionEpoch()
       if (savedEpoch !== currentEpoch) { clearSession(); return }
       setAuth(true)
@@ -68,8 +69,9 @@ export default function KitchenPage() {
   useEffect(() => {
     if (!auth) return
     const interval = setInterval(async () => {
+      const savedRole = localStorage.getItem('kahfe_admin_role')
       const savedAt = Number(localStorage.getItem('kahfe_session_started_at') || 0)
-      if (!savedAt || Date.now() - savedAt > SESSION_MAX_AGE_MS) { clearSession(); return }
+      if (!savedAt || Date.now() - savedAt > sessionMaxAgeFor(savedRole)) { clearSession(); return }
       const savedEpoch = localStorage.getItem('kahfe_session_epoch')
       const currentEpoch = await getCurrentSessionEpoch()
       if (savedEpoch !== currentEpoch) clearSession()
