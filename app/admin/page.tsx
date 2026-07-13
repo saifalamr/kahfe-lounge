@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
+import { queueOrder, flushQueuedOrders, queuedOrderCount } from '@/lib/offlineQueue'
 import VoidModal from './components/VoidModal'
 import CancelOrderModal from './components/CancelOrderModal'
 import TransferPickerModal from './components/TransferPickerModal'
@@ -24,6 +25,14 @@ import { formatTL } from './lib/format'
 /* ── Main Admin Page ── */
 export default function AdminPage() {
   const isOnline = useConnectivity()
+  const [queuedCount, setQueuedCount] = useState(0)
+  // Whenever connectivity comes back, try to actually send anything a
+  // staff member queued while offline (get_or_create_open_tab, etc. all
+  // need network, so this couldn't happen at queue time)
+  useEffect(() => {
+    if (!isOnline) { setQueuedCount(queuedOrderCount()); return }
+    flushQueuedOrders().then(() => { loadTableMapData(); setQueuedCount(queuedOrderCount()) })
+  }, [isOnline])
 
   // Load the redesign's font system client-side (scoped to this page only —
   // the customer-facing menu keeps its own font/theme untouched)
@@ -858,9 +867,24 @@ export default function AdminPage() {
       }
       const orderTotal = orderItems.reduce((s, i) => s + i.subtotal, 0)
 
+      if (!isOnline) {
+        queueOrder({ table_name: addOrderTable, items: orderItems, total: orderTotal, note: null, created_by: staffName, handled_by: staffName }); setQueuedCount(queuedOrderCount())
+        alert('📥 Bağlantı yok — sipariş kaydedildi, bağlantı gelince otomatik gönderilecek.')
+        setAddOrderTable(null)
+        setStaffCart({})
+        setStaffExtraItems({})
+        return
+      }
+
       const { data: tabId, error: tabError } = await supabase.rpc('get_or_create_open_tab', { p_table_name: addOrderTable })
       if (tabError || !tabId) {
-        alert('✗ Masa açılamadı.\n\n' + (tabError?.message || 'Bilinmeyen hata'))
+        // Couldn't even reach the RPC — connection likely just dropped
+        // mid-action. Queue rather than lose the order.
+        queueOrder({ table_name: addOrderTable, items: orderItems, total: orderTotal, note: null, created_by: staffName, handled_by: staffName }); setQueuedCount(queuedOrderCount())
+        alert('📥 Bağlantı sorunu — sipariş kaydedildi, bağlantı gelince otomatik gönderilecek.')
+        setAddOrderTable(null)
+        setStaffCart({})
+        setStaffExtraItems({})
         return
       }
 
@@ -878,7 +902,11 @@ export default function AdminPage() {
         handled_by: staffName,
       })
       if (orderError) {
-        alert('✗ Sipariş eklenemedi.\n\n' + orderError.message)
+        queueOrder({ table_name: addOrderTable, items: orderItems, total: orderTotal, note: null, created_by: staffName, handled_by: staffName }); setQueuedCount(queuedOrderCount())
+        alert('📥 Bağlantı sorunu — sipariş kaydedildi, bağlantı gelince otomatik gönderilecek.')
+        setAddOrderTable(null)
+        setStaffCart({})
+        setStaffExtraItems({})
         return
       }
       await supabase.rpc('decrement_stock_for_order', { p_items: orderItems })
@@ -2086,6 +2114,12 @@ export default function AdminPage() {
               style={{ background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
               💨
             </a>
+            {/* Queued offline orders indicator */}
+            {queuedCount > 0 && (
+              <div title="Bağlantı bekleyen sipariş(ler)" style={{ background: 'rgba(243,156,18,.14)', border: '1px solid #f39c12', borderRadius: 0, height: 40, padding: '0 10px', display: 'flex', alignItems: 'center', gap: 6, color: '#f39c12', fontSize: 12, fontWeight: 700 }}>
+                📥 {queuedCount}
+              </div>
+            )}
             {/* Notification Bell */}
             <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
               style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : 'var(--a-border)', border: newOrderAlert ? '1px solid #C0392B' : '1px solid var(--a-border2)', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
@@ -2409,8 +2443,8 @@ export default function AdminPage() {
                     <div style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{staffCartCount} ürün</div>
                     <div style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(staffCartTotal)}</div>
                   </div>
-                  <button onClick={submitStaffOrder} disabled={staffCartCount===0 || !isOnline}
-                    style={{ background: (staffCartCount===0 || !isOnline) ? 'var(--a-border)' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: (staffCartCount===0 || !isOnline) ? 'var(--a-disabled)' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: (staffCartCount===0 || !isOnline) ? 'not-allowed' : 'pointer' }}>{isOnline ? 'Siparişi Gönder' : '🔴 Bağlantı Yok'}</button>
+                  <button onClick={submitStaffOrder} disabled={staffCartCount===0}
+                    style={{ background: staffCartCount===0 ? 'var(--a-border)' : !isOnline ? '#8a5a1f' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: staffCartCount===0 ? 'var(--a-disabled)' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>{!isOnline ? '📥 Kaydet (Bağlantı Yok)' : 'Siparişi Gönder'}</button>
                 </div>
               </div>
             )}

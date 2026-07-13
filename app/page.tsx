@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
+import { queueOrder, flushQueuedOrders } from '@/lib/offlineQueue'
 
 type CartMap = Record<string, number>
 type Line = MenuItem & { qty: number, _baseId?: string, _optionsText?: string, _optionsTextEn?: string, _optionsTextAr?: string }
@@ -455,7 +456,7 @@ function OptionPickerModal({ item, groups, selections, onSelect, onClose, onConf
   )
 }
 
-function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent, orderNote, onNoteChange, orderNumber, isOnline }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean; orderNote:string; onNoteChange:(v:string)=>void; orderNumber:number|null; isOnline:boolean }) {
+function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableName, onSubmit, sending, sent, queued, orderNote, onNoteChange, orderNumber, isOnline }: { lines:Line[]; total:number; count:number; onClose:()=>void; onInc:(i:MenuItem)=>void; onDec:(i:MenuItem)=>void; lang:string; tableName:string; onSubmit:()=>void; sending:boolean; sent:boolean; queued:boolean; orderNote:string; onNoteChange:(v:string)=>void; orderNumber:number|null; isOnline:boolean }) {
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
@@ -506,6 +507,16 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
               {lang==='en'?'Your waiter will be with you shortly.':lang==='ar'?'سيأتي النادل إليك قريباً.':'Garsonunuz kısa sürede gelecek.'}
             </div>
           </div>
+        ) : queued ? (
+          <div style={{ margin:'14px 22px 0', background:'rgba(243,156,18,.1)', border:'1px solid rgba(243,156,18,.4)', borderRadius:14, padding:'20px', textAlign:'center' }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>📥</div>
+            <div style={{ color:'#f39c12', fontWeight:800, fontSize:16, marginBottom:4 }}>
+              {lang==='en'?'Order Saved':lang==='ar'?'تم حفظ الطلب':'Sipariş Kaydedildi'}
+            </div>
+            <div style={{ color:'rgba(240,237,232,.6)', fontSize:13 }}>
+              {lang==='en'?'No connection right now — it will send automatically once back online.':lang==='ar'?'لا يوجد اتصال حالياً — سيتم الإرسال تلقائياً عند عودة الاتصال.':'Şu anda bağlantı yok — bağlantı gelince otomatik olarak gönderilecek.'}
+            </div>
+          </div>
         ) : (
           <div style={{ margin:'14px 22px 0', display:'flex', flexDirection:'column', gap:10 }}>
             {/* Notes box */}
@@ -520,15 +531,20 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
                 style={{ width:'100%', background:'rgba(240,237,232,.06)', border:'1px solid rgba(240,237,232,.15)', borderRadius:12, padding:'12px 14px', color:'#F0EDE8', fontSize:13, resize:'none', minHeight:70, fontFamily:'inherit', outline:'none' }}
               />
             </div>
-            <button onClick={onSubmit} disabled={sending || !isOnline}
-              style={{ width:'100%', background: (sending || !isOnline) ? '#2A2A2A' : '#C0392B', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:800, fontSize:16, cursor: (sending || !isOnline) ? 'not-allowed' : 'pointer', boxShadow: (sending || !isOnline) ? 'none' : '0 8px 24px rgba(192,57,43,.35)', transition:'all .2s' }}>
-              {!isOnline
-                ? (lang==='en'?'🔴 No Connection':lang==='ar'?'🔴 لا يوجد اتصال':'🔴 Bağlantı Yok')
-                : sending
+            <button onClick={onSubmit} disabled={sending}
+              style={{ width:'100%', background: sending ? '#2A2A2A' : !isOnline ? '#8a5a1f' : '#C0392B', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:800, fontSize:16, cursor: sending ? 'not-allowed' : 'pointer', boxShadow: sending ? 'none' : '0 8px 24px rgba(192,57,43,.35)', transition:'all .2s' }}>
+              {sending
                 ? (lang==='en'?'Sending...':lang==='ar'?'جارٍ الإرسال...':'Gönderiliyor...')
+                : !isOnline
+                ? (lang==='en'?'📥 Save Order (Offline)':lang==='ar'?'📥 حفظ الطلب (بدون اتصال)':'📥 Siparişi Kaydet (Bağlantı Yok)')
                 : (lang==='en'?'✓ Confirm Order':lang==='ar'?'✓ تأكيد الطلب':'✓ Siparişi Onayla')
               }
             </button>
+            {!isOnline && (
+              <div style={{ textAlign:'center', fontSize:11.5, color:'#f0a94e' }}>
+                {lang==='en'?'No connection — order will send automatically once back online':lang==='ar'?'لا يوجد اتصال — سيتم الإرسال تلقائياً عند عودة الاتصال':'Bağlantı yok — bağlantı gelince otomatik gönderilecek'}
+              </div>
+            )}
             <div style={{ textAlign:'center', fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.5px' }}>
               {lang==='en'?'Your waiter will come to confirm':lang==='ar'?'سيأتي النادل للتأكيد':'Garsonunuz onaylamak için gelecek'}
             </div>
@@ -573,6 +589,7 @@ export default function MenuPage() {
   const [pulseKey, setPulseKey] = useState(0)
   const [tableName, setTableName] = useState('')
   const [orderSent, setOrderSent] = useState(false)
+  const [orderQueued, setOrderQueued] = useState(false)
   const [sendingOrder, setSendingOrder] = useState(false)
   const [orderNote, setOrderNote] = useState('')
   const [orderNumber, setOrderNumber] = useState<number|null>(null)
@@ -631,6 +648,19 @@ export default function MenuPage() {
         subtotal: l.price * l.qty
       }))
       const mesa = tableName || 'Bilinmiyor'
+
+      if (!isOnline) {
+        // No point even attempting the network calls below — queue
+        // straight away so this doesn't sit "sending" for no reason
+        queueOrder({ table_name: mesa, items: orderItems, total, note: orderNote.trim() || null, created_by: 'Müşteri (QR)' })
+        setOrderQueued(true)
+        setCart({})
+        setOrderNote('')
+        setTimeout(() => { setOrderQueued(false); setShowOrder(false) }, 5000)
+        setSendingOrder(false)
+        return
+      }
+
       // Get order count for today to generate order number
       const today = new Date().toISOString().split('T')[0]
       const { count: todayCount } = await supabase.from('orders')
@@ -662,10 +692,41 @@ export default function MenuPage() {
       setOrderNote('')
       setTimeout(() => { setOrderSent(false); setShowOrder(false) }, 4000)
     } catch (e) {
-      console.error('Order error:', e)
+      // The request itself failed (not just "we already knew we were
+      // offline") — most likely the connection dropped mid-request. Queue
+      // it rather than losing the order entirely.
+      console.error('Order error, queueing instead:', e)
+      const orderItems = lines.map((l: any) => ({
+        id: l._baseId || l.id,
+        name: l._optionsText ? `${l.name} (${l._optionsText})` : l.name,
+        name_en: l._optionsTextEn ? `${l.name_en || l.name} (${l._optionsTextEn})` : (l.name_en || l.name),
+        price: l.price,
+        quantity: l.qty,
+        subtotal: l.price * l.qty
+      }))
+      queueOrder({ table_name: tableName || 'Bilinmiyor', items: orderItems, total, note: orderNote.trim() || null, created_by: 'Müşteri (QR)' })
+      setOrderQueued(true)
+      setCart({})
+      setOrderNote('')
+      setTimeout(() => { setOrderQueued(false); setShowOrder(false) }, 5000)
     }
     setSendingOrder(false)
   }
+
+  // Whenever connectivity comes back, try to actually send anything that
+  // got queued while offline — recomputing the order number and sending
+  // the Telegram alert for each one, same as a live order would
+  useEffect(() => {
+    if (!isOnline) return
+    flushQueuedOrders(async (order) => {
+      const today = new Date().toISOString().split('T')[0]
+      const { count: todayCount } = await supabase.from('orders')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today)
+      await sendTelegramNotification(order.table_name, order.items, order.total, order.note || '', todayCount || 0)
+    })
+  }, [isOnline])
+
   const [lang, setLang] = useState<'tr'|'en'|'ar'>('tr')
   const [showWelcome, setShowWelcome] = useState(false)
 
@@ -894,7 +955,7 @@ export default function MenuPage() {
         )}
         {showOrder && count>0 && (
           <OrderSummary lines={lines as Line[]} total={total} count={count} lang={lang}
-            tableName={tableName} onSubmit={submitOrder} sending={sendingOrder} sent={orderSent}
+            tableName={tableName} onSubmit={submitOrder} sending={sendingOrder} sent={orderSent} queued={orderQueued}
             orderNote={orderNote} onNoteChange={setOrderNote} orderNumber={orderNumber} isOnline={isOnline}
             onClose={()=>setShowOrder(false)} onInc={inc} onDec={dec}/>
         )}

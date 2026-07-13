@@ -59,6 +59,13 @@ create policy "tabs public update" on public.tabs for update using (true);
 alter table public.orders add column if not exists tab_id uuid references public.tabs(id);
 alter table public.orders add column if not exists created_by text;
 alter table public.orders add column if not exists handled_by text;
+-- Lets order submission be safely retried after a dropped connection (see
+-- lib/offlineQueue.ts): each order gets a client-generated ID at creation
+-- time, and this unique index means the database itself rejects a
+-- duplicate insert if a retry ever fires twice. NULLs don't conflict with
+-- each other in Postgres, so existing rows without one are unaffected.
+alter table public.orders add column if not exists client_order_id uuid;
+create unique index if not exists idx_orders_client_order_id on public.orders(client_order_id) where client_order_id is not null;
 
 -- Invoice numbers, assigned automatically by the DB
 create sequence if not exists fatura_seq start 1;
