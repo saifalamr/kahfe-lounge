@@ -263,13 +263,16 @@ export default function AdminPage() {
     setAutoPrintEnabled(next)
   }
 
-  // Manager-only PIN changes for Yönetici/Dokunmatik Ekran/Personel(Genel) —
-  // the actual current PIN is never fetched or shown (matches how it's
-  // stored server-side with no select policy); this only ever writes a new
-  // one. Gated to isManager in the UI below, same as the rest of Ayarlar.
+  // Manager-only PIN changes for Yönetici/Dokunmatik Ekran — the actual
+  // current PIN is never fetched or shown (matches how it's stored
+  // server-side with no select policy); this only ever writes a new one.
+  // Gated to isManager in the UI below, same as the rest of Ayarlar.
+  // Personel (Genel)/5678 removed from here deliberately - staff access is
+  // now granted exclusively through the Personel tab (named, individual
+  // PINs), so there's only one place in the app that can grant it.
   const [accessPinInputs, setAccessPinInputs] = useState<Record<string, string>>({})
   const [accessPinMsg, setAccessPinMsg] = useState<Record<string, string>>({})
-  async function updateAccessPin(role: 'manager'|'touchscreen'|'staff_shared') {
+  async function updateAccessPin(role: 'manager'|'touchscreen') {
     const newPin = (accessPinInputs[role] || '').trim()
     if (!/^\d{4,6}$/.test(newPin)) {
       setAccessPinMsg(prev => ({ ...prev, [role]: '✗ 4-6 haneli bir sayı girin' }))
@@ -3231,8 +3234,8 @@ export default function AdminPage() {
             {/* Access PINs — manager-only, write-only (current values are never fetched/shown) */}
             <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🔐 Erişim Şifreleri</div>
-              <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Yönetici, Dokunmatik Ekran ve Genel Personel giriş şifrelerini buradan değiştirebilirsiniz. Mevcut şifreler güvenlik nedeniyle burada gösterilmez — sadece yenisini girip güncelleyebilirsiniz.</div>
-              {([['manager','Yönetici Şifresi'],['touchscreen','Dokunmatik Ekran Şifresi'],['staff_shared','Personel (Genel) Şifresi']] as const).map(([role, label]) => (
+              <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Yönetici ve Dokunmatik Ekran giriş şifrelerini buradan değiştirebilirsiniz. Mevcut şifreler güvenlik nedeniyle burada gösterilmez — sadece yenisini girip güncelleyebilirsiniz. (Personel erişimi artık yalnızca 👥 Personel sekmesinden, kişiye özel PIN ile verilir.)</div>
+              {([['manager','Yönetici Şifresi'],['touchscreen','Dokunmatik Ekran Şifresi']] as const).map(([role, label]) => (
                 <div key={role} style={{ marginBottom: 12 }}>
                   <div style={{ color: 'var(--a-text3)', fontSize: 12, marginBottom: 6 }}>{label}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

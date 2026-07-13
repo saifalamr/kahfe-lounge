@@ -538,6 +538,9 @@ create or replace function update_access_pin(p_session_token uuid, p_role text, 
 language plpgsql security definer set search_path = public as $$
 begin
   perform assert_manager_session(p_session_token);
+  if p_role not in ('manager', 'touchscreen') then
+    raise exception 'Staff access is granted via the Personel tab only, not a shared PIN.';
+  end if;
   update access_pins set pin = p_new_pin where role = p_role;
 end; $$;
 grant execute on function update_access_pin(uuid, text, text) to anon, authenticated;
