@@ -21,6 +21,59 @@
 -- ---------------------------------------------------------------------------
 -- reset_markers (Sıfırla)
 -- ---------------------------------------------------------------------------
+-- RLS lockdown: categories/menu_items/orders/monthly_reports previously had
+-- RLS disabled entirely (no default-deny floor at all - worse than the
+-- permissive-but-enabled pattern used everywhere else). Brought in line with
+-- the rest of the schema: RLS enabled, same open read/insert/update policies,
+-- no delete policy (matches the rest of the app - nothing here should be
+-- hard-deletable via the anon key).
+alter table public.categories enable row level security;
+alter table public.menu_items enable row level security;
+alter table public.orders enable row level security;
+alter table public.monthly_reports enable row level security;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename = 'categories' and policyname = 'categories public read') then
+    create policy "categories public read" on public.categories for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'categories' and policyname = 'categories public insert') then
+    create policy "categories public insert" on public.categories for insert with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'categories' and policyname = 'categories public update') then
+    create policy "categories public update" on public.categories for update using (true) with check (true);
+  end if;
+
+  if not exists (select 1 from pg_policies where tablename = 'menu_items' and policyname = 'menu_items public read') then
+    create policy "menu_items public read" on public.menu_items for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'menu_items' and policyname = 'menu_items public insert') then
+    create policy "menu_items public insert" on public.menu_items for insert with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'menu_items' and policyname = 'menu_items public update') then
+    create policy "menu_items public update" on public.menu_items for update using (true) with check (true);
+  end if;
+
+  if not exists (select 1 from pg_policies where tablename = 'orders' and policyname = 'orders public read') then
+    create policy "orders public read" on public.orders for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'orders' and policyname = 'orders public insert') then
+    create policy "orders public insert" on public.orders for insert with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'orders' and policyname = 'orders public update') then
+    create policy "orders public update" on public.orders for update using (true) with check (true);
+  end if;
+
+  if not exists (select 1 from pg_policies where tablename = 'monthly_reports' and policyname = 'monthly_reports public read') then
+    create policy "monthly_reports public read" on public.monthly_reports for select using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'monthly_reports' and policyname = 'monthly_reports public insert') then
+    create policy "monthly_reports public insert" on public.monthly_reports for insert with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename = 'monthly_reports' and policyname = 'monthly_reports public update') then
+    create policy "monthly_reports public update" on public.monthly_reports for update using (true) with check (true);
+  end if;
+end $$;
+
 create table if not exists public.reset_markers (
   key text primary key, reset_at timestamptz not null, updated_at timestamptz not null default now()
 );
