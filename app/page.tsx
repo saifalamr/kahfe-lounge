@@ -653,6 +653,9 @@ export default function MenuPage() {
         tab_id: tabId,
         created_by: 'Müşteri (QR)'
       })
+      // Decrement stock for any stock-tracked items — no-op for items that
+      // don't have stock tracking turned on
+      await supabase.rpc('decrement_stock_for_order', { p_items: orderItems })
       await sendTelegramNotification(mesa, orderItems, total, orderNote, orderNum)
       setOrderSent(true)
       setCart({})

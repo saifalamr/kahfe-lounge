@@ -18,6 +18,9 @@ export type MenuItem = {
   image_url: string
   available: boolean
   staff_only: boolean
+  track_stock: boolean
+  stock_quantity: number
+  low_stock_threshold: number
   recommended: boolean
   order_index: number
   created_at: string

@@ -280,6 +280,43 @@ create policy "debt_tx public insert" on public.debt_transactions for insert wit
 alter table public.menu_items add column if not exists staff_only boolean not null default false;
 
 -- ---------------------------------------------------------------------------
+-- menu_items stock tracking — item-level (not full ingredient/recipe-level
+-- inventory). Off by default per item; when on, stock decrements per order
+-- and the item auto-hides at zero, then restores on void/cancel.
+-- ---------------------------------------------------------------------------
+alter table public.menu_items add column if not exists track_stock boolean not null default false;
+alter table public.menu_items add column if not exists stock_quantity integer not null default 0;
+alter table public.menu_items add column if not exists low_stock_threshold integer not null default 5;
+
+create or replace function decrement_stock_for_order(p_items jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  item jsonb;
+begin
+  for item in select * from jsonb_array_elements(p_items) loop
+    update menu_items
+    set stock_quantity = greatest(0, stock_quantity - (item->>'quantity')::int),
+        available = (greatest(0, stock_quantity - (item->>'quantity')::int) > 0)
+    where id = (item->>'id')::uuid and track_stock = true;
+  end loop;
+end; $$;
+grant execute on function decrement_stock_for_order(jsonb) to anon, authenticated;
+
+create or replace function restore_stock_for_items(p_items jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  item jsonb;
+begin
+  for item in select * from jsonb_array_elements(p_items) loop
+    update menu_items
+    set stock_quantity = stock_quantity + (item->>'quantity')::int,
+        available = case when track_stock and stock_quantity + (item->>'quantity')::int > 0 then true else available end
+    where id = (item->>'id')::uuid and track_stock = true;
+  end loop;
+end; $$;
+grant execute on function restore_stock_for_items(jsonb) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
 -- item options (e.g. Şeker Oranı: Sade/Az Şekerli/Orta Şekerli/Şekerli)
 -- name_en/name_ar let the customer menu show translated option names
 -- ---------------------------------------------------------------------------

@@ -436,6 +436,7 @@ export default function AdminPage() {
       reason: voidReason.trim(),
       voided_by: staffName,
     })
+    await supabase.rpc('restore_stock_for_items', { p_items: [{ id: item.id, quantity: item.quantity }] })
     setVoidingItem(null)
     setVoidReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
@@ -468,6 +469,7 @@ export default function AdminPage() {
       reason: cancelReason.trim(),
       voided_by: staffName,
     })
+    await supabase.rpc('restore_stock_for_items', { p_items: (order.items || []).map((it: any) => ({ id: it.id, quantity: it.quantity })) })
     setCancellingOrder(null)
     setCancelReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
@@ -879,6 +881,7 @@ export default function AdminPage() {
         alert('✗ Sipariş eklenemedi.\n\n' + orderError.message)
         return
       }
+      await supabase.rpc('decrement_stock_for_order', { p_items: orderItems })
 
       await loadTableMapData()
       setAddOrderTable(null)
@@ -1572,6 +1575,9 @@ export default function AdminPage() {
   const [itemCat, setItemCat] = useState('')
   const [itemAvail, setItemAvail] = useState(true)
   const [itemStaffOnly, setItemStaffOnly] = useState(false)
+  const [itemTrackStock, setItemTrackStock] = useState(false)
+  const [itemStockQty, setItemStockQty] = useState('')
+  const [itemLowStockThreshold, setItemLowStockThreshold] = useState('5')
   const [itemRec, setItemRec] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
 
@@ -1929,12 +1935,12 @@ export default function AdminPage() {
       if (croppedBlob) imageUrl = await uploadBlob(croppedBlob)
 
       if (editingItem) {
-        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly }).eq('id', editingItem.id)
+        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, track_stock: itemTrackStock, stock_quantity: itemTrackStock ? (parseInt(itemStockQty) || 0) : 0, low_stock_threshold: parseInt(itemLowStockThreshold) || 5 }).eq('id', editingItem.id)
         showMsg('Ürün güncellendi ✓')
         await loadData()
       } else {
         const maxOrder = items.length ? Math.max(...items.map(i => i.order_index)) + 1 : 0
-        const { data: newItem } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, order_index: maxOrder }).select().single()
+        const { data: newItem } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, track_stock: itemTrackStock, stock_quantity: itemTrackStock ? (parseInt(itemStockQty) || 0) : 0, low_stock_threshold: parseInt(itemLowStockThreshold) || 5, order_index: maxOrder }).select().single()
         showMsg('✓ Ürün eklendi. Şimdi isterseniz seçenek (şeker oranı vb.) ekleyebilirsiniz.')
         await loadData()
         if (newItem) { startEditItem(newItem as MenuItem); setLoading(false); return }
@@ -1980,6 +1986,7 @@ export default function AdminPage() {
     setEditingItem(item); setItemName(item.name); setItemDesc(item.description || '')
     setItemPrice(item.price.toString()); setItemCat(item.category_id); setItemAvail(item.available)
     setItemRec(item.recommended || false); setItemStaffOnly(item.staff_only || false)
+    setItemTrackStock(item.track_stock || false); setItemStockQty(String(item.stock_quantity ?? 0)); setItemLowStockThreshold(String(item.low_stock_threshold ?? 5))
     setExistingImageUrl(item.image_url || ''); setCroppedBlob(null); setCroppedPreview(item.image_url || '')
     setRawImageSrc(''); setShowCropper(false)
     loadItemOptionGroups(item.id)
@@ -1988,6 +1995,7 @@ export default function AdminPage() {
   function resetItemForm() {
     setItemName(''); setItemDesc(''); setItemPrice(''); setItemCat(''); setItemAvail(true); setItemRec(false)
     setItemStaffOnly(false)
+    setItemTrackStock(false); setItemStockQty(''); setItemLowStockThreshold('5')
     setEditingItem(null); setCroppedBlob(null); setCroppedPreview(''); setRawImageSrc('')
     setExistingImageUrl(''); setShowCropper(false)
     setItemOptionGroups([]); setNewGroupName(''); setNewChoiceText({})
@@ -2899,6 +2907,22 @@ export default function AdminPage() {
         {/* ITEMS */}
         {isManager && tab === 'items' && (
           <div className="kahfe-section" style={s.section}>
+            {(() => {
+              const lowStockItems = items.filter(it => it.track_stock && it.stock_quantity > 0 && it.stock_quantity <= it.low_stock_threshold)
+              const outOfStockItems = items.filter(it => it.track_stock && it.stock_quantity <= 0)
+              if (lowStockItems.length === 0 && outOfStockItems.length === 0) return null
+              return (
+                <div style={{ background: 'rgba(231,76,60,.08)', border: '1px solid rgba(231,76,60,.25)', borderRadius: 0, padding: 14, marginBottom: 16 }}>
+                  <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>⚠️ Stok Uyarısı</div>
+                  {outOfStockItems.length > 0 && (
+                    <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 4 }}>Stok bitti: {outOfStockItems.map(it => it.name).join(', ')}</div>
+                  )}
+                  {lowStockItems.length > 0 && (
+                    <div style={{ color: 'var(--a-text2)', fontSize: 12 }}>Düşük stok: {lowStockItems.map(it => `${it.name} (${it.stock_quantity})`).join(', ')}</div>
+                  )}
+                </div>
+              )
+            })()}
             <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 16, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingItem ? 'ÜRÜN DÜZENLE' : 'YENİ ÜRÜN EKLE'}</div>
 
@@ -2950,6 +2974,26 @@ export default function AdminPage() {
                   <label htmlFor="staffOnly" style={{ color: '#f39c12', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>👤 Personel İçin (Müşteri Menüsünde Gizli)</label>
                 </div>
                 <div style={{ color: 'var(--a-text2)', fontSize: 11.5, marginTop: 6, marginLeft: 28 }}>Müşteri QR menüsünde görünmez, ama Sipariş Ekle ile siz masaya ekleyebilirsiniz. Örn. VİP Oda (Saatlik).</div>
+              </div>
+
+              <div style={{ marginBottom: 16, background: itemTrackStock ? 'rgba(52,152,219,.08)' : 'transparent', border: itemTrackStock ? '1px solid rgba(52,152,219,.3)' : '1px solid var(--a-border)', borderRadius: 0, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: itemTrackStock ? 10 : 0 }}>
+                  <input type="checkbox" id="trackStock" checked={itemTrackStock} onChange={e => setItemTrackStock(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#3498db' }} />
+                  <label htmlFor="trackStock" style={{ color: '#6FB9E8', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>📦 Stok Takibi</label>
+                </div>
+                {itemTrackStock && (
+                  <div style={{ display: 'flex', gap: 8, marginLeft: 28 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ color: 'var(--a-text2)', fontSize: 11, display: 'block', marginBottom: 4 }}>MEVCUT STOK</label>
+                      <input type="number" value={itemStockQty} onChange={e => setItemStockQty(e.target.value)} placeholder="0" style={{ ...s.input, height: 44, width: '100%' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ color: 'var(--a-text2)', fontSize: 11, display: 'block', marginBottom: 4 }}>DÜŞÜK STOK EŞİĞİ</label>
+                      <input type="number" value={itemLowStockThreshold} onChange={e => setItemLowStockThreshold(e.target.value)} placeholder="5" style={{ ...s.input, height: 44, width: '100%' }} />
+                    </div>
+                  </div>
+                )}
+                <div style={{ color: 'var(--a-text2)', fontSize: 11.5, marginTop: 6, marginLeft: 28 }}>Açıksa, her siparişte stok otomatik azalır; stok 0'a düşünce ürün otomatik "müsait değil" olur. İptal/void durumunda stok geri eklenir.</div>
               </div>
 
               {editingItem && (
@@ -3062,7 +3106,13 @@ export default function AdminPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{item.recommended && <span style={{ marginRight: 4 }}>⭐</span>}{item.staff_only && <span style={{ marginRight: 4 }}>👤</span>}{item.name}</div>
-                      <div style={{ color: 'var(--a-text2)', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}{item.staff_only && <span style={{ color: '#f39c12', marginLeft: 6 }}>· Personel İçin</span>}</div>
+                      <div style={{ color: 'var(--a-text2)', fontSize: 11, marginBottom: 4 }}>{cat?.name || '—'}{item.staff_only && <span style={{ color: '#f39c12', marginLeft: 6 }}>· Personel İçin</span>}
+                        {item.track_stock && (
+                          <span style={{ marginLeft: 6, color: item.stock_quantity <= 0 ? '#e74c3c' : item.stock_quantity <= item.low_stock_threshold ? '#f39c12' : '#5FD08C', fontWeight: 700 }}>
+                            · 📦 {item.stock_quantity <= 0 ? 'STOK YOK' : `${item.stock_quantity} adet`}
+                          </span>
+                        )}
+                      </div>
                       <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 14 }}>{item.price} ₺</div>
                     </div>
                     {!bulkMode && (
@@ -3070,6 +3120,9 @@ export default function AdminPage() {
                       <button onClick={() => startEditItem(item)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
                       <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 10px', color: item.recommended ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
                       <button onClick={() => deleteItem(item.id)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                      {item.track_stock && (
+                        <button onClick={async () => { await supabase.from('menu_items').update({ stock_quantity: item.stock_quantity + 10, available: true }).eq('id', item.id); await loadData() }} style={{ background: 'rgba(52,152,219,.14)', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#6FB9E8', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+10 Stok</button>
+                      )}
                     </div>
                     )}
                   </div>
