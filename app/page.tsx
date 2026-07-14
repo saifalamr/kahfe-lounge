@@ -573,6 +573,46 @@ function getCatName(cat: Category, lang: string): string {
   return cat.name
 }
 
+// Full-screen category picker — shown right after language is chosen,
+// before the customer sees any items. Tapping a category (or Recommended)
+// takes them into the normal browsing view already filtered to that
+// category; everything past that point (TabBar to switch categories,
+// item grid, cart, checkout) is completely unchanged.
+function CategoryPicker({ lang, categories, recCat, onPick }: { lang: string; categories: Category[]; recCat: Category | null; onPick: (id: string) => void }) {
+  const tiles = recCat ? [recCat, ...categories] : categories
+  return (
+    <div style={{ minHeight: '100vh', padding: '0 0 40px', animation: 'fadeUp .5s ease both' }}>
+      <div style={{ textAlign: 'center', padding: '48px 24px 8px' }}>
+        <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width: 130, height: 'auto', margin: '0 auto 18px', opacity: .95 }} />
+        <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 22, color: '#F0EDE8', margin: 0 }}>
+          {lang === 'en' ? 'What would you like?' : lang === 'ar' ? 'ماذا تودّ أن تطلب؟' : 'Ne almak istersiniz?'}
+        </h1>
+        <div style={{ fontSize: 13, color: 'rgba(240,237,232,.5)', marginTop: 8 }}>
+          {lang === 'en' ? 'Choose a category to get started' : lang === 'ar' ? 'اختر فئة للبدء' : 'Başlamak için bir kategori seçin'}
+        </div>
+      </div>
+
+      <div className='gold-divider' style={{ margin: '20px 16px' }} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, padding: '4px 16px' }}>
+        {tiles.map(cat => {
+          const isRec = cat.id === '__recommended__'
+          const displayName = isRec ? (lang === 'en' ? 'Recommended' : lang === 'ar' ? 'موصى به' : 'Öne Çıkanlar') : getCatName(cat, lang)
+          return (
+            <button key={cat.id} className='corner-card' onClick={() => onPick(cat.id)}
+              style={{ appearance: 'none', cursor: 'pointer', textAlign: 'center', padding: '28px 12px', borderRadius: 16,
+                background: isRec ? 'linear-gradient(135deg,rgba(201,168,76,.14),rgba(201,168,76,.05))' : 'rgba(240,237,232,.04)',
+                border: isRec ? '1px solid rgba(201,168,76,.4)' : '1px solid rgba(240,237,232,.1)' }}>
+              <div style={{ fontSize: 34, marginBottom: 10 }}>{cat.icon || (isRec ? '⭐' : '🍽️')}</div>
+              <div style={{ fontFamily: 'var(--sans)', fontWeight: 700, fontSize: 14, color: isRec ? '#C9A84C' : '#F0EDE8' }}>{displayName}</div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function MenuPage() {
   const isOnline = useConnectivity()
   const [categories, setCategories] = useState<Category[]>([])
@@ -735,6 +775,12 @@ export default function MenuPage() {
 
   const [lang, setLang] = useState<'tr'|'en'|'ar'>('tr')
   const [showWelcome, setShowWelcome] = useState(false)
+  // Gates the new category-picker screen that appears right after language
+  // selection. Deliberately re-shown on every fresh load (not remembered in
+  // localStorage the way lang is) - a café QR menu is scanned fresh each
+  // visit, so "what do you want" is the natural starting point every time,
+  // not just the very first time someone ever opens the menu.
+  const [categoryPicked, setCategoryPicked] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('kahfe_lang') as 'tr'|'en'|'ar'
@@ -793,6 +839,11 @@ export default function MenuPage() {
   const openItem = openItemId?byId[openItemId]:null
 
   const hasOptions = (itemId: string) => (itemOptions[itemId]?.length || 0) > 0
+
+  function pickCategory(id: string) {
+    setActiveCat(id)
+    setCategoryPicked(true)
+  }
 
   function openForOptions(item: MenuItem) {
     const groups = itemOptions[item.id] || []
@@ -914,27 +965,39 @@ export default function MenuPage() {
       )}
 
       <div style={{ minHeight:'100vh', maxWidth:480, margin:'0 auto', position:'relative', backgroundColor:'#0D0D0D', backgroundImage:'radial-gradient(circle, rgba(201,168,76,.06) 1px, transparent 1px)', backgroundSize:'26px 26px', direction: lang==='ar'?'rtl':'ltr' }}>
-        <Hero lang={lang} onLangChange={changeLang}/>
-        <VipRoomBanner lang={lang}/>
-        <div className='gold-divider'/>
-        <TabBar cats={categories} recCat={recCat} active={activeCat} onChange={setActiveCat} lang={lang}/>
+        {!showWelcome && !categoryPicked ? (
+          <CategoryPicker lang={lang} categories={categories} recCat={recCat} onPick={pickCategory} />
+        ) : (
+          <>
+            <Hero lang={lang} onLangChange={changeLang}/>
+            <div style={{ padding: '0 16px 10px', textAlign: 'center' }}>
+              <button onClick={() => setCategoryPicked(false)}
+                style={{ appearance:'none', background:'transparent', border:'none', color:'rgba(201,168,76,.75)', fontSize:12.5, fontWeight:600, cursor:'pointer', padding:'6px 10px', fontFamily:'var(--sans)' }}>
+                {lang==='en' ? '← All Categories' : lang==='ar' ? '← جميع الفئات' : '← Tüm Kategoriler'}
+              </button>
+            </div>
+            <VipRoomBanner lang={lang}/>
+            <div className='gold-divider'/>
+            <TabBar cats={categories} recCat={recCat} active={activeCat} onChange={setActiveCat} lang={lang}/>
 
-        <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
-          {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
-          {items.map((it,i)=>(
-            <MenuCard key={it.id} item={it} qty={hasOptions(it.id) ? 0 : (cart[it.id]||0)} index={i} lang={lang}
-              onOpen={()=>setOpenItemId(it.id)}
-              onAdd={()=>hasOptions(it.id) ? openForOptions(it) : add(it)} onInc={()=>inc(it)} onDec={()=>dec(it)}/>
-          ))}
-        </div>
+            <div key={activeCat} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, padding:'18px 16px 4px' }}>
+              {items.length===0 && <div style={{ gridColumn:'1/-1', textAlign:'center', color:'#888', padding:40 }}>{lang==='en'?'No items in this category yet.':lang==='ar'?'لا توجد عناصر في هذه الفئة بعد.':'Bu kategoride henüz ürün yok.'}</div>}
+              {items.map((it,i)=>(
+                <MenuCard key={it.id} item={it} qty={hasOptions(it.id) ? 0 : (cart[it.id]||0)} index={i} lang={lang}
+                  onOpen={()=>setOpenItemId(it.id)}
+                  onAdd={()=>hasOptions(it.id) ? openForOptions(it) : add(it)} onInc={()=>inc(it)} onDec={()=>dec(it)}/>
+              ))}
+            </div>
 
-        <VipRoomSection lang={lang}/>
-        <Contact lang={lang}/>
+            <VipRoomSection lang={lang}/>
+            <Contact lang={lang}/>
 
-        <footer style={{ textAlign:'center', padding:'28px 16px 120px', marginTop:14, borderTop:'1px solid rgba(240,237,232,.05)' }}>
-          <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:120, height:'auto', opacity:.6, marginBottom:12 }}/>
-          <div style={{ fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.01em' }}>{lang==='en'?'© 2024 Kahfe Lounge — All rights reserved':lang==='ar'?'© 2024 كهفة لاونج — جميع الحقوق محفوظة':'© 2024 Kahfe Lounge — Tüm hakları saklıdır'}</div>
-        </footer>
+            <footer style={{ textAlign:'center', padding:'28px 16px 120px', marginTop:14, borderTop:'1px solid rgba(240,237,232,.05)' }}>
+              <img src="/kahfe-logo.png" alt="Kahfe Lounge" style={{ width:120, height:'auto', opacity:.6, marginBottom:12 }}/>
+              <div style={{ fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.01em' }}>{lang==='en'?'© 2024 Kahfe Lounge — All rights reserved':lang==='ar'?'© 2024 كهفة لاونج — جميع الحقوق محفوظة':'© 2024 Kahfe Lounge — Tüm hakları saklıdır'}</div>
+            </footer>
+          </>
+        )}
 
         {count>0 && (
           <div style={{ position:'fixed', left:0, right:0, bottom:0, padding:'0 16px 24px', zIndex:30, maxWidth:480, margin:'0 auto', pointerEvents:'none' }}>
