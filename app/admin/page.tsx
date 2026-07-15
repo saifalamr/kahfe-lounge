@@ -553,7 +553,11 @@ export default function AdminPage() {
   const [splitCard, setSplitCard] = useState('')
   const [splitPeopleCount, setSplitPeopleCount] = useState('2')
   const [settleMode, setSettleMode] = useState<'all'|'select'>('all')
-  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
+  // Per-ITEM selection (not per-order) so a bill can be split by exactly
+  // who ordered what, even when several items were submitted together
+  // in one order. Keyed by "orderId::itemIndex" since items don't have
+  // their own row/id — they're array entries inside orders.items.
+  const [selectedItemKeys, setSelectedItemKeys] = useState<Set<string>>(new Set())
   const [discountType, setDiscountType] = useState<'none'|'percent'|'amount'>('none')
   const [discountValue, setDiscountValue] = useState('')
   const [discountReason, setDiscountReason] = useState('')
@@ -628,7 +632,7 @@ export default function AdminPage() {
     setSplitCard('0')
     setSplitPeopleCount('2')
     setSettleMode('all')
-    setSelectedOrderIds(new Set())
+    setSelectedItemKeys(new Set())
     setDiscountType('none')
     setDiscountValue('')
     setDiscountReason('')
@@ -719,31 +723,49 @@ export default function AdminPage() {
     }
   }
 
-  function toggleSelectedOrder(orderId: string) {
-    setSelectedOrderIds(prev => {
+  function itemKey(orderId: string, itemIndex: number) {
+    return `${orderId}::${itemIndex}`
+  }
+
+  function toggleSelectedItem(orderId: string, itemIndex: number) {
+    const key = itemKey(orderId, itemIndex)
+    setSelectedItemKeys(prev => {
       const next = new Set(prev)
-      if (next.has(orderId)) next.delete(orderId)
-      else next.add(orderId)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
 
-  // Settle only a subset of the orders on this tab (e.g. one guest's items),
-  // take payment + print for just that portion, and leave the rest of the
-  // table open with its remaining orders untouched.
+  function getSelectedItems(orders: any[]) {
+    const flat: { order: any, itemIndex: number, item: any }[] = []
+    orders.forEach((o: any) => {
+      (o.items || []).forEach((item: any, idx: number) => {
+        if (selectedItemKeys.has(itemKey(o.id, idx))) flat.push({ order: o, itemIndex: idx, item })
+      })
+    })
+    return flat
+  }
+
+  // Settle only a subset of the items on this tab (e.g. one guest's
+  // items, even if they were part of a bigger shared order), take
+  // payment + print for just that portion, and leave the rest of the
+  // table open with its remaining items untouched.
   async function confirmPartialPayment() {
     if (!paymentTab) return
-    const selectedOrders = paymentTab.orders.filter((o: any) => selectedOrderIds.has(o.id))
-    if (selectedOrders.length === 0) { alert('Lütfen ödenecek en az bir sipariş seçin.'); return }
+    const selectedFlat = getSelectedItems(paymentTab.orders)
+    if (selectedFlat.length === 0) { alert('Lütfen ödenecek en az bir ürün seçin.'); return }
 
-    // If every order on the tab was selected, this is just a full close —
-    // use the normal flow so we don't leave an empty open tab behind.
-    if (selectedOrders.length === paymentTab.orders.length) {
+    // If literally every item on the tab was selected, this is just a
+    // full close — use the normal flow so we don't leave an empty open
+    // tab behind.
+    const totalItemCount = paymentTab.orders.reduce((s: number, o: any) => s + ((o.items || []).length), 0)
+    if (selectedFlat.length === totalItemCount) {
       await confirmPayment()
       return
     }
 
-    const selectedTotal = selectedOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+    const selectedTotal = selectedFlat.reduce((s: number, x: any) => s + Number(x.item.subtotal), 0)
     const discountAmount = computeDiscountAmount(selectedTotal)
     if (discountAmount > 0 && !discountReason.trim()) {
       alert('Lütfen indirim için bir neden girin.')
@@ -773,16 +795,50 @@ export default function AdminPage() {
       }
     }
 
-    // Create a fresh tab for just the selected orders, then close it — this
-    // gets it its own fatura_no via the DB trigger, same as a normal close.
+    // Create a fresh tab for just the selected items, then close it —
+    // gets its own fatura_no via the DB trigger, same as a normal close.
     const { data: newTab, error: newTabError } = await supabase.from('tabs')
       .insert({ table_name: paymentTab.table_name, status: 'open' }).select('id').single()
     if (newTabError || !newTab) { alert('✗ Kısmi hesap oluşturulamadı.\n\n' + (newTabError?.message || '')); return }
 
-    const { error: moveError } = await supabase.from('orders')
-      .update({ tab_id: newTab.id })
-      .in('id', selectedOrders.map((o: any) => o.id))
-    if (moveError) { alert('✗ Siparişler taşınamadı.\n\n' + moveError.message); return }
+    // Group the selection back up by order: if every item in a given
+    // order was selected, just move that whole order across. If only
+    // some were, split it into two rows — a new one on the new tab for
+    // the selected items, the original row keeps whatever's left.
+    const byOrder = new Map<string, { order: any, indices: Set<number> }>()
+    selectedFlat.forEach(({ order, itemIndex }: any) => {
+      if (!byOrder.has(order.id)) byOrder.set(order.id, { order, indices: new Set() })
+      byOrder.get(order.id)!.indices.add(itemIndex)
+    })
+
+    for (const { order, indices } of byOrder.values()) {
+      const allItems: any[] = order.items || []
+      if (indices.size === allItems.length) {
+        const { error } = await supabase.from('orders').update({ tab_id: newTab.id }).eq('id', order.id)
+        if (error) { alert('✗ Siparişler taşınamadı.\n\n' + error.message); return }
+        continue
+      }
+      const selectedItems = allItems.filter((_, i) => indices.has(i))
+      const remainingItems = allItems.filter((_, i) => !indices.has(i))
+      const selectedItemsTotal = selectedItems.reduce((s, it) => s + Number(it.subtotal), 0)
+      const remainingItemsTotal = remainingItems.reduce((s, it) => s + Number(it.subtotal), 0)
+
+      const { error: insertError } = await supabase.from('orders').insert({
+        table_name: order.table_name,
+        items: selectedItems,
+        total: selectedItemsTotal,
+        status: order.status,
+        tab_id: newTab.id,
+        created_by: order.created_by,
+        handled_by: staffName,
+      })
+      if (insertError) { alert('✗ Ürünler ayrılamadı.\n\n' + insertError.message); return }
+
+      const { error: updateError } = await supabase.from('orders')
+        .update({ items: remainingItems, total: remainingItemsTotal })
+        .eq('id', order.id)
+      if (updateError) { alert('✗ Kalan ürünler güncellenemedi.\n\n' + updateError.message); return }
+    }
 
     const { data: closedTab, error: closeError } = await supabase.from('tabs').update({
       status: 'closed',
@@ -823,13 +879,14 @@ export default function AdminPage() {
       await loadDebtors()
     }
 
-    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, transfer: transferAmount, method: paymentMethod, orders: selectedOrders, discountAmount, discountReason: discountReason.trim(), originalTotal: selectedTotal, faturaNo: closedTab?.fatura_no }
+    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, transfer: transferAmount, method: paymentMethod, orders: [{ items: selectedFlat.map((x: any) => x.item) }], discountAmount, discountReason: discountReason.trim(), originalTotal: selectedTotal, faturaNo: closedTab?.fatura_no }
     setPaymentTab(null)
+    setSelectedItemKeys(new Set())
     await loadTableMapData()
     if (canPrint) {
       printReceipt(receiptInfo, autoPrintEnabled)
     } else {
-      alert('✓ Seçili siparişlerin ödemesi alındı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
+      alert('✓ Seçili ürünlerin ödemesi alındı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
     }
   }
 
@@ -2562,9 +2619,9 @@ export default function AdminPage() {
 
             {/* Payment modal - choose method, optionally split, close the tab */}
             {paymentTab && (() => {
-              const selectedOrders = paymentTab.orders.filter((o: any) => selectedOrderIds.has(o.id))
-              const baseTotal = settleMode === 'select' && selectedOrders.length > 0
-                ? selectedOrders.reduce((s: number, o: any) => s + Number(o.total), 0)
+              const selectedFlat = getSelectedItems(paymentTab.orders)
+              const baseTotal = settleMode === 'select' && selectedFlat.length > 0
+                ? selectedFlat.reduce((s: number, x: any) => s + Number(x.item.subtotal), 0)
                 : paymentTab.total
               const discountAmount = computeDiscountAmount(baseTotal)
               const finalTotal = baseTotal - discountAmount
@@ -2579,7 +2636,7 @@ export default function AdminPage() {
                   </div>
                   <div style={{ padding:'20px' }}>
                     <div style={{ textAlign:'center', marginBottom:16 }}>
-                      <div style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>{settleMode==='select' && selectedOrders.length>0 ? 'SEÇİLİ SİPARİŞLER TUTARI' : 'ÖDENECEK TUTAR'}</div>
+                      <div style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.1em', textTransform:'uppercase' }}>{settleMode==='select' && selectedFlat.length>0 ? 'SEÇİLİ ÜRÜNLER TUTARI' : 'ÖDENECEK TUTAR'}</div>
                       {discountAmount > 0 && (
                         <div style={{ color:'var(--a-text2)', fontSize:15, fontFamily:"'IBM Plex Mono', monospace", textDecoration:'line-through' }}>₺ {formatTL(baseTotal)}</div>
                       )}
@@ -2601,7 +2658,7 @@ export default function AdminPage() {
                     {/* Settle mode: pay the whole tab, or select specific orders (e.g. one guest's rounds) */}
                     <div style={{ marginBottom:16 }}>
                       <div style={{ display:'flex', gap:8, marginBottom: settleMode==='select' ? 10 : 0 }}>
-                        <button onClick={() => { setSettleMode('all'); setSelectedOrderIds(new Set()) }}
+                        <button onClick={() => { setSettleMode('all'); setSelectedItemKeys(new Set()) }}
                           style={{ flex:1, height:40, background: settleMode==='all' ? 'rgba(39,174,96,.14)' : 'transparent', border: settleMode==='all' ? '1px solid #27ae60' : '1px solid var(--a-border)', color: settleMode==='all' ? '#5FD08C' : 'var(--a-text2)', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
                           Tüm Hesap
                         </button>
@@ -2613,14 +2670,18 @@ export default function AdminPage() {
                       {settleMode === 'select' && (
                         <div style={{ border:'1px solid var(--a-border)' }}>
                           {paymentTab.orders.map((o: any) => (
-                            <label key={o.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderBottom:'1px solid var(--a-border)', cursor:'pointer' }}>
-                              <input type="checkbox" checked={selectedOrderIds.has(o.id)} onChange={() => toggleSelectedOrder(o.id)} style={{ width:18, height:18 }} />
-                              <div style={{ flex:1 }}>
-                                <div style={{ color:'var(--a-text)', fontSize:13 }}>{(o.items||[]).map((it:any)=>`${it.quantity}x ${it.name}`).join(', ')}</div>
-                                <div style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(o.created_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>
+                            <div key={o.id}>
+                              <div style={{ padding:'5px 12px', background:'var(--a-bg3)', color:'var(--a-text3)', fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em' }}>
+                                {new Date(o.created_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}
                               </div>
-                              <span style={{ color:'#C9A84C', fontWeight:700, fontSize:14, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {o.total}</span>
-                            </label>
+                              {(o.items || []).map((item: any, idx: number) => (
+                                <label key={itemKey(o.id, idx)} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderBottom:'1px solid var(--a-border)', cursor:'pointer' }}>
+                                  <input type="checkbox" checked={selectedItemKeys.has(itemKey(o.id, idx))} onChange={() => toggleSelectedItem(o.id, idx)} style={{ width:18, height:18 }} />
+                                  <div style={{ flex:1, color:'var(--a-text)', fontSize:13 }}>{item.quantity}x {item.name}</div>
+                                  <span style={{ color:'#C9A84C', fontWeight:700, fontSize:14, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {item.subtotal}</span>
+                                </label>
+                              ))}
+                            </div>
                           ))}
                           {paymentTab.orders.length === 0 && (
                             <div style={{ padding:14, color:'var(--a-text2)', fontSize:13, textAlign:'center' }}>Bu masada aktif sipariş yok.</div>
@@ -2696,13 +2757,13 @@ export default function AdminPage() {
                     )}
 
                     {canPrint && (
-                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), transfer: paymentMethod==='transfer'?finalTotal:0, method: paymentMethod, orders: settleMode==='select' && selectedOrders.length>0 ? selectedOrders : paymentTab.orders, discountAmount, discountReason, originalTotal: baseTotal }, autoPrintEnabled)}
+                      <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), transfer: paymentMethod==='transfer'?finalTotal:0, method: paymentMethod, orders: settleMode==='select' && selectedFlat.length>0 ? [{ items: selectedFlat.map((x: any) => x.item) }] : paymentTab.orders, discountAmount, discountReason, originalTotal: baseTotal }, autoPrintEnabled)}
                         style={{ width:'100%', height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
-                    <button onClick={settleMode==='select' ? confirmPartialPayment : confirmPayment} disabled={!isOnline || (settleMode==='select' && selectedOrders.length===0)}
+                    <button onClick={settleMode==='select' ? confirmPartialPayment : confirmPayment} disabled={!isOnline || (settleMode==='select' && selectedFlat.length===0)}
                       style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 0, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                      {!isOnline ? '🔴 Bağlantı Yok' : settleMode==='select' ? '✓ Seçili Siparişleri Öde ve Yazdır' : '✓ Ödemeyi Onayla ve Masayı Kapat'}
+                      {!isOnline ? '🔴 Bağlantı Yok' : settleMode==='select' ? '✓ Seçili Ürünleri Öde ve Yazdır' : '✓ Ödemeyi Onayla ve Masayı Kapat'}
                     </button>
                   </div>
                 </div>
