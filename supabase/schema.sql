@@ -636,6 +636,34 @@ create index if not exists idx_item_option_groups_menu_item_id on public.item_op
 create index if not exists idx_menu_items_category_id on public.menu_items(category_id);
 create index if not exists idx_voids_order_id on public.voids(order_id);
 
+-- ---------------------------------------------------------------------------
+-- refunds — audit trail for post-close corrections: a full reopen (tab
+-- goes back to 'open', same fatura_no, editable/re-closable) or a refund
+-- recorded against a tab that stays closed/historical. Cash refunds also
+-- create a matching "Kasadan Çıkış" cash_movements row; debt refunds/
+-- reopens create an offsetting 'ödeme' debt_transactions row.
+-- ---------------------------------------------------------------------------
+create table if not exists public.refunds (
+  id uuid primary key default gen_random_uuid(),
+  tab_id uuid references public.tabs(id) on delete set null,
+  table_name text not null,
+  fatura_no bigint,
+  type text not null check (type in ('refund','reopen')),
+  method text, -- 'cash'|'card'|'transfer'|'debt', null for a plain reopen
+  amount numeric not null default 0,
+  reason text not null,
+  staff_name text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_refunds_tab_id on public.refunds(tab_id);
+create index if not exists idx_refunds_created_at on public.refunds(created_at);
+alter table public.refunds enable row level security;
+drop policy if exists "refunds public select" on public.refunds;
+create policy "refunds public select" on public.refunds for select using (true);
+drop policy if exists "refunds public insert" on public.refunds;
+create policy "refunds public insert" on public.refunds for insert with check (true);
+grant select, insert on public.refunds to anon, authenticated;
+
 -- =============================================================================
 -- END — if this whole file ran without errors, the database is fully caught up.
 -- =============================================================================

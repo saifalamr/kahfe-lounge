@@ -1318,6 +1318,106 @@ export default function AdminPage() {
   const [receiptResults, setReceiptResults] = useState<any[]>([])
   const [receiptSearching, setReceiptSearching] = useState(false)
 
+  // Reopen a closed tab by mistake, or record a refund against one that
+  // stays closed. Both are manager-only, both require a reason, both get
+  // logged to `refunds` for accountability.
+  const [refundTarget, setRefundTarget] = useState<any | null>(null)
+  const [refundMode, setRefundMode] = useState<'refund'|'reopen'>('refund')
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundMethod, setRefundMethod] = useState<'cash'|'card'|'transfer'|'debt'>('cash')
+  const [refundReason, setRefundReason] = useState('')
+
+  function openRefund(tabRow: any, mode: 'refund'|'reopen') {
+    setRefundTarget(tabRow)
+    setRefundMode(mode)
+    setRefundAmount(String(Number(tabRow.total)))
+    setRefundMethod(tabRow.payment_method === 'debt' ? 'debt' : (tabRow.payment_method || 'cash'))
+    setRefundReason('')
+  }
+
+  // A refund against a debt-paid tab, or a debt-tab reopen, needs to know
+  // which debtor the original 'borç' entry belongs to so the ledger can
+  // be corrected too, not just the tab/cash side.
+  async function findDebtorForTab(tabId: string) {
+    const { data } = await supabase.from('debt_transactions').select('debtor_id').eq('tab_id', tabId).eq('type', 'borç').limit(1).maybeSingle()
+    return data?.debtor_id || null
+  }
+
+  async function confirmReopenTab() {
+    if (!refundTarget) return
+    if (!refundReason.trim()) { alert('Lütfen yeniden açma nedeni girin.'); return }
+    const tab = refundTarget
+
+    const { error } = await supabase.from('tabs').update({
+      status: 'open', closed_at: null, payment_method: null,
+      cash_amount: 0, card_amount: 0, transfer_amount: 0, debt_amount: 0,
+    }).eq('id', tab.id).eq('status', 'closed')
+    if (error) { alert('✗ Yeniden açılamadı.\n\n' + error.message); return }
+
+    // If it had been paid off as debt, cancel that debt out — otherwise
+    // the debtor would still show as owing for a tab that's open again.
+    if (tab.payment_method === 'debt') {
+      const debtorId = await findDebtorForTab(tab.id)
+      if (debtorId) {
+        await supabase.from('debt_transactions').insert({
+          debtor_id: debtorId, tab_id: tab.id, type: 'ödeme',
+          amount: Number(tab.debt_amount || tab.total),
+          note: 'Fiş yeniden açıldı — borç iptal edildi', created_by: staffName,
+        })
+        await loadDebtors()
+      }
+    }
+
+    await supabase.from('refunds').insert({
+      tab_id: tab.id, table_name: tab.table_name, fatura_no: tab.fatura_no,
+      type: 'reopen', amount: Number(tab.total), reason: refundReason.trim(), staff_name: staffName,
+    })
+
+    setReceiptResults(prev => prev.filter((r: any) => r.id !== tab.id))
+    setRefundTarget(null)
+    setRefundReason('')
+    await loadTableMapData()
+    alert(`✓ ${tab.table_name} yeniden açıldı. Masa Haritası'ndan devam edebilirsiniz.`)
+  }
+
+  async function confirmRefund() {
+    if (!refundTarget) return
+    const amt = parseFloat(refundAmount) || 0
+    if (amt <= 0) { alert('Lütfen geçerli bir iade tutarı girin.'); return }
+    if (amt > Number(refundTarget.total)) { alert('İade tutarı fişin toplamından fazla olamaz.'); return }
+    if (!refundReason.trim()) { alert('Lütfen iade nedeni girin.'); return }
+    const tab = refundTarget
+
+    const { error } = await supabase.from('refunds').insert({
+      tab_id: tab.id, table_name: tab.table_name, fatura_no: tab.fatura_no,
+      type: 'refund', method: refundMethod, amount: amt, reason: refundReason.trim(), staff_name: staffName,
+    })
+    if (error) { alert('✗ İade kaydedilemedi.\n\n' + error.message); return }
+
+    if (refundMethod === 'cash') {
+      await supabase.from('cash_movements').insert({
+        type: 'out', amount: amt,
+        reason: `İade — ${tab.table_name}${tab.fatura_no ? ` · Fiş #${String(tab.fatura_no).padStart(6, '0')}` : ''} — ${refundReason.trim()}`,
+        created_by: staffName,
+      })
+    } else if (refundMethod === 'debt') {
+      const debtorId = await findDebtorForTab(tab.id)
+      if (debtorId) {
+        await supabase.from('debt_transactions').insert({
+          debtor_id: debtorId, tab_id: tab.id, type: 'ödeme', amount: amt,
+          note: `İade: ${refundReason.trim()}`, created_by: staffName,
+        })
+        await loadDebtors()
+      } else {
+        alert('Not: bu fiş için borçlu bulunamadı, sadece iade kaydı oluşturuldu.')
+      }
+    }
+
+    setRefundTarget(null)
+    setRefundReason('')
+    alert(`✓ ₺${formatTL(amt)} iade kaydedildi.`)
+  }
+
   async function searchReceipts() {
     setReceiptSearching(true)
     let query = supabase.from('tabs').select('*').eq('status', 'closed')
@@ -2771,7 +2871,62 @@ export default function AdminPage() {
               )
             })()}
 
-            {/* View toggle - table map vs flat list, both roles see this */}
+            {/* Reopen a closed tab by mistake, or record a refund against
+                one that stays closed — both manager-only, both logged. */}
+            {refundTarget && (
+              <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setRefundTarget(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, background:'var(--a-bg2)', borderRadius:20, border: refundMode==='reopen' ? '1px solid rgba(52,152,219,.4)' : '1px solid rgba(230,126,34,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+                  <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ color: refundMode==='reopen' ? '#3498db' : '#e67e22', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>
+                      {refundMode==='reopen' ? `↩️ ${refundTarget.table_name} — Yeniden Aç` : `💸 ${refundTarget.table_name} — İade`}
+                    </div>
+                    <button onClick={() => setRefundTarget(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    <div style={{ color:'var(--a-text2)', fontSize:13, marginBottom:16 }}>
+                      {refundTarget.fatura_no ? `Fiş #${String(refundTarget.fatura_no).padStart(6, '0')} · ` : ''}Toplam: ₺{formatTL(Number(refundTarget.total))}
+                      {refundMode==='reopen' && <> — masa yeniden açılıp Masa Haritası'na geri döner, aynı fiş numarasıyla tekrar kapatılabilir.</>}
+                    </div>
+
+                    {refundMode === 'refund' && (
+                      <>
+                        <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İADE TUTARI (₺)</label>
+                        <input type="number" value={refundAmount} onChange={e => setRefundAmount(e.target.value)}
+                          style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace", marginBottom:14 }} />
+
+                        <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İADE YÖNTEMİ</label>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginBottom:16 }}>
+                          {(['cash','card','transfer','debt'] as const).map(m => (
+                            <button key={m} onClick={() => setRefundMethod(m)}
+                              style={{ height:52, background: refundMethod===m ? 'rgba(230,126,34,.14)' : 'transparent', border: refundMethod===m ? '1px solid #e67e22' : '1px solid var(--a-border)', color: refundMethod===m ? '#e67e22' : 'var(--a-text3)', fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                              {m==='cash' ? '💵 Nakit' : m==='card' ? '💳 Kart' : m==='transfer' ? '🏦 Havale' : '🧾 Borç'}
+                            </button>
+                          ))}
+                        </div>
+                        {refundMethod === 'cash' && (
+                          <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:14 }}>Bu tutar Kasa Hareketi'ne "Kasadan Çıkış" olarak otomatik işlenecek.</div>
+                        )}
+                        {refundMethod === 'debt' && (
+                          <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:14 }}>Bu fişe bağlı borçlunun bakiyesi bu tutar kadar azaltılacak.</div>
+                        )}
+                      </>
+                    )}
+
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>{refundMode==='reopen' ? 'YENİDEN AÇMA NEDENİ (zorunlu)' : 'İADE NEDENİ (zorunlu)'}</label>
+                    <textarea value={refundReason} onChange={e => setRefundReason(e.target.value)} rows={2}
+                      placeholder={refundMode==='reopen' ? 'Örn. yanlışlıkla kapatıldı' : 'Örn. müşteri şikayeti, yanlış ürün'}
+                      style={{ width:'100%', background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'10px 14px', color:'var(--a-text)', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif", marginBottom:18, resize:'vertical' }} />
+
+                    <button onClick={refundMode==='reopen' ? confirmReopenTab : confirmRefund}
+                      style={{ width:'100%', height:52, background: refundMode==='reopen' ? '#3498db' : '#e67e22', border:'none', color:'#fff', fontSize:15, cursor:'pointer', fontWeight:700 }}>
+                      {refundMode==='reopen' ? '✓ Yeniden Aç' : '✓ İadeyi Kaydet'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
             <div style={{ display:'flex', gap:6, marginBottom:14 }}>
               <button onClick={() => setViewMode('map')}
                 style={{ flex:1, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 0, color: viewMode==='map' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
@@ -3558,6 +3713,12 @@ export default function AdminPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 16, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(Number(r.total))}</div>
                   <button onClick={() => reprintReceipt(r)} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid var(--a-border2)', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>🖨️ Yazdır</button>
+                  {!isLimitedStaff && (
+                    <>
+                      <button onClick={() => openRefund(r, 'refund')} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid rgba(230,126,34,.4)', color: '#e67e22', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>💸 İade</button>
+                      <button onClick={() => openRefund(r, 'reopen')} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid rgba(52,152,219,.4)', color: '#3498db', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>↩️ Yeniden Aç</button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
