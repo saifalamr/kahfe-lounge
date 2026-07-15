@@ -24,6 +24,18 @@ async function periodRevenue(fromIso: string, toIso?: string) {
   return { revenue, count: rows.length }
 }
 
+// Same definition of "occupied" as the admin Kat Planı: a tab can still be
+// status='open' in the DB with nothing but dismissed/voided orders on it
+// (e.g. everything got cancelled), which the floor plan correctly treats as
+// empty. Matching that here so the two panels never show different counts.
+async function occupiedTablesCount() {
+  const { data: tabs } = await supabase.from('tabs').select('id').eq('status', 'open')
+  if (!tabs || tabs.length === 0) return 0
+  const ids = tabs.map((t: any) => t.id)
+  const { data: orders } = await supabase.from('orders').select('tab_id').in('tab_id', ids).neq('status', 'dismissed')
+  return new Set((orders || []).map((o: any) => o.tab_id)).size
+}
+
 export default function PatronPage() {
   const [auth, setAuth] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -53,13 +65,13 @@ export default function PatronPage() {
       periodRevenue(yesterdayStart.toISOString(), todayStart.toISOString()),
       periodRevenue(weekStart.toISOString()),
       periodRevenue(lastWeekStart.toISOString(), weekStart.toISOString()),
-      supabase.from('tabs').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      occupiedTablesCount(),
       supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('shifts').select('staff_name,started_at').is('ended_at', null).order('started_at', { ascending: false }).limit(1),
       supabase.from('orders').select('items').gte('created_at', weekStart.toISOString()),
     ])
     setToday(t); setYesterday(y); setThisWeek(w); setLastWeek(lw)
-    setOpenTables(tables.count ?? 0)
+    setOpenTables(tables ?? 0)
     setPendingOrders(pending.count ?? 0)
     setShift(shifts.data?.[0] || null)
 

@@ -74,20 +74,13 @@ do $$ begin
   end if;
 end $$;
 
-create table if not exists public.reset_markers (
-  key text primary key, reset_at timestamptz not null, updated_at timestamptz not null default now()
-);
-alter table public.reset_markers enable row level security;
--- Only ONE set of policies should ever exist here — an old manually-created
--- "Allow public *" set duplicated these once and was cleaned up; if you
--- ever see both sets again (check pg_policies), drop the "Allow public *"
--- ones, not these.
-drop policy if exists "reset public read" on public.reset_markers;
-create policy "reset public read" on public.reset_markers for select using (true);
-drop policy if exists "reset public insert" on public.reset_markers;
-create policy "reset public insert" on public.reset_markers for insert with check (true);
-drop policy if exists "reset public update" on public.reset_markers;
-create policy "reset public update" on public.reset_markers for update using (true);
+-- reset_markers table removed (2026-07-16): the Sıfırla feature let a
+-- period's stats be reset on one panel without the header/owner panel
+-- knowing about it, causing different "today" totals in different places.
+-- Today/week/month totals now always compute from the real period start,
+-- everywhere, with no override. If you find `drop table if exists
+-- public.reset_markers;` useful as a one-off cleanup, it's already been run
+-- on production — this comment is just so schema.sql doesn't recreate it.
 
 -- ---------------------------------------------------------------------------
 -- tabs (running bills) — includes every column added over time

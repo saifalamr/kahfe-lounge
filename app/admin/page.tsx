@@ -1046,14 +1046,6 @@ export default function AdminPage() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
-  // Reset markers are stored in Supabase (table: reset_markers) so a reset
-  // made on one device is instantly reflected on every other device.
-  async function getResetMarker(scope: 'today'|'week'|'month'|'custom'): Promise<string | null> {
-    if (scope === 'custom') return null // resetting a custom range isn't a meaningful action
-    const { data } = await supabase.from('reset_markers').select('reset_at').eq('key', scope).maybeSingle()
-    return data?.reset_at || null
-  }
-
   function baseFromForFilter(filter: 'today'|'week'|'month'|'custom') {
     const now = new Date()
     if (filter === 'today') return now.toISOString().split('T')[0]
@@ -1098,11 +1090,7 @@ export default function AdminPage() {
 
   async function loadOrders(filter: 'today'|'week'|'month'|'custom' = dateFilter) {
     setOrdersLoading(true)
-    const baseFrom = baseFromForFilter(filter)
-    const marker = await getResetMarker(filter)
-    // Only honor the marker if it falls within the current window (e.g. a
-    // "today" reset from three days ago shouldn't suppress today's orders)
-    const fromDate = (marker && marker > baseFrom) ? marker : baseFrom
+    const fromDate = baseFromForFilter(filter)
     const toDate = filter === 'custom' && customTo ? `${customTo}T23:59:59.999` : undefined
     let ordersQuery = supabase.from('orders').select('*').gte('created_at', fromDate).order('created_at', { ascending: false })
     if (toDate) ordersQuery = ordersQuery.lte('created_at', toDate)
@@ -1256,19 +1244,6 @@ export default function AdminPage() {
 
 
 
-  async function resetStats(scope: 'today'|'week'|'month') {
-    const label = scope === 'today' ? 'bugünkü' : scope === 'week' ? 'bu haftaki' : 'bu ayki'
-    if (!confirm(`${label.charAt(0).toUpperCase()+label.slice(1)} istatistikleri sıfırlamak istediğinizden emin misiniz?\n\nSiparişler silinmez, sadece bu andan itibaren sayılmaya başlanır. Bu sıfırlama tüm cihazlarda (telefon, bilgisayar, POS) geçerli olacaktır.`)) return
-    const nowIso = new Date().toISOString()
-    const { error } = await supabase.from('reset_markers').upsert({ key: scope, reset_at: nowIso, updated_at: nowIso })
-    if (error) {
-      alert('✗ Sıfırlama başarısız oldu.\n\n' + error.message + '\n\nreset_markers tablosunun Supabase\'de oluşturulduğundan emin olun.')
-      return
-    }
-    await loadOrders(scope)
-    alert(`✓ ${label.charAt(0).toUpperCase()+label.slice(1)} istatistikler sıfırlandı.\n\nEski siparişler silinmedi, sadece bu andan sonraki siparişler sayılacak. Bu sıfırlama tüm cihazlarda geçerlidir.`)
-  }
-
   useEffect(() => { if (auth) loadOrders() }, [auth])
 
   // Day-end close-out (Gün Sonu) - built on real payment data from closed tabs
@@ -1330,13 +1305,11 @@ export default function AdminPage() {
   async function openStaffReport(range: 'today'|'week'|'month' = staffReportRange) {
     setStaffReportRange(range)
     const fromDate = baseFromForFilter(range)
-    const marker = await getResetMarker(range)
-    const effectiveFrom = (marker && marker > fromDate) ? marker : fromDate
 
     const [{ data: closedTabs }, { data: orders }, { data: voidsData }] = await Promise.all([
-      supabase.from('tabs').select('closed_by,total').eq('status', 'closed').gte('closed_at', effectiveFrom),
-      supabase.from('orders').select('created_by,handled_by').gte('created_at', effectiveFrom),
-      supabase.from('voids').select('voided_by,amount').gte('created_at', effectiveFrom),
+      supabase.from('tabs').select('closed_by,total').eq('status', 'closed').gte('closed_at', fromDate),
+      supabase.from('orders').select('created_by,handled_by').gte('created_at', fromDate),
+      supabase.from('voids').select('voided_by,amount').gte('created_at', fromDate),
     ])
 
     const statsMap: Record<string, any> = {}
@@ -3176,9 +3149,6 @@ export default function AdminPage() {
                 <button onClick={() => loadOrders()} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, width:36, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600 }}>↻</button>
                 {isManager && (
                   <>
-                    {dateFilter !== 'custom' && (
-                      <button onClick={() => resetStats(dateFilter as 'today'|'week'|'month')} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, padding:'0 12px', color:'var(--a-text2)', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
-                    )}
                     <button onClick={() => exportOrdersPDF(dateFilter, allOrders, revenueSummary)} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
                     <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
                     <button onClick={() => { setTab('reports'); setReportsSubTab('overview') }} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Raporlar</button>
