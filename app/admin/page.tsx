@@ -2132,6 +2132,9 @@ export default function AdminPage() {
         @keyframes alertGlow {
           0%,100%{border-color:rgba(192,57,43,.6)} 50%{border-color:rgba(192,57,43,1)}
         }
+        @keyframes modalPopIn {
+          from{opacity:0; transform:scale(.94) translateY(10px)} to{opacity:1; transform:scale(1) translateY(0)}
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: var(--a-bg0); color: var(--a-text); font-family: 'IBM Plex Sans', system-ui, sans-serif; }
 
@@ -2212,8 +2215,8 @@ export default function AdminPage() {
 
         {/* Kasa Hareketi (manual cash in/out) modal */}
         {showCashMovement && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowCashMovement(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--a-bg2)', border: '1px solid rgba(201,168,76,.35)', borderBottom: 'none' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowCashMovement(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(201,168,76,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>💰 Kasa Hareketi</div>
                 <button onClick={() => setShowCashMovement(false)} style={{ background: 'var(--a-border)', border: 'none', width: 36, height: 36, color: 'var(--a-text2)', cursor: 'pointer', fontSize: 16 }}>✕</button>
@@ -2250,8 +2253,8 @@ export default function AdminPage() {
 
         {/* Shift close (Vardiya Sonu) modal */}
         {showShiftClose && shiftCloseData && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }} onClick={() => setShowShiftClose(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--a-bg2)', border: '1px solid rgba(231,76,60,.35)', borderBottom: 'none' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowShiftClose(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(231,76,60,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>⏹ Vardiya Sonu — {activeShift?.staff_name}</div>
                 <button onClick={() => setShowShiftClose(false)} style={{ background: 'var(--a-border)', border: 'none', width: 36, height: 36, color: 'var(--a-text2)', cursor: 'pointer', fontSize: 16 }}>✕</button>
@@ -2349,8 +2352,8 @@ export default function AdminPage() {
               const activeOrders = info.orders.filter((o:any) => o.status !== 'dismissed')
               const tabTotal = activeOrders.reduce((s:number,o:any)=>s+Number(o.total),0)
               return (
-                <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setActiveTableModal(null)}>
-                  <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'var(--a-bg2)', borderRadius: 0, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+                <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setActiveTableModal(null)}>
+                  <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, margin:'0 auto', background:'var(--a-bg2)', borderRadius:20, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
                     <div style={{ padding:'20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                       <div style={{ color:'var(--a-text)', fontWeight:700, fontSize:20, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🪑 {activeTableModal}</div>
                       <button onClick={() => setActiveTableModal(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
@@ -2510,8 +2513,8 @@ export default function AdminPage() {
 
             {/* Staff option picker - choose variant (e.g. şeker oranı) before adding */}
             {staffPendingOptionItem && (
-              <div style={{ position:'fixed', inset:0, zIndex:215, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setStaffPendingOptionItem(null)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'var(--a-bg2)', border:'1px solid rgba(201,168,76,.3)', borderBottom:'none' }}>
+              <div style={{ position:'fixed', inset:0, zIndex:215, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setStaffPendingOptionItem(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:520, maxHeight:'85vh', overflowY:'auto', margin:'0 auto', background:'var(--a-bg2)', borderRadius:20, border:'1px solid rgba(201,168,76,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
                   <div style={{ padding:'20px', borderBottom:'1px solid var(--a-border)' }}>
                     <div style={{ color:'var(--a-text)', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{staffPendingOptionItem.name}</div>
                     <div style={{ color:'var(--a-text2)', fontSize:12, marginTop:2 }}>Tercihinizi seçin</div>
@@ -2552,8 +2555,8 @@ export default function AdminPage() {
               const peopleCount = Math.max(1, parseInt(splitPeopleCount) || 1)
               const perPerson = finalTotal / peopleCount
               return (
-              <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={() => setPaymentTab(null)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'var(--a-bg2)', borderRadius: 0, border:'1px solid rgba(39,174,96,.3)', borderBottom:'none' }}>
+              <div style={{ position:'fixed', inset:0, zIndex:220, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setPaymentTab(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, maxHeight:'85vh', overflowY:'auto', margin:'0 auto', background:'var(--a-bg2)', borderRadius:20, border:'1px solid rgba(39,174,96,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div style={{ color:'#27ae60', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>💳 {paymentTab.table_name} — Ödeme Al</div>
                     <button onClick={() => setPaymentTab(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>

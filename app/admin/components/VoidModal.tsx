@@ -8,8 +8,8 @@ export default function VoidModal({ voidingItem, voidReason, onReasonChange, onC
   onConfirm: () => void
 }) {
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end' }} onClick={onCancel}>
-      <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', margin:'0 auto', background:'#141414', border:'1px solid rgba(192,57,43,.4)', borderBottom:'none' }}>
+    <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={onCancel}>
+      <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#141414', borderRadius:20, border:'1px solid rgba(192,57,43,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
         <div style={{ padding:'20px', borderBottom:'1px solid #2A2A2A' }}>
           <div style={{ color:'#e74c3c', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🗑️ Ürünü İptal Et</div>
           <div style={{ color:'#8A8A8A', fontSize:13, marginTop:4, fontFamily:"'IBM Plex Mono', monospace" }}>{voidingItem.order.items[voidingItem.itemIndex]?.quantity}× {voidingItem.order.items[voidingItem.itemIndex]?.name} — {voidingItem.order.table_name}</div>
