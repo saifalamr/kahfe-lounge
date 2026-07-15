@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
+import Sidebar from './components/Sidebar'
 import { queueOrder, flushQueuedOrders, queuedOrderCount } from '@/lib/offlineQueue'
 import VoidModal from './components/VoidModal'
 import CancelOrderModal from './components/CancelOrderModal'
@@ -2317,7 +2318,7 @@ export default function AdminPage() {
 
   const s = {
     page: { background: 'var(--a-bg0)', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 } as React.CSSProperties,
-    header: { background: 'var(--a-bg1)', padding: '16px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } as React.CSSProperties,
+    header: { background: 'var(--a-bg1)', padding: '16px 20px', borderBottom: '1px solid var(--a-border)', justifyContent: 'space-between', alignItems: 'center' } as React.CSSProperties,
     input: { width: '100%', background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 8, padding: '12px 14px', color: 'var(--a-text)', fontSize: 14, outline: 'none' } as React.CSSProperties,
     label: { color: 'var(--a-text2)', fontSize: 12, fontWeight: 600, marginBottom: 6, display: 'block', letterSpacing: 1 } as React.CSSProperties,
     btn: { background: '#C0392B', border: 'none', borderRadius: 8, padding: '12px 20px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' } as React.CSSProperties,
@@ -2376,19 +2377,42 @@ export default function AdminPage() {
 
         /* Fill the available width on touchscreens/desktops instead of
            staying pinned to a narrow phone-width column in the middle */
-        .kahfe-shell { max-width: 480px; margin: 0 auto; }
-        @media (min-width: 700px)  { .kahfe-shell { max-width: 100%; } }
+        .kahfe-shell { max-width: 480px; margin: 0 auto; flex: 1; min-width: 0; }
+        @media (min-width: 700px)  { .kahfe-shell { max-width: 100%; margin: 0; } }
         @media (min-width: 700px)  { .kahfe-shell .kahfe-section { padding-left: 32px; padding-right: 32px; } }
         @media (min-width: 700px)  { .kahfe-shell .kahfe-header   { padding-left: 32px; padding-right: 32px; } }
         @media (min-width: 1100px) { .kahfe-shell .kahfe-section { padding-left: 56px; padding-right: 56px; } }
         @media (min-width: 1100px) { .kahfe-shell .kahfe-header   { padding-left: 56px; padding-right: 56px; } }
 
+        /* Below 700px: phone/small-tablet — the horizontal grouped tab bar
+           (kahfe-topnav) IS the navigation, sidebar is hidden entirely.
+           At 700px+: a real sidebar takes over as primary nav (icon+label,
+           grouped, always visible — no more hunting through a tab strip),
+           and the horizontal bar + its title block hide since the sidebar
+           already shows the brand/revenue/nav. */
+        .kahfe-sidebar { display: none; }
+        .kahfe-topnav { display: flex; }
+        .kahfe-topnav-header { display: flex; }
+        @media (min-width: 700px) {
+          .kahfe-app-wrap { display: flex; align-items: flex-start; }
+          .kahfe-sidebar { display: flex; }
+          .kahfe-topnav, .kahfe-topnav-header { display: none; }
+        }
+
         .kahfe-modal { max-width: 480px; }
         @media (min-width: 700px) { .kahfe-modal { max-width: 560px; } }
       `}</style>
+      <div className="kahfe-app-wrap">
+      <Sidebar
+        isManager={isManager} tab={tab} setTab={setTab} reportsSubTab={reportsSubTab} setReportsSubTab={setReportsSubTab}
+        notifCount={notifications.length} todayRevenue={todayRevenue} theme={theme} setTheme={setTheme} clearSession={clearSession}
+        activeShift={activeShift} isLimitedStaff={isLimitedStaff} openCashMovement={openCashMovement} openShiftClose={openShiftClose} startShift={startShift}
+        loadOrders={loadOrders} dateFilter={dateFilter} loadDebtTransactions={loadDebtTransactions} searchReceipts={searchReceipts} searchAccountability={searchAccountability}
+        showNotif={showNotif} setShowNotif={setShowNotif} newOrderAlert={newOrderAlert} setNewOrderAlert={setNewOrderAlert} queuedCount={queuedCount}
+      />
       <div className="kahfe-shell" style={{ background: 'var(--a-bg0)', minHeight: '100vh', paddingBottom: 40 }}>
         <ConnectivityBanner />
-        <div className="kahfe-header" style={s.header}>
+        <div className="kahfe-header kahfe-topnav-header" style={s.header}>
           <div>
             <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>
             <div style={{ color: 'var(--a-text)', fontSize: 19, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
@@ -2433,8 +2457,9 @@ export default function AdminPage() {
           <NotificationPopup notifications={notifications} onClose={() => setShowNotif(false)} onDismiss={dismissOrder} onAccept={acceptOrder} />
         )}
 
-        {/* Shift (Vardiya) status bar — anyone can start/end their own shift */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px', background: activeShift ? 'rgba(39,174,96,.08)' : 'var(--a-bg3)', borderBottom: '1px solid var(--a-border)' }}>
+        {/* Shift (Vardiya) status bar — anyone can start/end their own shift.
+            Wide screens get the same thing inside the sidebar instead. */}
+        <div className="kahfe-topnav-header" style={{ alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px', background: activeShift ? 'rgba(39,174,96,.08)' : 'var(--a-bg3)', borderBottom: '1px solid var(--a-border)' }}>
           {activeShift ? (
             <div style={{ color: 'var(--a-text2)', fontSize: 12 }}>
               <span style={{ color: '#5FD08C', fontWeight: 700 }}>⏱ {activeShift.staff_name}</span> · {new Date(activeShift.started_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'den beri
@@ -2545,7 +2570,7 @@ export default function AdminPage() {
 
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--a-border)', overflowX: 'auto' }}>
+        <div className="kahfe-topnav" style={{ borderBottom: '1px solid var(--a-border)', overflowX: 'auto' }}>
           {(isManager
             ? ([['orders'], ['categories', 'items', 'staff', 'settings'], ['debts', 'reports']] as const)
             : ([['orders']] as const)
@@ -3930,6 +3955,7 @@ export default function AdminPage() {
               onClose={() => setDebtDetailId(null)} />
           )
         })()}
+      </div>
       </div>
     </>
   )
