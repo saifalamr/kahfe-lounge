@@ -704,11 +704,13 @@ export default function MenuPage() {
         return
       }
 
-      // Get order count for today to generate order number
-      const today = new Date().toISOString().split('T')[0]
+      // Get order count for today to generate order number. Local midnight,
+      // not UTC — otherwise this rolls over 3 hours early (Istanbul is
+      // UTC+3), same timezone bug as the admin/owner revenue totals had.
+      const today = new Date(); today.setHours(0, 0, 0, 0)
       const { count: todayCount } = await supabase.from('orders')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', today)
+        .gte('created_at', today.toISOString())
       const orderNum = (todayCount || 0) + 1
       setOrderNumber(orderNum)
 
@@ -762,10 +764,10 @@ export default function MenuPage() {
   useEffect(() => {
     if (!isOnline) return
     flushQueuedOrders(async (order) => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = new Date(); today.setHours(0, 0, 0, 0)
       const { count: todayCount } = await supabase.from('orders')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', today)
+        .gte('created_at', today.toISOString())
       await sendTelegramNotification(order.table_name, order.items, order.total, order.note || '', todayCount || 0)
     })
   }, [isOnline])

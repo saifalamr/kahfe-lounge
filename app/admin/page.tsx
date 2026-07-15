@@ -702,6 +702,14 @@ export default function AdminPage() {
 
     if (closeError) { alert('✗ Ödeme kaydedilemedi.\n\n' + closeError.message); return }
 
+    // A tab can be paid while one of its orders is still sitting at
+    // pending/accepted (e.g. it was rung in seconds before checkout, or a
+    // race with the kitchen screen). Once the bill is closed there's no
+    // legitimate reason for that order to keep showing on Kitchen/Nargile
+    // or inflating the pending-orders count everywhere else — the customer
+    // already paid and left, so whatever was on the bill was served.
+    await supabase.from('orders').update({ status: 'served' }).eq('tab_id', paymentTab.id).in('status', ['pending', 'accepted'])
+
     if (discountAmount > 0) {
       await supabase.from('discounts').insert({
         tab_id: paymentTab.id,
@@ -868,6 +876,11 @@ export default function AdminPage() {
     }).eq('id', newTab.id).select('fatura_no').single()
 
     if (closeError) { alert('✗ Ödeme kaydedilemedi.\n\n' + closeError.message); return }
+
+    // Same as the full-payment path: whatever ended up on this split-off
+    // tab was just paid for, so it can't still be "pending" on a kitchen
+    // screen afterward.
+    await supabase.from('orders').update({ status: 'served' }).eq('tab_id', newTab.id).in('status', ['pending', 'accepted'])
 
     if (discountAmount > 0) {
       await supabase.from('discounts').insert({
@@ -1046,11 +1059,17 @@ export default function AdminPage() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
+  // Local wall-clock day/week boundaries — must match the owner (Patron)
+  // panel's startOfDay/mondayOf exactly, or "today"/"this week" totals will
+  // silently disagree between panels near midnight or on the week rollover.
+  function startOfLocalDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
+  function mondayOfLocalWeek(d: Date) { const day = d.getDay() === 0 ? 7 : d.getDay(); const m = startOfLocalDay(d); m.setDate(m.getDate() - day + 1); return m }
+
   function baseFromForFilter(filter: 'today'|'week'|'month'|'custom') {
     const now = new Date()
-    if (filter === 'today') return now.toISOString().split('T')[0]
-    if (filter === 'week') { const d = new Date(now); d.setDate(d.getDate() - 7); return d.toISOString() }
-    if (filter === 'custom') return customFrom || now.toISOString().split('T')[0]
+    if (filter === 'today') return startOfLocalDay(now).toISOString()
+    if (filter === 'week') return mondayOfLocalWeek(now).toISOString()
+    if (filter === 'custom') return customFrom || startOfLocalDay(now).toISOString()
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   }
 
