@@ -12,21 +12,21 @@ export default function MonthlyReportModal({ report, onExportPDF, onClose }: {
         <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
           <div style={{ color:'#C9A84C', fontWeight:800, fontSize:16 }}>📊 {report.title || `${report.month} ${report.year} Raporu`}</div>
           <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onExportPDF} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 0, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
-            <button onClick={onClose} style={{ background:'#2A2A2A', border:'none', borderRadius: 0, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
+            <button onClick={onExportPDF} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
+            <button onClick={onClose} style={{ background:'#2A2A2A', border:'none', borderRadius: 8, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
           </div>
         </div>
         <div style={{ padding:'16px 20px' }}>
           <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
+            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 8, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
               <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{report.totalOrders}</div>
               <div style={{ color:'#8A8A8A', fontSize:11 }}>Sipariş</div>
             </div>
-            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
+            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 8, padding:'12px', textAlign:'center', border:'1px solid rgba(201,168,76,.2)' }}>
               <div style={{ color:'#C9A84C', fontWeight:800, fontSize:22 }}>{formatTL(Number(report.totalRevenue))} ₺</div>
               <div style={{ color:'#8A8A8A', fontSize:11 }}>Ciro</div>
             </div>
-            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 0, padding:'12px', textAlign:'center', border:'1px solid rgba(231,76,60,.25)' }}>
+            <div style={{ flex:1, background:'#1A1A1A', borderRadius: 8, padding:'12px', textAlign:'center', border:'1px solid rgba(231,76,60,.25)' }}>
               <div style={{ color:'#e74c3c', fontWeight:800, fontSize:22 }}>{formatTL(Number(report.totalDebt || 0))} ₺</div>
               <div style={{ color:'#8A8A8A', fontSize:11 }}>Borç</div>
             </div>

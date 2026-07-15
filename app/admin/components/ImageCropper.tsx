@@ -76,7 +76,7 @@ export default function ImageCropper({ src, onCrop, onCancel }: { src: string; o
       <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 16 }}>Sürükle · Zoom ile boyutlandır · Kırp</div>
 
       {/* Canvas crop area */}
-      <div ref={containerRef} style={{ position: 'relative', border: '2px solid #C9A84C', borderRadius: 0, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}>
+      <div ref={containerRef} style={{ position: 'relative', border: '2px solid #C9A84C', borderRadius: 8, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}>
         <canvas
           ref={canvasRef}
           width={CROP_W}
@@ -101,13 +101,13 @@ export default function ImageCropper({ src, onCrop, onCancel }: { src: string; o
           onChange={e => setZoom(parseFloat(e.target.value))}
           style={{ flex: 1, accentColor: '#C9A84C' }} />
         <span style={{ color: '#C9A84C', fontSize: 12, minWidth: 36 }}>{Math.round(zoom * 100)}%</span>
-        <button onClick={resetPos} style={{ background: '#2A2A2A', border: 'none', borderRadius: 0, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Sıfırla</button>
+        <button onClick={resetPos} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Sıfırla</button>
       </div>
 
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 12, marginTop: 16, width: '100%', maxWidth: CROP_W }}>
-        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 0, padding: 14, color: '#8A8A8A', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>İptal</button>
-        <button onClick={handleCrop} style={{ flex: 2, background: '#C9A84C', border: 'none', borderRadius: 0, padding: 14, color: '#1A0E06', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>✓ Fotoğrafı Kaydet</button>
+        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: 14, color: '#8A8A8A', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>İptal</button>
+        <button onClick={handleCrop} style={{ flex: 2, background: '#C9A84C', border: 'none', borderRadius: 8, padding: 14, color: '#1A0E06', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>✓ Fotoğrafı Kaydet</button>
       </div>
     </div>
   )

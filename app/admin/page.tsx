@@ -2259,18 +2259,18 @@ export default function AdminPage() {
   const s = {
     page: { background: 'var(--a-bg0)', minHeight: '100vh', maxWidth: 480, margin: '0 auto', paddingBottom: 40 } as React.CSSProperties,
     header: { background: 'var(--a-bg1)', padding: '16px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } as React.CSSProperties,
-    input: { width: '100%', background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 0, padding: '12px 14px', color: 'var(--a-text)', fontSize: 14, outline: 'none' } as React.CSSProperties,
+    input: { width: '100%', background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 8, padding: '12px 14px', color: 'var(--a-text)', fontSize: 14, outline: 'none' } as React.CSSProperties,
     label: { color: 'var(--a-text2)', fontSize: 12, fontWeight: 600, marginBottom: 6, display: 'block', letterSpacing: 1 } as React.CSSProperties,
-    btn: { background: '#C0392B', border: 'none', borderRadius: 0, padding: '12px 20px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' } as React.CSSProperties,
-    btnSecondary: { background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '10px 16px', color: 'var(--a-text2)', fontWeight: 600, fontSize: 13, cursor: 'pointer' } as React.CSSProperties,
-    card: { background: 'var(--a-bg1)', borderRadius: 0, padding: '14px 16px', border: '1px solid var(--a-border)', marginBottom: 10 } as React.CSSProperties,
+    btn: { background: '#C0392B', border: 'none', borderRadius: 8, padding: '12px 20px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' } as React.CSSProperties,
+    btnSecondary: { background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '10px 16px', color: 'var(--a-text2)', fontWeight: 600, fontSize: 13, cursor: 'pointer' } as React.CSSProperties,
+    card: { background: 'var(--a-bg1)', borderRadius: 8, padding: '14px 16px', border: '1px solid var(--a-border)', marginBottom: 10 } as React.CSSProperties,
     section: { padding: '16px 20px' } as React.CSSProperties,
   }
 
   if (!auth) return (
     <div style={{ background: 'var(--a-bg0)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <ConnectivityBanner />
-      <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 32, width: '100%', maxWidth: 360, border: '1px solid var(--a-border)' }}>
+      <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 32, width: '100%', maxWidth: 360, border: '1px solid var(--a-border)' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 4, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM PANELİ</div>
           <div style={{ color: 'var(--a-text)', fontSize: 24, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
@@ -2309,6 +2309,10 @@ export default function AdminPage() {
           from{opacity:0; transform:scale(.94) translateY(10px)} to{opacity:1; transform:scale(1) translateY(0)}
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* Baseline rounding — inline styles above already set an explicit
+           radius almost everywhere and always win over this, so this only
+           catches whatever was missed rather than fighting anything. */
+        button, input, select, textarea { border-radius: 8px; }
         body { background: var(--a-bg0); color: var(--a-text); font-family: 'IBM Plex Sans', system-ui, sans-serif; }
 
         /* Fill the available width on touchscreens/desktops instead of
@@ -2333,30 +2337,30 @@ export default function AdminPage() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {/* Kitchen Display link */}
             <a href="/kitchen" target="_blank" rel="noopener noreferrer"
-              style={{ background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
+              style={{ background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 8, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
               🍳
             </a>
             {/* Nargile Display link */}
             <a href="/nargile" target="_blank" rel="noopener noreferrer"
-              style={{ background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
+              style={{ background: 'var(--a-border)', border: '1px solid var(--a-border2)', borderRadius: 8, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, textDecoration: 'none' }}>
               💨
             </a>
             {/* Queued offline orders indicator */}
             {queuedCount > 0 && (
-              <div title="Bağlantı bekleyen sipariş(ler)" style={{ background: 'rgba(243,156,18,.14)', border: '1px solid #f39c12', borderRadius: 0, height: 40, padding: '0 10px', display: 'flex', alignItems: 'center', gap: 6, color: '#f39c12', fontSize: 12, fontWeight: 700 }}>
+              <div title="Bağlantı bekleyen sipariş(ler)" style={{ background: 'rgba(243,156,18,.14)', border: '1px solid #f39c12', borderRadius: 8, height: 40, padding: '0 10px', display: 'flex', alignItems: 'center', gap: 6, color: '#f39c12', fontSize: 12, fontWeight: 700 }}>
                 📥 {queuedCount}
               </div>
             )}
             {/* Notification Bell */}
             <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
-              style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : 'var(--a-border)', border: newOrderAlert ? '1px solid #C0392B' : '1px solid var(--a-border2)', borderRadius: 0, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
+              style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : 'var(--a-border)', border: newOrderAlert ? '1px solid #C0392B' : '1px solid var(--a-border2)', borderRadius: 8, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>
               🔔
               {notifications.length > 0 && (
                 <span style={{ position: 'absolute', top: -4, right: -4, background: '#C0392B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notifications.length}</span>
               )}
             </button>
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="Görünümü Değiştir" style={{ background: 'transparent', border: '1px solid var(--a-border)', borderRadius: 0, padding: '6px 10px', color: 'var(--a-text2)', fontSize: 14, cursor: 'pointer', marginRight: 8 }}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-            <button onClick={clearSession} style={{ background: 'transparent', border: '1px solid var(--a-border)', borderRadius: 0, padding: '6px 12px', color: 'var(--a-text2)', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} title="Görünümü Değiştir" style={{ background: 'transparent', border: '1px solid var(--a-border)', borderRadius: 8, padding: '6px 10px', color: 'var(--a-text2)', fontSize: 14, cursor: 'pointer', marginRight: 8 }}>{theme === 'dark' ? '☀️' : '🌙'}</button>
+            <button onClick={clearSession} style={{ background: 'transparent', border: '1px solid var(--a-border)', borderRadius: 8, padding: '6px 12px', color: 'var(--a-text2)', fontSize: 12, cursor: 'pointer' }}>Çıkış</button>
           </div>
         </div>
 
@@ -2529,7 +2533,7 @@ export default function AdminPage() {
                   <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, margin:'0 auto', background:'var(--a-bg2)', borderRadius:20, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(201,168,76,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
                     <div style={{ padding:'20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                       <div style={{ color:'var(--a-text)', fontWeight:700, fontSize:20, fontFamily:"'Bricolage Grotesque', sans-serif" }}>🪑 {activeTableModal}</div>
-                      <button onClick={() => setActiveTableModal(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                      <button onClick={() => setActiveTableModal(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
                     </div>
                     <div style={{ padding:'16px 20px' }}>
                       {activeOrders.length === 0 && (
@@ -2539,9 +2543,9 @@ export default function AdminPage() {
                         const statusColor = order.status==='pending'?'#C0392B':'#27ae60'
                         const statusLabel = order.status==='pending'?'Bekliyor':'Tamamlandı'
                         return (
-                          <div key={order.id} style={{ background:'var(--a-bg1)', border:'1px solid var(--a-border)', borderLeft:`3px solid ${statusColor}`, borderRadius: 0, padding:'14px 16px', marginBottom:10 }}>
+                          <div key={order.id} style={{ background:'var(--a-bg1)', border:'1px solid var(--a-border)', borderLeft:`3px solid ${statusColor}`, borderRadius: 8, padding:'14px 16px', marginBottom:10 }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                              <span style={{ background:statusColor, color:'#fff', borderRadius: 0, padding:'4px 10px', fontSize:10, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
+                              <span style={{ background:statusColor, color:'#fff', borderRadius: 8, padding:'4px 10px', fontSize:10, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
                               <span style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
                             </div>
                             {order.items?.map((item:any, i:number) => (
@@ -2554,13 +2558,13 @@ export default function AdminPage() {
                               </div>
                             ))}
                             {order.note && (
-                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'var(--a-text2)' }}>📝 {order.note}</div>
+                              <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 8, fontSize:12, color:'var(--a-text2)' }}>📝 {order.note}</div>
                             )}
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, paddingTop:8, borderTop:'1px solid rgba(201,168,76,.2)' }}>
                               <span style={{ color:'#C9A84C', fontWeight:700, fontSize:16, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {order.total}</span>
                               <div style={{ display:'flex', gap:6 }}>
                                 {!isLimitedStaff && order.status === 'pending' && <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et" style={{ background:'transparent', border:'1px solid var(--a-border2)', color:'#e74c3c', height:40, padding:'0 10px', cursor:'pointer', fontSize:16 }}>🚫</button>}
-                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline} style={{ background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 0, height:40, padding:'0 16px', color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:13, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴'}</button>}
+                                {order.status === 'pending' && <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline} style={{ background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 8, height:40, padding:'0 16px', color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:13, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴'}</button>}
                               </div>
                             </div>
                           </div>
@@ -2575,7 +2579,7 @@ export default function AdminPage() {
                       )}
 
                       <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                        <button onClick={() => openAddOrder(activeTableModal)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'var(--a-text)', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>➕ Sipariş Ekle</button>
+                        <button onClick={() => openAddOrder(activeTableModal)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'var(--a-text)', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>➕ Sipariş Ekle</button>
                       </div>
                       {activeOrders.length > 0 && (
                         <div style={{ display:'flex', gap:8, marginBottom:12 }}>
@@ -2588,10 +2592,10 @@ export default function AdminPage() {
                               so tapping it printed a blank ticket with zero
                               lines - no error, just silently empty paper. */}
                           {filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'kitchen').length > 0 && (
-                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'kitchen'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'kitchen'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'#f39c12', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🍳 Mutfak Fişi</button>
                           )}
                           {filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'nargile').length > 0 && (
-                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'nargile'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
+                            <button onClick={() => printKitchenTicket(activeTableModal, filterOrdersByStation(activeOrders.filter((o: any) => o.status === 'pending'), 'nargile'), autoPrintEnabled)} style={{ flex:1, height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'#9b59b6', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💨 Nargile Fişi</button>
                           )}
                         </div>
                       )}
@@ -2599,13 +2603,13 @@ export default function AdminPage() {
                       {info.tabData && (
                         <div style={{ display:'flex', gap:8 }}>
                           {!info.tabData.bill_requested ? (
-                            <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🧾 Hesap İstendi</button>
+                            <button onClick={() => requestBill(info.tabData.id)} style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 8, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🧾 Hesap İstendi</button>
                           ) : (
-                            <button onClick={() => cancelBillRequest(info.tabData.id)} title="Hesap isteğini iptal et" style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 0, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✕ Hesap İsteğini İptal Et</button>
+                            <button onClick={() => cancelBillRequest(info.tabData.id)} title="Hesap isteğini iptal et" style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 8, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✕ Hesap İsteğini İptal Et</button>
                           )}
-                          {!isLimitedStaff && <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'var(--a-text3)', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>}
+                          {!isLimitedStaff && <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'var(--a-text3)', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>}
                           {activeOrders.length > 0 && (
-                            <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 0, color:'var(--a-bg0)', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
+                            <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 8, color:'var(--a-bg0)', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
                           )}
                         </div>
                       )}
@@ -2635,15 +2639,15 @@ export default function AdminPage() {
               <div style={{ position:'fixed', inset:0, zIndex:210, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', flexDirection:'column' }}>
                 <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>➕ {addOrderTable} — Sipariş Ekle</div>
-                  <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:30, height:30, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                  <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:30, height:30, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
                 </div>
 
                 <div style={{ display:'flex', gap:6, padding:'12px 16px', overflowX:'auto', borderBottom:'1px solid var(--a-border)' }}>
                   <button onClick={() => setStaffCategoryFilter(null)}
-                    style={{ flexShrink:0, background: staffCategoryFilter===null ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: staffCategoryFilter===null ? '1px solid rgba(201,168,76,.4)' : '1px solid var(--a-border)', borderRadius: 0, padding:'7px 14px', color: staffCategoryFilter===null ? '#C9A84C' : 'var(--a-text2)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
+                    style={{ flexShrink:0, background: staffCategoryFilter===null ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: staffCategoryFilter===null ? '1px solid rgba(201,168,76,.4)' : '1px solid var(--a-border)', borderRadius: 8, padding:'7px 14px', color: staffCategoryFilter===null ? '#C9A84C' : 'var(--a-text2)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
                   {categories.map(cat => (
                     <button key={cat.id} onClick={() => setStaffCategoryFilter(cat.id)}
-                      style={{ flexShrink:0, background: staffCategoryFilter===cat.id ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: staffCategoryFilter===cat.id ? '1px solid rgba(201,168,76,.4)' : '1px solid var(--a-border)', borderRadius: 0, padding:'7px 14px', color: staffCategoryFilter===cat.id ? '#C9A84C' : 'var(--a-text2)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{cat.icon} {cat.name}</button>
+                      style={{ flexShrink:0, background: staffCategoryFilter===cat.id ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: staffCategoryFilter===cat.id ? '1px solid rgba(201,168,76,.4)' : '1px solid var(--a-border)', borderRadius: 8, padding:'7px 14px', color: staffCategoryFilter===cat.id ? '#C9A84C' : 'var(--a-text2)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{cat.icon} {cat.name}</button>
                   ))}
                 </div>
 
@@ -2653,18 +2657,18 @@ export default function AdminPage() {
                       const withOptions = hasMenuOptions(item.id)
                       const qty = withOptions ? 0 : (staffCart[item.id] || 0)
                       return (
-                        <div key={item.id} style={{ background:'var(--a-bg1)', border: qty>0 ? '1.5px solid rgba(201,168,76,.5)' : '1px solid var(--a-border)', borderRadius: 0, padding:'12px 10px', display:'flex', flexDirection:'column', gap:8 }}>
+                        <div key={item.id} style={{ background:'var(--a-bg1)', border: qty>0 ? '1.5px solid rgba(201,168,76,.5)' : '1px solid var(--a-border)', borderRadius: 8, padding:'12px 10px', display:'flex', flexDirection:'column', gap:8 }}>
                           <div>
                             <div style={{ color:'var(--a-text)', fontSize:13, fontWeight:700, marginBottom:2 }}>{item.name}</div>
                             <div style={{ color:'#C9A84C', fontSize:12, fontWeight:700 }}>{item.price} ₺</div>
                           </div>
                           {qty === 0 ? (
-                            <button onClick={() => withOptions ? openStaffOptionPicker(item) : adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
+                            <button onClick={() => withOptions ? openStaffOptionPicker(item) : adjustStaffCart(item.id, 1)} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, padding:'8px', color:'#C9A84C', fontSize:13, fontWeight:800, cursor:'pointer' }}>+ Ekle</button>
                           ) : (
-                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--a-bg4)', borderRadius: 0, padding:'4px 8px' }}>
-                              <button onClick={() => adjustStaffCart(item.id, -1)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:28, height:28, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:800 }}>−</button>
+                            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'var(--a-bg4)', borderRadius: 8, padding:'4px 8px' }}>
+                              <button onClick={() => adjustStaffCart(item.id, -1)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:28, height:28, color:'#fff', fontSize:16, cursor:'pointer', fontWeight:800 }}>−</button>
                               <span style={{ color:'#C9A84C', fontWeight:800, fontSize:14 }}>{qty}</span>
-                              <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'#C9A84C', border:'none', borderRadius: 0, width:28, height:28, color:'var(--a-bg2)', fontSize:16, cursor:'pointer', fontWeight:800 }}>+</button>
+                              <button onClick={() => adjustStaffCart(item.id, 1)} style={{ background:'#C9A84C', border:'none', borderRadius: 8, width:28, height:28, color:'var(--a-bg2)', fontSize:16, cursor:'pointer', fontWeight:800 }}>+</button>
                             </div>
                           )}
                         </div>
@@ -2679,7 +2683,7 @@ export default function AdminPage() {
                     <div style={{ color:'#C9A84C', fontWeight:700, fontSize:20, fontFamily:"'IBM Plex Mono', monospace" }}>₺ {formatTL(staffCartTotal)}</div>
                   </div>
                   <button onClick={submitStaffOrder} disabled={staffCartCount===0}
-                    style={{ background: staffCartCount===0 ? 'var(--a-border)' : !isOnline ? '#8a5a1f' : '#27ae60', border:'none', borderRadius: 0, height:56, padding:'0 28px', color: staffCartCount===0 ? 'var(--a-disabled)' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>{!isOnline ? '📥 Kaydet (Bağlantı Yok)' : 'Siparişi Gönder'}</button>
+                    style={{ background: staffCartCount===0 ? 'var(--a-border)' : !isOnline ? '#8a5a1f' : '#27ae60', border:'none', borderRadius: 8, height:56, padding:'0 28px', color: staffCartCount===0 ? 'var(--a-disabled)' : '#fff', fontSize:16, fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif", cursor: staffCartCount===0 ? 'not-allowed' : 'pointer' }}>{!isOnline ? '📥 Kaydet (Bağlantı Yok)' : 'Siparişi Gönder'}</button>
                 </div>
               </div>
             )}
@@ -2732,7 +2736,7 @@ export default function AdminPage() {
                 <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, maxHeight:'85vh', overflowY:'auto', margin:'0 auto', background:'var(--a-bg2)', borderRadius:20, border:'1px solid rgba(39,174,96,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
                   <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div style={{ color:'#27ae60', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>💳 {paymentTab.table_name} — Ödeme Al</div>
-                    <button onClick={() => setPaymentTab(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                    <button onClick={() => setPaymentTab(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
                   </div>
                   <div style={{ padding:'20px' }}>
                     <div style={{ textAlign:'center', marginBottom:16 }}>
@@ -2815,7 +2819,7 @@ export default function AdminPage() {
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, marginBottom:16 }}>
                       {(isLimitedStaff ? (['cash','card','transfer','mixed'] as const) : (['cash','card','transfer','mixed','debt'] as const)).map(m => (
                         <button key={m} onClick={() => setPaymentMethod(m)}
-                          style={{ height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid var(--a-border)', borderRadius: 0, color: paymentMethod===m ? '#5FD08C' : 'var(--a-text3)', fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
+                          style={{ height:72, background: paymentMethod===m ? 'rgba(39,174,96,.14)' : 'transparent', border: paymentMethod===m ? '1px solid #27ae60' : '1px solid var(--a-border)', borderRadius: 8, color: paymentMethod===m ? '#5FD08C' : 'var(--a-text3)', fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
                           <span style={{ fontSize:20 }}>{m==='cash' ? '💵' : m==='card' ? '💳' : m==='transfer' ? '🏦' : m==='mixed' ? '🔀' : '🧾'}</span>
                           {m==='cash' ? 'Nakit' : m==='card' ? 'Kart' : m==='transfer' ? 'Havale' : m==='mixed' ? 'Böl' : 'Borç'}
                         </button>
@@ -2827,12 +2831,12 @@ export default function AdminPage() {
                         <div style={{ flex:1 }}>
                           <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>NAKİT (₺)</label>
                           <input type="number" value={splitCash} onChange={e => setSplitCash(e.target.value)}
-                            style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', borderRadius: 0, padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
+                            style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', borderRadius: 8, padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
                         </div>
                         <div style={{ flex:1 }}>
                           <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>KART (₺)</label>
                           <input type="number" value={splitCard} onChange={e => setSplitCard(e.target.value)}
-                            style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', borderRadius: 0, padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
+                            style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', borderRadius: 8, padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace" }} />
                         </div>
                       </div>
                     )}
@@ -2858,11 +2862,11 @@ export default function AdminPage() {
 
                     {canPrint && (
                       <button onClick={() => printReceipt({ table_name: paymentTab.table_name, total: finalTotal, cash: paymentMethod==='cash'?finalTotal:(parseFloat(splitCash)||0), card: paymentMethod==='card'?finalTotal:(parseFloat(splitCard)||0), transfer: paymentMethod==='transfer'?finalTotal:0, method: paymentMethod, orders: settleMode==='select' && selectedFlat.length>0 ? [{ items: selectedFlat.map((x: any) => x.item) }] : paymentTab.orders, discountAmount, discountReason, originalTotal: baseTotal }, autoPrintEnabled)}
-                        style={{ width:'100%', height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
+                        style={{ width:'100%', height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
                     <button onClick={settleMode==='select' ? confirmPartialPayment : confirmPayment} disabled={!isOnline || (settleMode==='select' && selectedFlat.length===0)}
-                      style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 0, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                      style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 8, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>
                       {!isOnline ? '🔴 Bağlantı Yok' : settleMode==='select' ? '✓ Seçili Ürünleri Öde ve Yazdır' : '✓ Ödemeyi Onayla ve Masayı Kapat'}
                     </button>
                   </div>
@@ -2880,7 +2884,7 @@ export default function AdminPage() {
                     <div style={{ color: refundMode==='reopen' ? '#3498db' : '#e67e22', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>
                       {refundMode==='reopen' ? `↩️ ${refundTarget.table_name} — Yeniden Aç` : `💸 ${refundTarget.table_name} — İade`}
                     </div>
-                    <button onClick={() => setRefundTarget(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 0, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                    <button onClick={() => setRefundTarget(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
                   </div>
                   <div style={{ padding:20 }}>
                     <div style={{ color:'var(--a-text2)', fontSize:13, marginBottom:16 }}>
@@ -2929,11 +2933,11 @@ export default function AdminPage() {
 
             <div style={{ display:'flex', gap:6, marginBottom:14 }}>
               <button onClick={() => setViewMode('map')}
-                style={{ flex:1, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 0, color: viewMode==='map' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
+                style={{ flex:1, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='map' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
               <button onClick={() => setViewMode('list')}
-                style={{ flex:1, height:48, background: viewMode==='list' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='list' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 0, color: viewMode==='list' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📋 Liste</button>
+                style={{ flex:1, height:48, background: viewMode==='list' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='list' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='list' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📋 Liste</button>
               <button onClick={() => setViewMode('floor')}
-                style={{ flex:1, height:48, background: viewMode==='floor' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='floor' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 0, color: viewMode==='floor' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📐 Kat Planı</button>
+                style={{ flex:1, height:48, background: viewMode==='floor' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='floor' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='floor' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📐 Kat Planı</button>
             </div>
 
             {viewMode === 'map' && (
@@ -2968,7 +2972,7 @@ export default function AdminPage() {
                         const openedMinutesAgo = info.status !== 'empty' && info.tabData?.opened_at ? minutesSince(info.tabData.opened_at) : null
                         return (
                           <button key={tableName} onClick={() => setActiveTableModal(tableName)}
-                            style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 0, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between', animation: info.status === 'pending' ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
+                            style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 8, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between', animation: info.status === 'pending' ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
                             <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
                             <div style={{ color:p.labelText, fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase', marginTop:6 }}>
                               {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo} dk` : ''}
@@ -3040,7 +3044,7 @@ export default function AdminPage() {
                 <div style={{ display:'flex', gap:6, marginBottom: dateFilter === 'custom' ? 10 : 0 }}>
                   {(['today','week','month','custom'] as const).map(f => (
                     <button key={f} onClick={() => { setDateFilter(f); if (f !== 'custom') loadOrders(f) }}
-                      style={{ flex:1, height:44, background: dateFilter===f ? 'rgba(201,168,76,.14)' : 'transparent', border: dateFilter===f ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 0, color: dateFilter===f ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
+                      style={{ flex:1, height:44, background: dateFilter===f ? 'rgba(201,168,76,.14)' : 'transparent', border: dateFilter===f ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: dateFilter===f ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
                       {f==='today'?'Bugün':f==='week'?'Bu Hafta':f==='month'?'Bu Ay':'Özel'}
                     </button>
                   ))}
@@ -3067,15 +3071,15 @@ export default function AdminPage() {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:8, flexWrap:'wrap' }}>
               <div style={{ color:'var(--a-text2)', fontSize:12, letterSpacing:'0.08em', fontFamily:"'IBM Plex Mono', monospace" }}>{allOrders.length} SİPARİŞ</div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                <button onClick={() => loadOrders()} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, height:36, width:36, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600 }}>↻</button>
+                <button onClick={() => loadOrders()} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, width:36, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600 }}>↻</button>
                 {isManager && (
                   <>
                     {dateFilter !== 'custom' && (
-                      <button onClick={() => resetStats(dateFilter as 'today'|'week'|'month')} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, height:36, padding:'0 12px', color:'var(--a-text2)', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
+                      <button onClick={() => resetStats(dateFilter as 'today'|'week'|'month')} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, padding:'0 12px', color:'var(--a-text2)', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
                     )}
-                    <button onClick={() => exportOrdersPDF(dateFilter, allOrders, revenueSummary)} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
+                    <button onClick={() => exportOrdersPDF(dateFilter, allOrders, revenueSummary)} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
                     <div style={{ position:'relative' }}>
-                      <button onClick={() => setShowReportPicker(v => !v)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Rapor</button>
+                      <button onClick={() => setShowReportPicker(v => !v)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Rapor</button>
                       {showReportPicker && (
                         <>
                           <div onClick={() => setShowReportPicker(false)} style={{ position:'fixed', inset:0, zIndex:299 }} />
@@ -3090,9 +3094,9 @@ export default function AdminPage() {
                         </>
                       )}
                     </div>
-                    <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
-                    <button onClick={() => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
-                    <button onClick={() => openItemReport('today')} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 0, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📦 Ürün Raporu</button>
+                    <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
+                    <button onClick={() => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
+                    <button onClick={() => openItemReport('today')} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📦 Ürün Raporu</button>
                   </>
                 )}
               </div>
@@ -3100,7 +3104,7 @@ export default function AdminPage() {
 
             {/* Summary bar - revenue stats, managers only */}
             {isManager && allOrders.length > 0 && (
-              <div style={{ background:'var(--a-bg1)', border:'1px solid rgba(201,168,76,.2)', borderRadius: 0, padding:'16px', marginBottom:16, display:'flex', justifyContent:'space-around' }}>
+              <div style={{ background:'var(--a-bg1)', border:'1px solid rgba(201,168,76,.2)', borderRadius: 8, padding:'16px', marginBottom:16, display:'flex', justifyContent:'space-around' }}>
                 <div style={{ textAlign:'center' }}>
                   <div style={{ color:'#C9A84C', fontWeight:700, fontSize:22, fontFamily:"'IBM Plex Mono', monospace" }}>{allOrders.length}</div>
                   <div style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>Toplam Sipariş</div>
@@ -3136,10 +3140,10 @@ export default function AdminPage() {
               const statusColor = order.status==='pending'?'#C0392B':order.status==='dismissed'?'var(--a-text2)':'#27ae60'
               const statusLabel = order.status==='pending'?'Bekliyor':order.status==='dismissed'?'Reddedildi':'Tamamlandı'
               return (
-                <div key={order.id} style={{ background:'var(--a-bg1)', border:'1px solid var(--a-border)', borderLeft:`3px solid ${statusColor}`, borderRadius: 0, padding:'16px 18px', marginBottom:10 }}>
+                <div key={order.id} style={{ background:'var(--a-bg1)', border:'1px solid var(--a-border)', borderLeft:`3px solid ${statusColor}`, borderRadius: 8, padding:'16px 18px', marginBottom:10 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <span style={{ background:statusColor, color:'#fff', borderRadius: 0, padding:'4px 10px', fontSize:11, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
+                      <span style={{ background:statusColor, color:'#fff', borderRadius: 8, padding:'4px 10px', fontSize:11, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
                       <span style={{ color:'var(--a-text)', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{order.table_name.replace('-', ' ')}</span>
                     </div>
                     <span style={{ color:'var(--a-text2)', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
@@ -3153,7 +3157,7 @@ export default function AdminPage() {
                   ))}
 
                   {order.note && (
-                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 0, fontSize:12, color:'var(--a-text2)' }}>
+                    <div style={{ marginTop:8, padding:'8px 10px', background:'rgba(201,168,76,.06)', border:'1px solid rgba(201,168,76,.15)', borderRadius: 8, fontSize:12, color:'var(--a-text2)' }}>
                       📝 {order.note}
                     </div>
                   )}
@@ -3166,10 +3170,10 @@ export default function AdminPage() {
                     <div style={{ display:'flex', gap:8, marginTop:12 }}>
                       {!isLimitedStaff && (
                         <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et"
-                          style={{ width:56, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 0, color:'#e74c3c', fontSize:18, cursor:'pointer' }}>🚫</button>
+                          style={{ width:56, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'#e74c3c', fontSize:18, cursor:'pointer' }}>🚫</button>
                       )}
                       <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
-                        style={{ flex:1, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 0, padding:0, height:48, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
+                        style={{ flex:1, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 8, padding:0, height:48, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
                     </div>
                   )}
                 </div>
@@ -3181,7 +3185,7 @@ export default function AdminPage() {
 
         {isManager && tab === 'categories' && (
           <div className="kahfe-section" style={s.section}>
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 16, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 16, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingCat ? 'KATEGORİ DÜZENLE' : 'YENİ KATEGORİ EKLE'}</div>
               <label style={s.label}>KATEGORİ ADI *</label>
               <input value={catName} onChange={e => setCatName(e.target.value)} style={{ ...s.input, marginBottom: 12 }} placeholder="örn. Kahveler" />
@@ -3223,8 +3227,8 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => { setEditingCat(cat); setCatName(cat.name); setCatIcon(cat.icon || '') }} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                    <button onClick={() => deleteCategory(cat.id)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                    <button onClick={() => { setEditingCat(cat); setCatName(cat.name); setCatIcon(cat.icon || '') }} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
+                    <button onClick={() => deleteCategory(cat.id)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                   </div>
                 </div>
               </div>
@@ -3240,7 +3244,7 @@ export default function AdminPage() {
               const outOfStockItems = items.filter(it => it.track_stock && it.stock_quantity <= 0)
               if (lowStockItems.length === 0 && outOfStockItems.length === 0) return null
               return (
-                <div style={{ background: 'rgba(231,76,60,.08)', border: '1px solid rgba(231,76,60,.25)', borderRadius: 0, padding: 14, marginBottom: 16 }}>
+                <div style={{ background: 'rgba(231,76,60,.08)', border: '1px solid rgba(231,76,60,.25)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
                   <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>⚠️ Stok Uyarısı</div>
                   {outOfStockItems.length > 0 && (
                     <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 4 }}>Stok bitti: {outOfStockItems.map(it => it.name).join(', ')}</div>
@@ -3251,7 +3255,7 @@ export default function AdminPage() {
                 </div>
               )
             })()}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 16, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 16, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 14 }}>{editingItem ? 'ÜRÜN DÜZENLE' : 'YENİ ÜRÜN EKLE'}</div>
 
               <label style={s.label}>ÜRÜN ADI *</label>
@@ -3275,12 +3279,12 @@ export default function AdminPage() {
               {/* Preview */}
               {croppedPreview ? (
                 <div style={{ position: 'relative', marginBottom: 12 }}>
-                  <img src={croppedPreview} alt="önizleme" style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 0, border: '2px solid #C9A84C' }} />
+                  <img src={croppedPreview} alt="önizleme" style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 8, border: '2px solid #C9A84C' }} />
                   <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
-                    {rawImageSrc && <button onClick={() => setShowCropper(true)} style={{ background: '#C9A84C', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#1A0E06', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✂️ Düzenle</button>}
-                    <button onClick={() => { setCroppedPreview(''); setCroppedBlob(null); setExistingImageUrl('') }} style={{ background: '#C0392B', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✕ Sil</button>
+                    {rawImageSrc && <button onClick={() => setShowCropper(true)} style={{ background: '#C9A84C', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#1A0E06', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✂️ Düzenle</button>}
+                    <button onClick={() => { setCroppedPreview(''); setCroppedBlob(null); setExistingImageUrl('') }} style={{ background: '#C0392B', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>✕ Sil</button>
                   </div>
-                  <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', borderRadius: 0, padding: '4px 8px', fontSize: 10, color: '#C9A84C' }}>
+                  <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '4px 8px', fontSize: 10, color: '#C9A84C' }}>
                     {croppedBlob ? '✓ Kırpıldı' : '📷 Mevcut fotoğraf'}
                   </div>
                 </div>
@@ -3291,12 +3295,12 @@ export default function AdminPage() {
                 <label htmlFor="avail" style={{ color: 'var(--a-text)', fontSize: 14, cursor: 'pointer' }}>Satışta (aktif)</label>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, background: itemRec ? 'rgba(201,168,76,.08)' : 'transparent', border: itemRec ? '1px solid rgba(201,168,76,.3)' : '1px solid var(--a-border)', borderRadius: 0, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, background: itemRec ? 'rgba(201,168,76,.08)' : 'transparent', border: itemRec ? '1px solid rgba(201,168,76,.3)' : '1px solid var(--a-border)', borderRadius: 8, padding: '10px 12px' }}>
                 <input type="checkbox" id="rec" checked={itemRec} onChange={e => setItemRec(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#C9A84C' }} />
                 <label htmlFor="rec" style={{ color: '#C9A84C', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>⭐ Öne Çıkan (Önerilen)</label>
               </div>
 
-              <div style={{ marginBottom: 16, background: itemStaffOnly ? 'rgba(243,156,18,.08)' : 'transparent', border: itemStaffOnly ? '1px solid rgba(243,156,18,.3)' : '1px solid var(--a-border)', borderRadius: 0, padding: '10px 12px' }}>
+              <div style={{ marginBottom: 16, background: itemStaffOnly ? 'rgba(243,156,18,.08)' : 'transparent', border: itemStaffOnly ? '1px solid rgba(243,156,18,.3)' : '1px solid var(--a-border)', borderRadius: 8, padding: '10px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input type="checkbox" id="staffOnly" checked={itemStaffOnly} onChange={e => setItemStaffOnly(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#f39c12' }} />
                   <label htmlFor="staffOnly" style={{ color: '#f39c12', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>👤 Personel İçin (Müşteri Menüsünde Gizli)</label>
@@ -3304,7 +3308,7 @@ export default function AdminPage() {
                 <div style={{ color: 'var(--a-text2)', fontSize: 11.5, marginTop: 6, marginLeft: 28 }}>Müşteri QR menüsünde görünmez, ama Sipariş Ekle ile siz masaya ekleyebilirsiniz. Örn. VİP Oda (Saatlik).</div>
               </div>
 
-              <div style={{ marginBottom: 16, background: itemTrackStock ? 'rgba(52,152,219,.08)' : 'transparent', border: itemTrackStock ? '1px solid rgba(52,152,219,.3)' : '1px solid var(--a-border)', borderRadius: 0, padding: '10px 12px' }}>
+              <div style={{ marginBottom: 16, background: itemTrackStock ? 'rgba(52,152,219,.08)' : 'transparent', border: itemTrackStock ? '1px solid rgba(52,152,219,.3)' : '1px solid var(--a-border)', borderRadius: 8, padding: '10px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: itemTrackStock ? 10 : 0 }}>
                   <input type="checkbox" id="trackStock" checked={itemTrackStock} onChange={e => setItemTrackStock(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#3498db' }} />
                   <label htmlFor="trackStock" style={{ color: '#6FB9E8', fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>📦 Stok Takibi</label>
@@ -3392,14 +3396,14 @@ export default function AdminPage() {
                 {selectedItems.size > 0 && <span style={{ color: '#C9A84C', marginLeft: 8 }}>· {selectedItems.size} seçildi</span>}
               </div>
               <button onClick={() => { setBulkMode(!bulkMode); setSelectedItems(new Set()) }}
-                style={{ background: bulkMode ? 'rgba(201,168,76,.15)' : 'var(--a-border)', border: bulkMode ? '1px solid rgba(201,168,76,.4)' : 'none', borderRadius: 0, padding: '6px 12px', color: bulkMode ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ background: bulkMode ? 'rgba(201,168,76,.15)' : 'var(--a-border)', border: bulkMode ? '1px solid rgba(201,168,76,.4)' : 'none', borderRadius: 8, padding: '6px 12px', color: bulkMode ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                 {bulkMode ? '✕ İptal' : '↔ Toplu Taşı'}
               </button>
             </div>
 
             {/* Bulk move action bar */}
             {bulkMode && selectedItems.size > 0 && (
-              <div style={{ background: 'var(--a-bg1)', border: '1px solid rgba(201,168,76,.3)', borderRadius: 0, padding: 14, marginBottom: 14 }}>
+              <div style={{ background: 'var(--a-bg1)', border: '1px solid rgba(201,168,76,.3)', borderRadius: 8, padding: 14, marginBottom: 14 }}>
                 <div style={{ color: '#C9A84C', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
                   {selectedItems.size} ürünü taşı →
                 </div>
@@ -3423,11 +3427,11 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {/* Bulk mode checkbox */}
                     {bulkMode && (
-                      <div style={{ width: 24, height: 24, borderRadius: 0, border: isSelected ? 'none' : '2px solid var(--a-border2)', background: isSelected ? '#C9A84C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: 8, border: isSelected ? 'none' : '2px solid var(--a-border2)', background: isSelected ? '#C9A84C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>
                         {isSelected && '✓'}
                       </div>
                     )}
-                    <div style={{ width: 60, height: 60, borderRadius: 0, overflow: 'hidden', background: 'var(--a-border)', flexShrink: 0 }}>
+                    <div style={{ width: 60, height: 60, borderRadius: 8, overflow: 'hidden', background: 'var(--a-border)', flexShrink: 0 }}>
                       {item.image_url
                         ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--a-disabled2)', fontSize: 22 }}>📷</div>}
@@ -3445,11 +3449,11 @@ export default function AdminPage() {
                     </div>
                     {!bulkMode && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <button onClick={() => startEditItem(item)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                      <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 10px', color: item.recommended ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
-                      <button onClick={() => deleteItem(item.id)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
+                      <button onClick={() => startEditItem(item)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
+                      <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: item.recommended ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
+                      <button onClick={() => deleteItem(item.id)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                       {item.track_stock && (
-                        <button onClick={async () => { await supabase.from('menu_items').update({ stock_quantity: item.stock_quantity + 10, available: true }).eq('id', item.id); await loadData() }} style={{ background: 'rgba(52,152,219,.14)', border: 'none', borderRadius: 0, padding: '6px 10px', color: '#6FB9E8', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+10 Stok</button>
+                        <button onClick={async () => { await supabase.from('menu_items').update({ stock_quantity: item.stock_quantity + 10, available: true }).eq('id', item.id); await loadData() }} style={{ background: 'rgba(52,152,219,.14)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#6FB9E8', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+10 Stok</button>
                       )}
                     </div>
                     )}
@@ -3462,7 +3466,7 @@ export default function AdminPage() {
 
         {isManager && tab === 'staff' && (
           <div className="kahfe-section" style={s.section}>
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
               <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
               <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="4-6 haneli PIN (örn. 4821)" inputMode="numeric" style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.15em', marginBottom: 10 }} />
@@ -3478,9 +3482,9 @@ export default function AdminPage() {
               </div>
               <div style={{ color: 'var(--a-text2)', fontSize: 11.5, marginBottom: 10 }}>Kısıtlı personel sadece sipariş ekleyebilir ve ödeme alabilir — ürün iptali, sipariş iptali, indirim, borç ve masa taşıma yapamaz.</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={saveStaff} style={{ flex: 1, height: 52, background: '#C9A84C', border: 'none', borderRadius: 0, color: 'var(--a-bg0)', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>{editingStaffId ? '✓ Kaydet' : '+ Ekle'}</button>
+                <button onClick={saveStaff} style={{ flex: 1, height: 52, background: '#C9A84C', border: 'none', borderRadius: 8, color: 'var(--a-bg0)', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>{editingStaffId ? '✓ Kaydet' : '+ Ekle'}</button>
                 {editingStaffId && (
-                  <button onClick={resetStaffForm} style={{ height: 52, background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 0, padding: '0 20px', color: 'var(--a-text2)', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>İptal</button>
+                  <button onClick={resetStaffForm} style={{ height: 52, background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, padding: '0 20px', color: 'var(--a-text2)', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>İptal</button>
                 )}
               </div>
             </div>
@@ -3490,15 +3494,15 @@ export default function AdminPage() {
             )}
 
             {staffList.map(s => (
-              <div key={s.id} style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 0, padding: '16px 18px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
+              <div key={s.id} style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 8, padding: '16px 18px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
                 <div>
                   <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{s.name}</div>
                   <div style={{ color: 'var(--a-text2)', fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>PIN: {s.pin} {!s.active && '· Pasif'} {s.permission === 'limited' && <span style={{ color: '#f39c12' }}>· Kısıtlı</span>}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => startEditStaff(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 0, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
-                  <button onClick={() => toggleStaffActive(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 0, height: 40, padding: '0 12px', color: s.active ? '#f39c12' : '#27ae60', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>{s.active ? 'Pasifleştir' : 'Aktifleştir'}</button>
-                  <button onClick={() => deleteStaff(s.id)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 0, height: 40, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
+                  <button onClick={() => startEditStaff(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
+                  <button onClick={() => toggleStaffActive(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: s.active ? '#f39c12' : '#27ae60', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>{s.active ? 'Pasifleştir' : 'Aktifleştir'}</button>
+                  <button onClick={() => deleteStaff(s.id)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
                 </div>
               </div>
             ))}
@@ -3508,7 +3512,7 @@ export default function AdminPage() {
         {isManager && tab === 'settings' && (
           <div className="kahfe-section" style={s.section}>
             {/* Notification sound (per-device) */}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🔔 Bildirim Sesi</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Bu cihaz için — her cihazda ayrı ayarlanır (örn. mutfak tableti farklı olabilir).</div>
               <button onClick={toggleNotifSound} style={{ height: 48, padding: '0 20px', background: notifSoundOn ? 'rgba(39,174,96,.14)' : 'transparent', border: notifSoundOn ? '1px solid #27ae60' : '1px solid var(--a-border2)', color: notifSoundOn ? '#5FD08C' : 'var(--a-text2)', fontSize: 14, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -3517,7 +3521,7 @@ export default function AdminPage() {
             </div>
 
             {/* Access PINs — manager-only, write-only (current values are never fetched/shown) */}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🔐 Erişim Şifreleri</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Yönetici ve Dokunmatik Ekran giriş şifrelerini buradan değiştirebilirsiniz. Mevcut şifreler güvenlik nedeniyle burada gösterilmez — sadece yenisini girip güncelleyebilirsiniz. (Personel erişimi artık yalnızca 👥 Personel sekmesinden, kişiye özel PIN ile verilir.)</div>
               {([['manager','Yönetici Şifresi'],['touchscreen','Dokunmatik Ekran Şifresi']] as const).map(([role, label]) => (
@@ -3541,7 +3545,7 @@ export default function AdminPage() {
             </div>
 
             {/* Auto print via RawBT */}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 4 }}>
                 <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>🖨️ Otomatik Yazdırma (RawBT)</div>
                 <button onClick={toggleAutoPrintEnabled} style={{ height: 36, padding: '0 14px', background: autoPrintEnabled ? 'rgba(39,174,96,.14)' : 'transparent', border: autoPrintEnabled ? '1px solid #27ae60' : '1px solid var(--a-border2)', color: autoPrintEnabled ? '#5FD08C' : 'var(--a-text2)', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -3553,7 +3557,7 @@ export default function AdminPage() {
             </div>
 
             {/* Telegram recipients */}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 4 }}>
                 <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>📲 Telegram Bildirimleri</div>
                 <button onClick={toggleTelegramEnabled} style={{ height: 36, padding: '0 14px', background: telegramEnabled ? 'rgba(39,174,96,.14)' : 'transparent', border: telegramEnabled ? '1px solid #27ae60' : '1px solid var(--a-border2)', color: telegramEnabled ? '#5FD08C' : 'var(--a-text2)', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>
@@ -3583,7 +3587,7 @@ export default function AdminPage() {
             </div>
 
             {/* Category → printer station routing */}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🖨️ Fiş Yönlendirme</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Her kategorinin fişi hangi istasyona (Mutfak / Nargile) yazdırılacağını seçin. Ayarlanmamış kategoriler varsayılan olarak Mutfak'a gider.</div>
               {categories.map(cat => (
@@ -3598,7 +3602,7 @@ export default function AdminPage() {
             </div>
 
             {/* Table list, grouped the same way as Masa Haritası so it's not one flat jumble */}
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🪑 Masalar</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Masa Haritası'nda görünen masalar. Yeni bir QR/NFC etiketi bastırdığınızda buraya da eklemeyi unutmayın.</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
@@ -3631,7 +3635,7 @@ export default function AdminPage() {
 
         {isManager && tab === 'debts' && (
           <div className="kahfe-section" style={s.section}>
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>+ Yeni Borçlu Ekle</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={newDebtorNameTab} onChange={e => setNewDebtorNameTab(e.target.value)} placeholder="İsim" style={{ ...s.input, height: 48, flex: 1 }} />
@@ -3675,7 +3679,7 @@ export default function AdminPage() {
         {/* RECEIPT HISTORY — search and reprint any past receipt */}
         {isManager && tab === 'receipts' && (
           <div className="kahfe-section" style={s.section}>
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🧾 Fiş Geçmişi</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Geçmişteki herhangi bir tarihten (bir hafta önce, bir yıl önce, fark etmez) fiş bulup yeniden yazdırın.</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -3733,7 +3737,7 @@ export default function AdminPage() {
           const totalVoid = accVoids.reduce((s, v) => s + Number(v.amount || 0), 0)
           return (
           <div className="kahfe-section" style={s.section}>
-            <div style={{ background: 'var(--a-bg1)', borderRadius: 0, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🏷️ İndirim & İptal Raporu</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Kim ne kadar indirim veriyor, kim ne kadar ürün/sipariş iptal ediyor — hem dürüst hatalar hem de dikkat edilmesi gereken örüntüler için.</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>

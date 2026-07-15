@@ -22,7 +22,7 @@ export default function TransferPickerModal({ sourceTable, allTables, getTableIn
               const isEmpty = info.status === 'empty'
               return (
                 <button key={t} onClick={() => onTransfer(sourceTable, t)}
-                  style={{ background: isEmpty ? '#161616' : '#221E12', border: isEmpty ? '1px solid #2A2A2A' : '1px solid rgba(201,168,76,.5)', borderRadius: 0, padding:'10px 8px', cursor:'pointer', textAlign:'left' }}>
+                  style={{ background: isEmpty ? '#161616' : '#221E12', border: isEmpty ? '1px solid #2A2A2A' : '1px solid rgba(201,168,76,.5)', borderRadius: 8, padding:'10px 8px', cursor:'pointer', textAlign:'left' }}>
                   <div style={{ color:'#F0EDE8', fontWeight:700, fontSize:14, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{t}</div>
                   <div style={{ color: isEmpty ? '#6E6E6E' : '#C9A84C', fontSize:10, fontFamily:"'IBM Plex Mono', monospace", textTransform:'uppercase', marginTop:4 }}>{isEmpty ? 'Boş' : 'Birleştir'}</div>
                 </button>
