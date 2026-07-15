@@ -197,6 +197,17 @@ export function exportMonthlyReportPDF(report: any) {
   const tableRows = (report.topTables || []).slice(0, 10).map((t: any, i: number) => `
     <tr><td>${i + 1}</td><td>${t.name}</td><td style="text-align:right">${t.revenue} ₺</td></tr>
   `).join('')
+  const paymentTotal = (report.cash || 0) + (report.card || 0) + (report.transfer || 0)
+  const paymentRows = [
+    ['Nakit', report.cash || 0], ['Kart', report.card || 0], ['Havale', report.transfer || 0],
+  ].filter(([, v]) => Number(v) > 0).map(([label, v]) => `
+    <tr><td>${label}</td><td style="text-align:right">${formatTL(Number(v))} ₺</td><td style="text-align:right">%${paymentTotal > 0 ? ((Number(v) / paymentTotal) * 100).toFixed(0) : 0}</td></tr>
+  `).join('')
+  const deltaText = (pct: number | null) => pct === null ? '' : ` (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% ${report.prevLabel || 'önceki döneme göre'})`
+  const activeHours = (report.hourlyPattern || []).filter((h: any) => h.orders > 0)
+  const hourRows = activeHours.map((h: any) => `
+    <tr><td>${String(h.hour).padStart(2, '0')}:00</td><td style="text-align:right">${h.orders}</td><td style="text-align:right">${formatTL(h.revenue)} ₺</td></tr>
+  `).join('')
   win.document.write(`
     <!DOCTYPE html>
     <html lang="tr">
@@ -223,10 +234,22 @@ export function exportMonthlyReportPDF(report: any) {
       <div class="brand">KAHFE LOUNGE</div>
       <h1>${title}</h1>
       <div class="stats">
-        <div class="stat"><div class="num">${report.totalOrders}</div><div class="label">Toplam Sipariş</div></div>
-        <div class="stat"><div class="num">${formatTL(Number(report.totalRevenue))} ₺</div><div class="label">Toplam Ciro</div></div>
+        <div class="stat"><div class="num">${report.totalOrders}</div><div class="label">Toplam Sipariş${deltaText(report.ordersDeltaPct)}</div></div>
+        <div class="stat"><div class="num">${formatTL(Number(report.totalRevenue))} ₺</div><div class="label">Toplam Ciro${deltaText(report.revenueDeltaPct)}</div></div>
         <div class="stat"><div class="num">${formatTL(Number(report.totalDebt || 0))} ₺</div><div class="label">Toplam Borç</div></div>
       </div>
+      ${paymentRows ? `
+      <h2>Ödeme Yöntemi Dağılımı</h2>
+      <table>
+        <tr><th>Yöntem</th><th style="text-align:right">Tutar</th><th style="text-align:right">Oran</th></tr>
+        ${paymentRows}
+      </table>` : ''}
+      ${hourRows ? `
+      <h2>Saatlik Yoğunluk${report.peakHour?.orders > 0 ? ` (En yoğun: ${String(report.peakHour.hour).padStart(2, '0')}:00)` : ''}</h2>
+      <table>
+        <tr><th>Saat</th><th style="text-align:right">Sipariş</th><th style="text-align:right">Ciro</th></tr>
+        ${hourRows}
+      </table>` : ''}
       ${categoryRows ? `
       <h2>Kategori Bazında Ciro</h2>
       <table>

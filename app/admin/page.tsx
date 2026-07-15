@@ -69,6 +69,10 @@ export default function AdminPage() {
   // individual staff PINs marked limited in Personel.
   const isLimitedStaff = role === 'staff' && staffPermission === 'limited'
   const [staffName, setStaffName] = useState<string>('')
+  // Live running total for the header — refreshed on every realtime
+  // orders/tabs event (not just when a report is generated), so it's an
+  // always-current "how are we doing today" number at a glance.
+  const [todayRevenue, setTodayRevenue] = useState<{ revenue: number, count: number } | null>(null)
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotif, setShowNotif] = useState(false)
   const [newOrderAlert, setNewOrderAlert] = useState(false)
@@ -181,6 +185,7 @@ export default function AdminPage() {
     if (!auth) return
     // Load pending orders on mount
     refreshNotifications()
+    refreshTodayRevenue()
 
     // Real-time subscription for new orders
     const channel = supabase
@@ -201,7 +206,10 @@ export default function AdminPage() {
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadTableMapData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => loadTableMapData())
+      // Revenue is only actually earned when a tab CLOSES (payment taken),
+      // not when an order is placed — this is what keeps the header total
+      // live the moment any device closes/reopens/refunds a tab.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => { loadTableMapData(); refreshTodayRevenue() })
       .subscribe()
 
 
@@ -209,7 +217,7 @@ export default function AdminPage() {
 
     // Polling fallback in case realtime isn't enabled/working for this
     // Supabase project - checks every 15s regardless of which tab is open
-    const notifPoll = setInterval(refreshNotifications, 15000)
+    const notifPoll = setInterval(() => { refreshNotifications(); refreshTodayRevenue() }, 15000)
 
     return () => { supabase.removeChannel(channel); clearInterval(notifPoll) }
   }, [auth])
@@ -1071,10 +1079,16 @@ export default function AdminPage() {
       // folded into revenue, even though its `total` column is set the
       // same as any other closed tab.
       revenue: cash + card + transfer,
-      cash, card,
+      cash, card, transfer,
       debt: tabs.reduce((s: number, t: any) => s + Number(t.debt_amount || 0), 0),
       count: tabs.length,
     }
+  }
+
+  async function refreshTodayRevenue() {
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+    const rev = await getClosedTabsRevenue(startOfToday.toISOString())
+    setTodayRevenue({ revenue: rev.revenue, count: rev.count })
   }
 
   async function loadOrders(filter: 'today'|'week'|'month'|'custom' = dateFilter) {
@@ -1104,23 +1118,38 @@ export default function AdminPage() {
     const now = new Date()
     const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
     let firstDay: string, lastDay: string, title: string
+    // Previous period of the same length, for the "vs last week/month/year"
+    // comparison — e.g. the week is Mon-Sun, so "previous" is the Mon-Sun
+    // right before it, not just "7 days back" from today.
+    let prevFirstDay: string, prevLastDay: string, prevLabel: string
     if (period === 'week') {
       const day = now.getDay() === 0 ? 7 : now.getDay() // Monday-start week
       const monday = new Date(now); monday.setDate(now.getDate() - day + 1); monday.setHours(0,0,0,0)
       const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999)
       firstDay = monday.toISOString(); lastDay = sunday.toISOString()
       title = `${monday.toLocaleDateString('tr-TR')} - ${sunday.toLocaleDateString('tr-TR')} Haftalık Raporu`
+      const prevMonday = new Date(monday); prevMonday.setDate(monday.getDate() - 7)
+      const prevSunday = new Date(prevMonday); prevSunday.setDate(prevMonday.getDate() + 6); prevSunday.setHours(23,59,59,999)
+      prevFirstDay = prevMonday.toISOString(); prevLastDay = prevSunday.toISOString()
+      prevLabel = 'geçen hafta'
     } else if (period === 'year') {
       const year = now.getFullYear()
       firstDay = new Date(year, 0, 1).toISOString()
       lastDay = new Date(year, 11, 31, 23, 59, 59).toISOString()
       title = `${year} Yıllık Raporu`
+      prevFirstDay = new Date(year - 1, 0, 1).toISOString()
+      prevLastDay = new Date(year - 1, 11, 31, 23, 59, 59).toISOString()
+      prevLabel = `${year - 1}`
     } else {
       const month = monthNames[now.getMonth()]
       const year = now.getFullYear()
       firstDay = new Date(year, now.getMonth(), 1).toISOString()
       lastDay = new Date(year, now.getMonth() + 1, 0, 23, 59, 59).toISOString()
       title = `${month} ${year} Raporu`
+      const prevMonthDate = new Date(year, now.getMonth() - 1, 1)
+      prevFirstDay = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), 1).toISOString()
+      prevLastDay = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0, 23, 59, 59).toISOString()
+      prevLabel = `geçen ay (${monthNames[prevMonthDate.getMonth()]})`
     }
 
     const { data: periodOrders } = await supabase.from('orders').select('*')
@@ -1131,9 +1160,19 @@ export default function AdminPage() {
       return
     }
 
-    const periodRevenue = await getClosedTabsRevenue(firstDay, lastDay)
+    const [periodRevenue, previousRevenue, { count: previousOrderCount }] = await Promise.all([
+      getClosedTabsRevenue(firstDay, lastDay),
+      getClosedTabsRevenue(prevFirstDay, prevLastDay),
+      supabase.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', prevFirstDay).lte('created_at', prevLastDay),
+    ])
     const totalRevenue = periodRevenue.revenue
     const totalDebt = periodRevenue.debt
+
+    // vs previous period — null when there's nothing to compare against
+    // (e.g. the café's first ever week) rather than showing a misleading
+    // "+∞%" or "-100%"
+    const revenueDeltaPct = previousRevenue.revenue > 0 ? ((totalRevenue - previousRevenue.revenue) / previousRevenue.revenue) * 100 : null
+    const ordersDeltaPct = (previousOrderCount || 0) > 0 ? ((periodOrders.length - (previousOrderCount || 0)) / (previousOrderCount || 0)) * 100 : null
 
     // Top items
     const itemMap: Record<string, { name: string; count: number; revenue: number; categoryId: string | null }> = {}
@@ -1174,6 +1213,18 @@ export default function AdminPage() {
       dayMap[day].revenue += Number(o.total)
     })
 
+    // Hourly pattern (0-23, local device time) — which hours are actually
+    // busy, for staffing/prep decisions. Based on order volume across the
+    // whole period, same as the daily breakdown above.
+    const hourBuckets: { orders: number, revenue: number }[] = Array.from({ length: 24 }, () => ({ orders: 0, revenue: 0 }))
+    periodOrders.forEach((o: any) => {
+      const h = new Date(o.created_at).getHours()
+      hourBuckets[h].orders++
+      hourBuckets[h].revenue += Number(o.total)
+    })
+    const hourlyPattern = hourBuckets.map((v, hour) => ({ hour, ...v }))
+    const peakHour = hourlyPattern.reduce((best, cur) => cur.orders > best.orders ? cur : best, hourlyPattern[0])
+
     // Only the monthly cadence gets persisted to the existing monthly_reports
     // table (matches its schema); week/year reports are generate-on-demand.
     if (period === 'month') {
@@ -1189,7 +1240,14 @@ export default function AdminPage() {
     }
 
     showMsg(`✓ ${title.replace(' Raporu','')} raporu oluşturuldu!`)
-    setShowMonthlyReport({ title, periodType: period, totalOrders: periodOrders.length, totalRevenue, totalDebt, topItems, topTables, categoryStats, dayMap })
+    setShowMonthlyReport({
+      title, periodType: period, totalOrders: periodOrders.length, totalRevenue, totalDebt,
+      cash: periodRevenue.cash, card: periodRevenue.card, transfer: periodRevenue.transfer,
+      previousRevenue: previousRevenue.revenue, previousOrders: previousOrderCount || 0, prevLabel,
+      revenueDeltaPct, ordersDeltaPct,
+      hourlyPattern, peakHour,
+      topItems, topTables, categoryStats, dayMap,
+    })
   }
 
 
@@ -2333,6 +2391,11 @@ export default function AdminPage() {
           <div>
             <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>
             <div style={{ color: 'var(--a-text)', fontSize: 19, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>KAHFE LOUNGE</div>
+            {todayRevenue !== null && (
+              <div style={{ color: 'var(--a-text2)', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>
+                Bugün: <span style={{ color: '#5FD08C', fontWeight: 700 }}>₺{formatTL(todayRevenue.revenue)}</span> · {todayRevenue.count} fiş
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {/* Kitchen Display link */}
