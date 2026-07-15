@@ -257,7 +257,11 @@ export default function AdminPage() {
   // without this, that failure looked identical to "wrong password" and
   // was genuinely undiagnosable from the login screen alone.
   const [loginSystemError, setLoginSystemError] = useState('')
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts' | 'accountability'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts' | 'accountability' | 'reports'>('orders')
+  // Fiş Geçmişi and İndirim/İptal used to be their own top-level tabs;
+  // they're still the exact same views/state under the hood, just reached
+  // through the Raporlar hub now instead of two extra tab-bar buttons.
+  const [reportsSubTab, setReportsSubTab] = useState<'overview' | 'receipts' | 'accountability'>('overview')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
@@ -1111,10 +1115,7 @@ export default function AdminPage() {
   }
 
 
-  const [showReportPicker, setShowReportPicker] = useState(false)
-
   async function generatePeriodReport(period: 'week'|'month'|'year') {
-    setShowReportPicker(false)
     const now = new Date()
     const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
     let firstDay: string, lastDay: string, title: string
@@ -2545,14 +2546,27 @@ export default function AdminPage() {
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
         <div style={{ display: 'flex', borderBottom: '1px solid var(--a-border)', overflowX: 'auto' }}>
-          {(isManager ? (['orders', 'categories', 'items', 'staff', 'settings', 'debts', 'receipts', 'accountability'] as const) : (['orders'] as const)).map(t => (
-            <button key={t} onClick={() => { setTab(t); if(t==='orders') loadOrders(dateFilter); if(t==='debts') loadDebtTransactions(); if(t==='receipts') searchReceipts(); if(t==='accountability') searchAccountability() }}
-              style={{ flex: '1 0 auto', minWidth: 80, padding: '16px 8px', background: 'transparent', border: 'none', borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent', color: tab === t ? 'var(--a-text)' : 'var(--a-text2)', fontWeight: tab === t ? 600 : 500, fontSize: 13, cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap' }}>
-              {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : t === 'receipts' ? 'Fiş Geçmişi' : t === 'accountability' ? 'İndirim/İptal' : 'Siparişler'}
-              {t === 'orders' && notifications.length > 0 && (
-                <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
-              )}
-            </button>
+          {(isManager
+            ? ([['orders'], ['categories', 'items', 'staff', 'settings'], ['debts', 'reports']] as const)
+            : ([['orders']] as const)
+          ).map((group, gi) => (
+            <div key={gi} style={{ display: 'flex', borderRight: gi < 2 && isManager ? '1px solid var(--a-border)' : 'none' }}>
+              {group.map(t => (
+                <button key={t} onClick={() => {
+                  setTab(t)
+                  if (t === 'orders') loadOrders(dateFilter)
+                  if (t === 'debts') loadDebtTransactions()
+                  if (t === 'reports' && reportsSubTab === 'receipts') searchReceipts()
+                  if (t === 'reports' && reportsSubTab === 'accountability') searchAccountability()
+                }}
+                  style={{ flex: '1 0 auto', minWidth: 80, padding: '16px 8px', background: 'transparent', border: 'none', borderBottom: (tab === t || (t === 'reports' && (tab === 'receipts' || tab === 'accountability'))) ? '2px solid #C9A84C' : '2px solid transparent', color: (tab === t || (t === 'reports' && (tab === 'receipts' || tab === 'accountability'))) ? 'var(--a-text)' : 'var(--a-text2)', fontWeight: tab === t ? 600 : 500, fontSize: 13, cursor: 'pointer', position: 'relative', whiteSpace: 'nowrap' }}>
+                  {t === 'categories' ? 'Kategoriler' : t === 'items' ? 'Ürünler' : t === 'staff' ? 'Personel' : t === 'settings' ? 'Ayarlar' : t === 'debts' ? 'Borç' : t === 'reports' ? 'Raporlar' : 'Siparişler'}
+                  {t === 'orders' && notifications.length > 0 && (
+                    <span style={{ position:'absolute', top:8, right:8, background:'#C0392B', color:'#fff', borderRadius:'50%', width:16, height:16, fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>{notifications.length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
 
@@ -3141,25 +3155,8 @@ export default function AdminPage() {
                       <button onClick={() => resetStats(dateFilter as 'today'|'week'|'month')} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, padding:'0 12px', color:'var(--a-text2)', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>Sıfırla</button>
                     )}
                     <button onClick={() => exportOrdersPDF(dateFilter, allOrders, revenueSummary)} style={{ background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>PDF</button>
-                    <div style={{ position:'relative' }}>
-                      <button onClick={() => setShowReportPicker(v => !v)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Rapor</button>
-                      {showReportPicker && (
-                        <>
-                          <div onClick={() => setShowReportPicker(false)} style={{ position:'fixed', inset:0, zIndex:299 }} />
-                          <div style={{ position:'absolute', top:40, left:0, zIndex:300, background:'var(--a-bg1)', border:'1px solid var(--a-border2)', minWidth:140, boxShadow:'0 8px 24px rgba(0,0,0,.5)' }}>
-                            {([['week','📅 Haftalık'],['month','🗓️ Aylık'],['year','📈 Yıllık']] as const).map(([period, label]) => (
-                              <button key={period} onClick={() => generatePeriodReport(period)}
-                                style={{ display:'block', width:'100%', textAlign:'left', background:'transparent', border:'none', borderBottom:'1px solid var(--a-border)', padding:'12px 14px', color:'var(--a-text)', fontSize:13, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
                     <button onClick={openDayClose} style={{ background:'rgba(52,152,219,.14)', border:'1px solid rgba(52,152,219,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#3498db', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🌙 Gün Sonu</button>
-                    <button onClick={() => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter)} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>👤 Personel</button>
-                    <button onClick={() => openItemReport('today')} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📦 Ürün Raporu</button>
+                    <button onClick={() => { setTab('reports'); setReportsSubTab('overview') }} style={{ background:'rgba(201,168,76,.14)', border:'1px solid rgba(201,168,76,.4)', borderRadius: 8, height:36, padding:'0 12px', color:'#C9A84C', fontSize:12, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>📊 Raporlar</button>
                   </>
                 )}
               </div>
@@ -3740,7 +3737,46 @@ export default function AdminPage() {
         )}
 
         {/* RECEIPT HISTORY — search and reprint any past receipt */}
-        {isManager && tab === 'receipts' && (
+        {/* RAPORLAR HUB — consolidates what used to be scattered across a
+            toolbar dropdown (Haftalık/Aylık/Yıllık, Personel, Ürün Raporu)
+            and two separate top-level tabs (Fiş Geçmişi, İndirim/İptal)
+            into one place with a small sub-nav. */}
+        {isManager && tab === 'reports' && (
+          <div className="kahfe-section" style={{ padding: '16px 20px 0' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+              {([['overview', '📊 Genel Bakış'], ['receipts', '🧾 Fiş Geçmişi'], ['accountability', '💸 İndirim & İptal']] as const).map(([key, label]) => (
+                <button key={key} onClick={() => { setReportsSubTab(key); if (key === 'receipts') searchReceipts(); if (key === 'accountability') searchAccountability() }}
+                  style={{ height: 36, padding: '0 14px', background: reportsSubTab === key ? 'rgba(201,168,76,.14)' : 'transparent', border: reportsSubTab === key ? '1px solid #C9A84C' : '1px solid var(--a-border2)', color: reportsSubTab === key ? '#C9A84C' : 'var(--a-text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {isManager && tab === 'reports' && reportsSubTab === 'overview' && (
+          <div className="kahfe-section" style={{ padding: '0 20px 20px' }}>
+            <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 16 }}>Bir rapor türü seçin — her biri kendi penceresinde açılır, PDF/Excel olarak indirilebilir.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+              {[
+                { icon: '📅', label: 'Haftalık Rapor', onClick: () => generatePeriodReport('week') },
+                { icon: '🗓️', label: 'Aylık Rapor', onClick: () => generatePeriodReport('month') },
+                { icon: '📈', label: 'Yıllık Rapor', onClick: () => generatePeriodReport('year') },
+                { icon: '📦', label: 'Ürün Raporu', onClick: () => openItemReport('today') },
+                { icon: '👤', label: 'Personel Performansı', onClick: () => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter) },
+                { icon: '🌙', label: 'Gün Sonu', onClick: openDayClose },
+                { icon: '🧾', label: 'Fiş Geçmişi', onClick: () => { setReportsSubTab('receipts'); searchReceipts() } },
+                { icon: '💸', label: 'İndirim & İptal', onClick: () => { setReportsSubTab('accountability'); searchAccountability() } },
+              ].map((r, i) => (
+                <button key={i} onClick={r.onClick} style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 12, padding: '18px 14px', textAlign: 'left', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <span style={{ fontSize: 22 }}>{r.icon}</span>
+                  <span style={{ color: 'var(--a-text)', fontSize: 13, fontWeight: 600 }}>{r.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isManager && tab === 'reports' && reportsSubTab === 'receipts' && (
           <div className="kahfe-section" style={s.section}>
             <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🧾 Fiş Geçmişi</div>
@@ -3793,7 +3829,7 @@ export default function AdminPage() {
         )}
 
         {/* İNDİRİM & İPTAL RAPORU — loss prevention: who's discounting/voiding, how much, how often */}
-        {isManager && tab === 'accountability' && (() => {
+        {isManager && tab === 'reports' && reportsSubTab === 'accountability' && (() => {
           const discountByStaff = groupByStaff(accDiscounts, 'applied_by', 'discount_amount')
           const voidByStaff = groupByStaff(accVoids, 'voided_by', 'amount')
           const totalDiscount = accDiscounts.reduce((s, d) => s + Number(d.discount_amount || 0), 0)
