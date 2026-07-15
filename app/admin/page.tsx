@@ -160,6 +160,11 @@ export default function AdminPage() {
         setNewOrderAlert(true)
         setShowNotif(true)
         playNotifSound()
+        // The realtime channel normally does this on INSERT, but this path
+        // only runs when realtime has silently dropped (backgrounded tab,
+        // flaky wifi) - without it, the table stayed showing "Boş"/old
+        // state even though the alert had already fired for the same order.
+        loadTableMapData()
       }
       seenOrderIdsRef.current = new Set(data.map((o: any) => o.id))
     }
