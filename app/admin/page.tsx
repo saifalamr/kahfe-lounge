@@ -2587,37 +2587,94 @@ export default function AdminPage() {
           ))}
         </div>
 
+        {/* These four modals are opened from the Raporlar tab's quick-action
+            tiles (Haftalık/Aylık/Yıllık Rapor, Gün Sonu, Ürün Raporu,
+            Personel Performansı). They render here — always, regardless of
+            which tab is active — instead of nested inside the orders tab,
+            because the trigger button and the modal being in different tabs
+            meant clicking the button set the state but nothing appeared
+            until you happened to switch to Siparişler afterward. */}
+        {isManager && showMonthlyReport && (
+          <MonthlyReportModal report={showMonthlyReport} onExportPDF={() => exportMonthlyReportPDF(showMonthlyReport)} onClose={() => setShowMonthlyReport(null)} />
+        )}
+        {isManager && showDayClose && dayCloseData && (
+          <DayCloseModal dayCloseData={dayCloseData} countedCash={countedCash} onCountedCashChange={setCountedCash}
+            onSave={saveDayClose} onExportPDF={() => printDayClosePDF(dayCloseData, countedCash)} onClose={() => setShowDayClose(false)} />
+        )}
+        {isManager && showItemReport && (
+          <ItemReportModal itemReportRange={itemReportRange} itemReportData={itemReportData} onRangeChange={openItemReport}
+            customFrom={itemReportCustomFrom} customTo={itemReportCustomTo}
+            onCustomFromChange={setItemReportCustomFrom} onCustomToChange={setItemReportCustomTo}
+            onExportPDF={() => printItemReportPDF(itemReportRange, itemReportData)} onClose={() => setShowItemReport(false)} />
+        )}
+        {isManager && showStaffReport && (
+          <StaffReportModal staffReportRange={staffReportRange} staffReportData={staffReportData} onRangeChange={openStaffReport}
+            onExportPDF={() => printStaffReportPDF(staffReportRange, staffReportData)} onClose={() => setShowStaffReport(false)} />
+        )}
+
+        {/* Reopen a closed tab by mistake, or record a refund against one
+            that stays closed. Opened from Raporlar → Fiş Geçmişi, same
+            reason as the four modals above: must render regardless of
+            active tab, not just when tab==='orders'. */}
+        {refundTarget && (
+          <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setRefundTarget(null)}>
+            <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, background:'var(--a-bg2)', borderRadius:20, border: refundMode==='reopen' ? '1px solid rgba(52,152,219,.4)' : '1px solid rgba(230,126,34,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+              <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ color: refundMode==='reopen' ? '#3498db' : '#e67e22', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>
+                  {refundMode==='reopen' ? `↩️ ${refundTarget.table_name} — Yeniden Aç` : `💸 ${refundTarget.table_name} — İade`}
+                </div>
+                <button onClick={() => setRefundTarget(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+              </div>
+              <div style={{ padding:20 }}>
+                <div style={{ color:'var(--a-text2)', fontSize:13, marginBottom:16 }}>
+                  {refundTarget.fatura_no ? `Fiş #${String(refundTarget.fatura_no).padStart(6, '0')} · ` : ''}Toplam: ₺{formatTL(Number(refundTarget.total))}
+                  {refundMode==='reopen' && <> — masa yeniden açılıp Masa Haritası'na geri döner, aynı fiş numarasıyla tekrar kapatılabilir.</>}
+                </div>
+
+                {refundMode === 'refund' && (
+                  <>
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İADE TUTARI (₺)</label>
+                    <input type="number" value={refundAmount} onChange={e => setRefundAmount(e.target.value)}
+                      style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace", marginBottom:14 }} />
+
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İADE YÖNTEMİ</label>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginBottom:16 }}>
+                      {(['cash','card','transfer','debt'] as const).map(m => (
+                        <button key={m} onClick={() => setRefundMethod(m)}
+                          style={{ height:52, background: refundMethod===m ? 'rgba(230,126,34,.14)' : 'transparent', border: refundMethod===m ? '1px solid #e67e22' : '1px solid var(--a-border)', color: refundMethod===m ? '#e67e22' : 'var(--a-text3)', fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                          {m==='cash' ? '💵 Nakit' : m==='card' ? '💳 Kart' : m==='transfer' ? '🏦 Havale' : '🧾 Borç'}
+                        </button>
+                      ))}
+                    </div>
+                    {refundMethod === 'cash' && (
+                      <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:14 }}>Bu tutar Kasa Hareketi'ne "Kasadan Çıkış" olarak otomatik işlenecek.</div>
+                    )}
+                    {refundMethod === 'debt' && (
+                      <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:14 }}>Bu fişe bağlı borçlunun bakiyesi bu tutar kadar azaltılacak.</div>
+                    )}
+                  </>
+                )}
+
+                <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>{refundMode==='reopen' ? 'YENİDEN AÇMA NEDENİ (zorunlu)' : 'İADE NEDENİ (zorunlu)'}</label>
+                <textarea value={refundReason} onChange={e => setRefundReason(e.target.value)} rows={2}
+                  placeholder={refundMode==='reopen' ? 'Örn. yanlışlıkla kapatıldı' : 'Örn. müşteri şikayeti, yanlış ürün'}
+                  style={{ width:'100%', background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'10px 14px', color:'var(--a-text)', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif", marginBottom:18, resize:'vertical' }} />
+
+                <button onClick={refundMode==='reopen' ? confirmReopenTab : confirmRefund}
+                  style={{ width:'100%', height:52, background: refundMode==='reopen' ? '#3498db' : '#e67e22', border:'none', color:'#fff', fontSize:15, cursor:'pointer', fontWeight:700 }}>
+                  {refundMode==='reopen' ? '✓ Yeniden Aç' : '✓ İadeyi Kaydet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* CATEGORIES */}
         {/* ORDERS TAB */}
         {tab === 'orders' && (
           <div className="kahfe-section" style={{ padding: '16px 20px' }}>
 
-            {/* Monthly report modal - managers only */}
-            {isManager && showMonthlyReport && (
-              <MonthlyReportModal report={showMonthlyReport} onExportPDF={() => exportMonthlyReportPDF(showMonthlyReport)} onClose={() => setShowMonthlyReport(null)} />
-            )}
 
-            {/* Day-end close-out modal */}
-            {isManager && showDayClose && dayCloseData && (
-              <DayCloseModal dayCloseData={dayCloseData} countedCash={countedCash} onCountedCashChange={setCountedCash}
-                onSave={saveDayClose} onExportPDF={() => printDayClosePDF(dayCloseData, countedCash)} onClose={() => setShowDayClose(false)} />
-            )}
-
-            {/* Ürün Raporu - per-item sales breakdown */}
-            {isManager && showItemReport && (
-              <ItemReportModal itemReportRange={itemReportRange} itemReportData={itemReportData} onRangeChange={openItemReport}
-                customFrom={itemReportCustomFrom} customTo={itemReportCustomTo}
-                onCustomFromChange={setItemReportCustomFrom} onCustomToChange={setItemReportCustomTo}
-                onExportPDF={() => printItemReportPDF(itemReportRange, itemReportData)} onClose={() => setShowItemReport(false)} />
-            )}
-
-            {/* Staff Performance report modal */}
-            {isManager && showStaffReport && (
-              <StaffReportModal staffReportRange={staffReportRange} staffReportData={staffReportData} onRangeChange={openStaffReport}
-                onExportPDF={() => printStaffReportPDF(staffReportRange, staffReportData)} onClose={() => setShowStaffReport(false)} />
-            )}
-
-            {/* Table drilldown modal - tap a table on the map */}
             {activeTableModal && (() => {
               const info = getTableInfo(activeTableModal)
               const activeOrders = info.orders.filter((o:any) => o.status !== 'dismissed')
@@ -2968,61 +3025,6 @@ export default function AdminPage() {
               </div>
               )
             })()}
-
-            {/* Reopen a closed tab by mistake, or record a refund against
-                one that stays closed — both manager-only, both logged. */}
-            {refundTarget && (
-              <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setRefundTarget(null)}>
-                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:480, background:'var(--a-bg2)', borderRadius:20, border: refundMode==='reopen' ? '1px solid rgba(52,152,219,.4)' : '1px solid rgba(230,126,34,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
-                  <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div style={{ color: refundMode==='reopen' ? '#3498db' : '#e67e22', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>
-                      {refundMode==='reopen' ? `↩️ ${refundTarget.table_name} — Yeniden Aç` : `💸 ${refundTarget.table_name} — İade`}
-                    </div>
-                    <button onClick={() => setRefundTarget(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
-                  </div>
-                  <div style={{ padding:20 }}>
-                    <div style={{ color:'var(--a-text2)', fontSize:13, marginBottom:16 }}>
-                      {refundTarget.fatura_no ? `Fiş #${String(refundTarget.fatura_no).padStart(6, '0')} · ` : ''}Toplam: ₺{formatTL(Number(refundTarget.total))}
-                      {refundMode==='reopen' && <> — masa yeniden açılıp Masa Haritası'na geri döner, aynı fiş numarasıyla tekrar kapatılabilir.</>}
-                    </div>
-
-                    {refundMode === 'refund' && (
-                      <>
-                        <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İADE TUTARI (₺)</label>
-                        <input type="number" value={refundAmount} onChange={e => setRefundAmount(e.target.value)}
-                          style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace", marginBottom:14 }} />
-
-                        <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>İADE YÖNTEMİ</label>
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginBottom:16 }}>
-                          {(['cash','card','transfer','debt'] as const).map(m => (
-                            <button key={m} onClick={() => setRefundMethod(m)}
-                              style={{ height:52, background: refundMethod===m ? 'rgba(230,126,34,.14)' : 'transparent', border: refundMethod===m ? '1px solid #e67e22' : '1px solid var(--a-border)', color: refundMethod===m ? '#e67e22' : 'var(--a-text3)', fontWeight:600, fontSize:12, cursor:'pointer' }}>
-                              {m==='cash' ? '💵 Nakit' : m==='card' ? '💳 Kart' : m==='transfer' ? '🏦 Havale' : '🧾 Borç'}
-                            </button>
-                          ))}
-                        </div>
-                        {refundMethod === 'cash' && (
-                          <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:14 }}>Bu tutar Kasa Hareketi'ne "Kasadan Çıkış" olarak otomatik işlenecek.</div>
-                        )}
-                        {refundMethod === 'debt' && (
-                          <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:14 }}>Bu fişe bağlı borçlunun bakiyesi bu tutar kadar azaltılacak.</div>
-                        )}
-                      </>
-                    )}
-
-                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>{refundMode==='reopen' ? 'YENİDEN AÇMA NEDENİ (zorunlu)' : 'İADE NEDENİ (zorunlu)'}</label>
-                    <textarea value={refundReason} onChange={e => setRefundReason(e.target.value)} rows={2}
-                      placeholder={refundMode==='reopen' ? 'Örn. yanlışlıkla kapatıldı' : 'Örn. müşteri şikayeti, yanlış ürün'}
-                      style={{ width:'100%', background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'10px 14px', color:'var(--a-text)', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif", marginBottom:18, resize:'vertical' }} />
-
-                    <button onClick={refundMode==='reopen' ? confirmReopenTab : confirmRefund}
-                      style={{ width:'100%', height:52, background: refundMode==='reopen' ? '#3498db' : '#e67e22', border:'none', color:'#fff', fontSize:15, cursor:'pointer', fontWeight:700 }}>
-                      {refundMode==='reopen' ? '✓ Yeniden Aç' : '✓ İadeyi Kaydet'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
 
             <div style={{ display:'flex', gap:6, marginBottom:14 }}>
