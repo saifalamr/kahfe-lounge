@@ -151,24 +151,30 @@ export default function AdminPage() {
   async function refreshNotifications() {
     const { data } = await supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false })
     if (!data) return
+    // Only customer-placed (QR) orders should ever alert staff — if a
+    // staff member just added an item themselves at the register, they
+    // obviously already know about it. Staff-entered orders still count
+    // as "pending" for the kitchen/table state, just never for this alert.
+    const customerOrders = data.filter((o: any) => o.created_by === 'Müşteri (QR)')
     if (seenOrderIdsRef.current === null) {
       // First load this session - just record what's already pending, don't beep for it
       seenOrderIdsRef.current = new Set(data.map((o: any) => o.id))
     } else {
       const newlySeen = data.filter((o: any) => !seenOrderIdsRef.current!.has(o.id))
       if (newlySeen.length > 0) {
+        // Keep the table map fresh regardless of who placed the order —
+        // this is the fallback for when realtime has silently dropped.
+        loadTableMapData()
+      }
+      const newlySeenCustomer = newlySeen.filter((o: any) => o.created_by === 'Müşteri (QR)')
+      if (newlySeenCustomer.length > 0) {
         setNewOrderAlert(true)
         setShowNotif(true)
         playNotifSound()
-        // The realtime channel normally does this on INSERT, but this path
-        // only runs when realtime has silently dropped (backgrounded tab,
-        // flaky wifi) - without it, the table stayed showing "Boş"/old
-        // state even though the alert had already fired for the same order.
-        loadTableMapData()
       }
       seenOrderIdsRef.current = new Set(data.map((o: any) => o.id))
     }
-    setNotifications(data.filter((o: any) => !acknowledgedIds.current.has(o.id)))
+    setNotifications(customerOrders.filter((o: any) => !acknowledgedIds.current.has(o.id)))
   }
 
   useEffect(() => {
@@ -180,19 +186,24 @@ export default function AdminPage() {
     const channel = supabase
       .channel('orders-channel')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-        setNotifications(prev => [payload.new, ...prev])
-        setNewOrderAlert(true)
-        // Pop the alert straight onto the screen — no need to tap the bell
-        // to find out an order came in.
-        setShowNotif(true)
+        const order = payload.new as any
+        // Table map stays live for every order, staff-added or customer —
+        // the kitchen still needs to know either way.
         loadTableMapData()
-        if (seenOrderIdsRef.current) seenOrderIdsRef.current.add((payload.new as any).id)
-        // Play beep sound (respects the Ayarlar sound toggle for this device)
-        playNotifSound()
+        if (seenOrderIdsRef.current) seenOrderIdsRef.current.add(order.id)
+        // Only pop the alert (badge, popup, alarm) for orders that came
+        // from a customer, not ones a staff member just entered themselves.
+        if (order.created_by === 'Müşteri (QR)') {
+          setNotifications(prev => [order, ...prev])
+          setNewOrderAlert(true)
+          setShowNotif(true)
+          playNotifSound()
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadTableMapData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => loadTableMapData())
       .subscribe()
+
 
     loadTableMapData()
 
