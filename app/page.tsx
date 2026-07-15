@@ -381,9 +381,8 @@ function ItemSheet({ item, qty, onClose, onAdd, onInc, onDec, lang }: { item:Men
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
-    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:40, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end', maxWidth:480, margin:'0 auto', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderTopLeftRadius:26, borderTopRightRadius:26, paddingBottom:30, borderTop:'1px solid rgba(201,168,76,.2)', boxShadow:'0 -20px 60px rgba(0,0,0,.7)', animation: closing?'sheetDown .3s ease-in both':'sheetUp .36s cubic-bezier(.18,.84,.26,1) both' }}>
-        <div style={{ width:38, height:4, borderRadius:4, background:'rgba(240,237,232,.18)', margin:'10px auto 2px' }}/>
+    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:40, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', maxWidth:480, margin:'0 auto', padding:'20px', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderRadius:24, paddingBottom:30, border:'1px solid rgba(201,168,76,.2)', boxShadow:'0 20px 60px rgba(0,0,0,.7)', animation: closing?'popOut .22s ease-in both':'popIn .32s cubic-bezier(.18,.84,.26,1) both' }}>
         <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
         <div style={{ padding:'8px 14px 0' }}><KImg label={item.name} src={item.image_url||''} h={260} rounded={20}/></div>
         <div style={{ padding:'18px 22px 0' }}>
@@ -418,9 +417,8 @@ function OptionPickerModal({ item, groups, selections, onSelect, onClose, onConf
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   const allSelected = groups.every(g => !!selections[g.id])
   return (
-    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:45, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end', maxWidth:480, margin:'0 auto', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderTopLeftRadius:26, borderTopRightRadius:26, paddingBottom:24, borderTop:'1px solid rgba(201,168,76,.2)', boxShadow:'0 -20px 60px rgba(0,0,0,.7)', animation: closing?'sheetDown .3s ease-in both':'sheetUp .36s cubic-bezier(.18,.84,.26,1) both' }}>
-        <div style={{ width:38, height:4, borderRadius:4, background:'rgba(240,237,232,.18)', margin:'10px auto 2px' }}/>
+    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:45, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', maxWidth:480, margin:'0 auto', padding:'20px', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderRadius:24, paddingBottom:24, border:'1px solid rgba(201,168,76,.2)', boxShadow:'0 20px 60px rgba(0,0,0,.7)', animation: closing?'popOut .22s ease-in both':'popIn .32s cubic-bezier(.18,.84,.26,1) both' }}>
         <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
         <div style={{ padding:'20px 22px 0' }}>
           <h2 style={{ fontFamily:'var(--serif)', fontWeight:700, fontSize:22, margin:0, color:'#F0EDE8', direction:lang==='ar'?'rtl':'ltr' }}>{lang==='en'?(item.name_en||item.name):lang==='ar'?(item.name_ar||item.name):item.name}</h2>
@@ -460,9 +458,8 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
   const [closing, setClosing] = useState(false)
   const close = () => { setClosing(true); setTimeout(onClose, 280) }
   return (
-    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:40, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'flex-end', maxWidth:480, margin:'0 auto', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderTopLeftRadius:26, borderTopRightRadius:26, paddingBottom:30, borderTop:'1px solid rgba(201,168,76,.2)', boxShadow:'0 -20px 60px rgba(0,0,0,.7)', animation: closing?'sheetDown .3s ease-in both':'sheetUp .36s cubic-bezier(.18,.84,.26,1) both' }}>
-        <div style={{ width:38, height:4, borderRadius:4, background:'rgba(240,237,232,.18)', margin:'10px auto 2px' }}/>
+    <div onClick={close} style={{ position:'fixed', inset:0, zIndex:40, background:'rgba(5,5,5,.7)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', maxWidth:480, margin:'0 auto', padding:'20px', animation: closing?'overlayOut .28s ease both':'overlayIn .28s ease both' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ position:'relative', width:'100%', maxHeight:'90%', overflowY:'auto', background:'#0D0D0D', borderRadius:24, paddingBottom:30, border:'1px solid rgba(201,168,76,.2)', boxShadow:'0 20px 60px rgba(0,0,0,.7)', animation: closing?'popOut .22s ease-in both':'popIn .32s cubic-bezier(.18,.84,.26,1) both' }}>
         <button onClick={close} style={{ position:'absolute', top:14, right:14, width:34, height:34, borderRadius:'50%', background:'rgba(240,237,232,.07)', border:'none', color:'rgba(240,237,232,.7)', display:'grid', placeItems:'center', cursor:'pointer', zIndex:2 }}><IconClose size={18}/></button>
         <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', padding:'18px 22px 0' }}>
           <span style={{ fontFamily:'var(--sans)', fontSize:11, fontWeight:600, letterSpacing:'.08em', color:'#C9A84C' }}>{lang==='en'?'ORDER SUMMARY':lang==='ar'?'ملخص الطلب':'S İ P A R İ Ş   Ö Z E T İ'}</span>
@@ -908,6 +905,8 @@ export default function MenuPage() {
         @keyframes overlayOut{from{opacity:1;}to{opacity:0;}}
         @keyframes sheetUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
         @keyframes sheetDown{from{transform:translateY(0);}to{transform:translateY(100%);}}
+        @keyframes popIn{from{opacity:0;transform:scale(.92) translateY(10px);}to{opacity:1;transform:scale(1) translateY(0);}}
+        @keyframes popOut{from{opacity:1;transform:scale(1) translateY(0);}to{opacity:0;transform:scale(.95) translateY(6px);}}
         @keyframes pulseScale{0%{transform:scale(1);}28%{transform:scale(1.035);}60%{transform:scale(.992);}100%{transform:scale(1);}}
         @keyframes heroGlow{0%{opacity:.55;transform:translate(-2%,-2%);}100%{opacity:.9;transform:translate(2%,2%);}}
         @keyframes welcomeIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:scale(1);}}

@@ -8,9 +8,9 @@ export default function NotificationPopup({ notifications, onClose, onDismiss, o
 }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, margin: '0 auto', background: '#1A1A1A', borderRadius: 0, maxHeight: '80vh', overflowY: 'auto', border: '1px solid #2A2A2A', borderTop: 'none' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#C9A84C', fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>🔔 YENİ SİPARİŞLER ({notifications.length})</span>
+      <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 60, right: 0, left: 0, margin: '0 auto', background: '#1A1A1A', borderRadius: 0, maxHeight: '80vh', overflowY: 'auto', border: '2px solid #C0392B', borderTop: 'none', boxShadow: '0 12px 40px rgba(192,57,43,.35)', animation: notifications.length > 0 ? 'alertPopIn .35s cubic-bezier(.18,.84,.26,1) both, alertGlow 1.1s ease-in-out infinite' : 'alertPopIn .35s cubic-bezier(.18,.84,.26,1) both' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #2A2A2A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: notifications.length > 0 ? 'rgba(192,57,43,.16)' : 'transparent' }}>
+          <span style={{ color: notifications.length > 0 ? '#E8756A' : '#C9A84C', fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>🔴 YENİ SİPARİŞLER ({notifications.length})</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8A8A8A', fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
         {notifications.length === 0 ? (

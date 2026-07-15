@@ -115,13 +115,21 @@ export default function AdminPage() {
     try {
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContext()
       const ctx = audioCtxRef.current
+      const beep = (freq: number, delayMs: number) => {
+        setTimeout(() => {
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.connect(gain); gain.connect(ctx.destination)
+          osc.frequency.value = freq; gain.gain.value = 0.55
+          osc.start(); osc.stop(ctx.currentTime + 0.18)
+        }, delayMs)
+      }
+      // A proper attention-grabbing alarm, not a soft one-off blip: two
+      // high/low pairs back to back so it's obvious even from across the
+      // room, over the touchscreen's own speaker.
       const fire = () => {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain); gain.connect(ctx.destination)
-        osc.frequency.value = 880; gain.gain.value = 0.3
-        osc.start(); osc.stop(ctx.currentTime + 0.15)
-        setTimeout(() => { const o2 = ctx.createOscillator(); const g2 = ctx.createGain(); o2.connect(g2); g2.connect(ctx.destination); o2.frequency.value = 1100; g2.gain.value = 0.3; o2.start(); o2.stop(ctx.currentTime + 0.15) }, 200)
+        beep(880, 0); beep(1100, 220)
+        beep(880, 550); beep(1100, 770)
       }
       // If the context is still suspended (e.g. no tap registered yet, or
       // the mobile browser re-suspended it after backgrounding), resume it
@@ -150,6 +158,7 @@ export default function AdminPage() {
       const newlySeen = data.filter((o: any) => !seenOrderIdsRef.current!.has(o.id))
       if (newlySeen.length > 0) {
         setNewOrderAlert(true)
+        setShowNotif(true)
         playNotifSound()
       }
       seenOrderIdsRef.current = new Set(data.map((o: any) => o.id))
@@ -168,6 +177,9 @@ export default function AdminPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
         setNewOrderAlert(true)
+        // Pop the alert straight onto the screen — no need to tap the bell
+        // to find out an order came in.
+        setShowNotif(true)
         loadTableMapData()
         if (seenOrderIdsRef.current) seenOrderIdsRef.current.add((payload.new as any).id)
         // Play beep sound (respects the Ayarlar sound toggle for this device)
@@ -185,6 +197,23 @@ export default function AdminPage() {
 
     return () => { supabase.removeChannel(channel); clearInterval(notifPoll) }
   }, [auth])
+
+  // Keep alarming every few seconds for as long as there's a new order the
+  // popup hasn't been opened for yet — a single beep is too easy to miss
+  // over kitchen/nargile/customer noise. Stops the moment the popup is
+  // actually open (no point alarming at someone already looking at it).
+  useEffect(() => {
+    if (!newOrderAlert || showNotif) return
+    const alarm = setInterval(playNotifSound, 4000)
+    return () => clearInterval(alarm)
+  }, [newOrderAlert, showNotif])
+
+  // Once every pending order has been acknowledged or dismissed, drop the
+  // alert state too, so the bell/alarm don't come back after the popup is
+  // closed with nothing left in it.
+  useEffect(() => {
+    if (notifications.length === 0) setNewOrderAlert(false)
+  }, [notifications])
 
   async function acceptOrder(id: string) {
     // Just acknowledges the popup notification - the order itself stays
@@ -2094,6 +2123,15 @@ export default function AdminPage() {
         @keyframes bellShake {
           0%,100%{transform:rotate(0)} 20%{transform:rotate(-15deg)} 40%{transform:rotate(15deg)} 60%{transform:rotate(-10deg)} 80%{transform:rotate(10deg)}
         }
+        @keyframes tilePulse {
+          0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.55)} 50%{box-shadow:0 0 0 8px rgba(192,57,43,0)}
+        }
+        @keyframes alertPopIn {
+          from{opacity:0; transform:scale(.94) translateY(-8px)} to{opacity:1; transform:scale(1) translateY(0)}
+        }
+        @keyframes alertGlow {
+          0%,100%{border-color:rgba(192,57,43,.6)} 50%{border-color:rgba(192,57,43,1)}
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: var(--a-bg0); color: var(--a-text); font-family: 'IBM Plex Sans', system-ui, sans-serif; }
 
@@ -2695,7 +2733,7 @@ export default function AdminPage() {
                         const openedMinutesAgo = info.status !== 'empty' && info.tabData?.opened_at ? minutesSince(info.tabData.opened_at) : null
                         return (
                           <button key={tableName} onClick={() => setActiveTableModal(tableName)}
-                            style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 0, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                            style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 0, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between', animation: info.status === 'pending' ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
                             <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
                             <div style={{ color:p.labelText, fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase', marginTop:6 }}>
                               {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo} dk` : ''}
@@ -2747,7 +2785,7 @@ export default function AdminPage() {
                           onPointerMove={handleFloorPointerMove}
                           onPointerUp={handleFloorPointerUp}
                           onClick={() => { if (!floorEditMode) setActiveTableModal(tableName) }}
-                          style={{ position:'absolute', left:pos.x, top:pos.y, width:FLOOR_TILE, height:FLOOR_TILE, background:p.bg, border:`2px solid ${p.border}`, borderRadius:12, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:6, cursor: floorEditMode ? 'grab' : 'pointer', userSelect:'none', touchAction:'none', zIndex: isDragging ? 10 : 1, boxShadow: isDragging ? '0 8px 20px rgba(0,0,0,.5)' : 'none' }}>
+                          style={{ position:'absolute', left:pos.x, top:pos.y, width:FLOOR_TILE, height:FLOOR_TILE, background:p.bg, border:`2px solid ${p.border}`, borderRadius:12, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:6, cursor: floorEditMode ? 'grab' : 'pointer', userSelect:'none', touchAction:'none', zIndex: isDragging ? 10 : 1, boxShadow: isDragging ? '0 8px 20px rgba(0,0,0,.5)' : 'none', animation: info.status === 'pending' && !floorEditMode ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
                           <div style={{ color:p.text, fontWeight:700, fontSize:13, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
                           <div style={{ color:p.labelText, fontSize:9, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>
                             {p.label}{itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo}dk` : ''}
