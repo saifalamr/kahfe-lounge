@@ -451,7 +451,8 @@ alter table public.access_pins enable row level security;
 insert into public.access_pins (role, pin) values
   ('manager', '1234'),
   ('touchscreen', '9000'),
-  ('staff_shared', '5678')
+  ('staff_shared', '5678'),
+  ('owner', '7777')
 on conflict (role) do nothing;
 
 create or replace function verify_access_pin(p_pin text) returns text
@@ -533,16 +534,17 @@ begin
     return;
   end if;
 
-  -- Manager (1234) and Touchscreen (9000) are fixed, trusted devices that
-  -- should basically never need re-login. Staff PINs (individual + the
-  -- shared 5678) keep the original 24h expiry - those change hands more
-  -- often and are the more likely-to-be-compromised case.
-  v_expires_at := case when v_role in ('manager', 'touchscreen') then now() + interval '100 years' else now() + interval '24 hours' end;
+  -- Manager (1234), Touchscreen (9000), and Owner (7777, the Patron View
+  -- on the owner's personal phone) are fixed, trusted devices that should
+  -- basically never need re-login. Staff PINs (individual + the shared
+  -- 5678) keep the original 24h expiry - those change hands more often
+  -- and are the more likely-to-be-compromised case.
+  v_expires_at := case when v_role in ('manager', 'touchscreen', 'owner') then now() + interval '100 years' else now() + interval '24 hours' end;
 
   insert into device_sessions(role, expires_at) values (v_role, v_expires_at) returning device_sessions.token into v_token;
   return query select v_role,
     v_token,
-    coalesce(v_staff_name, case v_role when 'manager' then 'Yönetici' when 'touchscreen' then 'Dokunmatik Ekran' else 'Personel (Genel)' end),
+    coalesce(v_staff_name, case v_role when 'manager' then 'Yönetici' when 'touchscreen' then 'Dokunmatik Ekran' when 'owner' then 'Patron' else 'Personel (Genel)' end),
     coalesce(v_permission, 'full');
 end; $$;
 grant execute on function login_with_pin(text) to anon, authenticated;
@@ -563,7 +565,7 @@ create or replace function update_access_pin(p_session_token uuid, p_role text, 
 language plpgsql security definer set search_path = public as $$
 begin
   perform assert_manager_session(p_session_token);
-  if p_role not in ('manager', 'touchscreen') then
+  if p_role not in ('manager', 'touchscreen', 'owner') then
     raise exception 'Staff access is granted via the Personel tab only, not a shared PIN.';
   end if;
   update access_pins set pin = p_new_pin where role = p_role;

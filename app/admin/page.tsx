@@ -330,7 +330,7 @@ export default function AdminPage() {
   // PINs), so there's only one place in the app that can grant it.
   const [accessPinInputs, setAccessPinInputs] = useState<Record<string, string>>({})
   const [accessPinMsg, setAccessPinMsg] = useState<Record<string, string>>({})
-  async function updateAccessPin(role: 'manager'|'touchscreen') {
+  async function updateAccessPin(role: 'manager'|'touchscreen'|'owner') {
     const newPin = (accessPinInputs[role] || '').trim()
     if (!/^\d{4,6}$/.test(newPin)) {
       setAccessPinMsg(prev => ({ ...prev, [role]: '✗ 4-6 haneli bir sayı girin' }))
@@ -3609,7 +3609,7 @@ export default function AdminPage() {
             <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🔐 Erişim Şifreleri</div>
               <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Yönetici ve Dokunmatik Ekran giriş şifrelerini buradan değiştirebilirsiniz. Mevcut şifreler güvenlik nedeniyle burada gösterilmez — sadece yenisini girip güncelleyebilirsiniz. (Personel erişimi artık yalnızca 👥 Personel sekmesinden, kişiye özel PIN ile verilir.)</div>
-              {([['manager','Yönetici Şifresi'],['touchscreen','Dokunmatik Ekran Şifresi']] as const).map(([role, label]) => (
+              {([['manager','Yönetici Şifresi'],['touchscreen','Dokunmatik Ekran Şifresi'],['owner','Patron Görünümü Şifresi (📱 /patron)']] as const).map(([role, label]) => (
                 <div key={role} style={{ marginBottom: 12 }}>
                   <div style={{ color: 'var(--a-text3)', fontSize: 12, marginBottom: 6 }}>{label}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
