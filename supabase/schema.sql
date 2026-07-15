@@ -666,6 +666,31 @@ drop policy if exists "refunds public insert" on public.refunds;
 create policy "refunds public insert" on public.refunds for insert with check (true);
 grant select, insert on public.refunds to anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- nargile_timers — coal-check countdown, one per open tab that's had a
+-- nargile item served. Self-cleaning: always queried joined against
+-- tabs.status='open', so a closed tab's timer just stops appearing rather
+-- than needing an explicit deactivation step.
+-- ---------------------------------------------------------------------------
+create table if not exists public.nargile_timers (
+  id uuid primary key default gen_random_uuid(),
+  tab_id uuid not null references public.tabs(id) on delete cascade,
+  table_name text not null,
+  started_at timestamptz not null default now(),
+  last_checked_at timestamptz not null default now(),
+  checked_by text,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists idx_nargile_timers_tab_id on public.nargile_timers(tab_id);
+alter table public.nargile_timers enable row level security;
+drop policy if exists "nargile_timers public select" on public.nargile_timers;
+create policy "nargile_timers public select" on public.nargile_timers for select using (true);
+drop policy if exists "nargile_timers public insert" on public.nargile_timers;
+create policy "nargile_timers public insert" on public.nargile_timers for insert with check (true);
+drop policy if exists "nargile_timers public update" on public.nargile_timers;
+create policy "nargile_timers public update" on public.nargile_timers for update using (true);
+grant select, insert, update on public.nargile_timers to anon, authenticated;
+
 -- =============================================================================
 -- END — if this whole file ran without errors, the database is fully caught up.
 -- =============================================================================

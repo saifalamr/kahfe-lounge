@@ -29,6 +29,10 @@ export default function NargilePage() {
   const [loginSystemError, setLoginSystemError] = useState('')
   const [orders, setOrders] = useState<any[]>([])
   const [now, setNow] = useState(Date.now())
+  // Active coal-check timers, one per open tab that's had a nargile item
+  // served. Coal typically needs checking/replacing every ~20-25 min.
+  const COAL_CHECK_MINUTES = 25
+  const [nargileTimers, setNargileTimers] = useState<any[]>([])
   // Maps a menu item id -> its printer station, built from menu_items +
   // the category_stations setting configured in Ayarlar
   const [itemStationMap, setItemStationMap] = useState<Record<string, 'kitchen'|'nargile'>>({})
@@ -129,9 +133,36 @@ export default function NargilePage() {
     setOrders(data || [])
   }
 
+  // Only timers whose tab is still open — a closed/paid tab's timer just
+  // stops appearing here rather than needing an explicit cleanup step.
+  async function loadNargileTimers() {
+    const { data } = await supabase.from('nargile_timers').select('*, tabs!inner(status)').eq('tabs.status', 'open')
+    setNargileTimers(data || [])
+  }
+
+  async function checkCoal(timerId: string) {
+    setNargileTimers(prev => prev.map(t => t.id === timerId ? { ...t, last_checked_at: new Date().toISOString() } : t))
+    await supabase.from('nargile_timers').update({ last_checked_at: new Date().toISOString(), checked_by: staffName }).eq('id', timerId)
+  }
+
   async function markDone(id: string) {
+    const order = orders.find(o => o.id === id)
     setOrders(prev => prev.filter(o => o.id !== id))
     await supabase.from('orders').update({ status: 'served', handled_by: staffName }).eq('id', id)
+    // Start the coal clock the moment nargile actually gets served, not at
+    // order time — one per tab (ignoreDuplicates: a second nargile order on
+    // the same table doesn't reset an already-running timer; staff resets
+    // it manually via "Kontrol Edildi" instead).
+    if (order?.tab_id) {
+      const hasNargileItem = (order.items || []).some((it: any) => itemStationMapRef.current[it.id] === 'nargile')
+      if (hasNargileItem) {
+        await supabase.from('nargile_timers').upsert(
+          { tab_id: order.tab_id, table_name: order.table_name },
+          { onConflict: 'tab_id', ignoreDuplicates: true }
+        )
+        loadNargileTimers()
+      }
+    }
   }
 
   function beep() {
@@ -146,6 +177,23 @@ export default function NargilePage() {
         osc.start(ctx.currentTime + i * 0.16)
         osc.stop(ctx.currentTime + i * 0.16 + 0.15)
       })
+    } catch (e) {}
+  }
+
+  // Deliberately a different pattern from the new-order beep (low, slow,
+  // two-tone) so staff can tell "coal needs checking" apart from "new
+  // order" by ear without looking at the screen.
+  function coalBeep() {
+    if (localStorage.getItem('kahfe_notif_sound') === 'off') return
+    try {
+      const ctx = new AudioContext()
+      const fire = (freq: number, delayMs: number) => setTimeout(() => {
+        const osc = ctx.createOscillator(); const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = freq; gain.gain.value = 0.4
+        osc.start(); osc.stop(ctx.currentTime + 0.35)
+      }, delayMs)
+      fire(392, 0); fire(330, 400)
     } catch (e) {}
   }
 
@@ -165,6 +213,7 @@ export default function NargilePage() {
     if (!auth) return
     loadStationMap()
     loadOrders()
+    loadNargileTimers()
     const channel = supabase
       .channel('nargile-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: any) => {
@@ -186,7 +235,7 @@ export default function NargilePage() {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
       .subscribe()
-    const poll = setInterval(loadOrders, 20000)
+    const poll = setInterval(() => { loadOrders(); loadNargileTimers() }, 20000)
     const clock = setInterval(() => setNow(Date.now()), 1000)
     return () => { supabase.removeChannel(channel); clearInterval(poll); clearInterval(clock) }
   }, [auth])
@@ -199,6 +248,22 @@ export default function NargilePage() {
       return { ...order, _nargileItems: nargileItems, _isMixed: nargileItems.length > 0 && nargileItems.length < (order.items || []).length }
     })
     .filter(o => o._nargileItems.length > 0)
+
+  const timersWithStatus = nargileTimers.map(t => {
+    const elapsedMin = (now - new Date(t.last_checked_at).getTime()) / 60000
+    return { ...t, elapsedMin, overdue: elapsedMin >= COAL_CHECK_MINUTES, dueSoon: elapsedMin >= COAL_CHECK_MINUTES - 5 }
+  }).sort((a, b) => b.elapsedMin - a.elapsedMin)
+  const anyOverdue = timersWithStatus.some(t => t.overdue)
+
+  // Repeats every 45s for as long as ANY table's coal is overdue — a
+  // single beep is too easy to miss over a busy room, same reasoning as
+  // the admin kasa's new-order alarm.
+  useEffect(() => {
+    if (!anyOverdue) return
+    coalBeep()
+    const alarm = setInterval(coalBeep, 45000)
+    return () => clearInterval(alarm)
+  }, [anyOverdue])
 
   if (!auth) return (
     <div style={{ background: '#0A0A0A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -221,6 +286,9 @@ export default function NargilePage() {
 
   return (
     <div style={{ background: '#0A0A0A', minHeight: '100vh', padding: '24px 32px', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <style>{`
+        @keyframes coalPulse { 0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.5)} 50%{box-shadow:0 0 0 10px rgba(192,57,43,0)} }
+      `}</style>
       <ConnectivityBanner />
 
       {autoPrintEnabled && !printingActivated && (
@@ -244,6 +312,37 @@ export default function NargilePage() {
         </div>
         <div style={{ color: '#8A8A8A', fontSize: 17, fontFamily: "'IBM Plex Mono', monospace" }}>{nargileOrders.length} bekleyen sipariş</div>
       </div>
+
+      {timersWithStatus.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ color: '#8A8A8A', fontSize: 13, letterSpacing: '0.08em', fontFamily: "'IBM Plex Mono', monospace", marginBottom: 12 }}>
+            🔥 AKTİF NARGİLE MASALARI — KÖMÜR KONTROLÜ ({COAL_CHECK_MINUTES} DK)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14 }}>
+            {timersWithStatus.map(t => {
+              const remaining = Math.max(0, COAL_CHECK_MINUTES - t.elapsedMin)
+              const mins = Math.floor(remaining); const secs = Math.floor((remaining - mins) * 60)
+              return (
+                <div key={t.id} style={{
+                  background: t.overdue ? 'rgba(192,57,43,.14)' : t.dueSoon ? 'rgba(243,156,18,.1)' : '#1A1A1A',
+                  border: `1px solid ${t.overdue ? '#C0392B' : t.dueSoon ? '#f39c12' : '#2A2A2A'}`,
+                  padding: 18, animation: t.overdue ? 'coalPulse 1.2s ease-in-out infinite' : 'none',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                    <div style={{ color: '#F0EDE8', fontSize: 20, fontWeight: 700, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{t.table_name}</div>
+                    <div style={{ color: t.overdue ? '#e74c3c' : t.dueSoon ? '#f39c12' : '#8A8A8A', fontSize: 22, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>
+                      {t.overdue ? '🔥 ŞİMDİ' : `${mins}:${String(secs).padStart(2, '0')}`}
+                    </div>
+                  </div>
+                  <button onClick={() => checkCoal(t.id)} disabled={!isOnline} style={{ width: '100%', height: 44, background: t.overdue ? '#C0392B' : 'transparent', border: t.overdue ? 'none' : '1px solid #383838', color: t.overdue ? '#fff' : '#8A8A8A', fontSize: 14, fontWeight: 600, cursor: isOnline ? 'pointer' : 'not-allowed', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+                    ✓ Kontrol Edildi
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {nargileOrders.length === 0 && (
         <div style={{ textAlign: 'center', color: '#8A8A8A', padding: '100px 0', fontSize: 22 }}>Bekleyen sipariş yok ✓</div>
