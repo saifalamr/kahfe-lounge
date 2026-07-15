@@ -1387,6 +1387,150 @@ export default function AdminPage() {
     setRefundReason('')
   }
 
+  // Fişi Düzenle (edit a closed bill) — the safe alternative to Yeniden Aç
+  // when a mistake needs fixing on an old bill but the table itself might
+  // already be live again with a different customer. This never touches
+  // tabs.status or the floor plan at all: the tab stays 'closed' the whole
+  // time, so there's zero chance of colliding with whatever's happening at
+  // that table right now. Items are corrected in place (removals logged to
+  // `voids`, additions as a new order row, same as every other correction
+  // flow in the app), and the payment total is adjusted to match.
+  const [editingBill, setEditingBill] = useState<any | null>(null)
+  const [editBillOrders, setEditBillOrders] = useState<any[]>([])
+  const [editBillItems, setEditBillItems] = useState<{ orderId: string, itemIndex: number, id: string, name: string, name_en: string, price: number, quantity: number, newQuantity: number }[]>([])
+  const [editAddedItems, setEditAddedItems] = useState<{ id: string, name: string, name_en: string, price: number, quantity: number }[]>([])
+  const [editBillReason, setEditBillReason] = useState('')
+  const [editBillMethod, setEditBillMethod] = useState<'cash'|'card'|'transfer'|'debt'>('cash')
+  const [editBillSearch, setEditBillSearch] = useState('')
+  const [editBillSaving, setEditBillSaving] = useState(false)
+
+  async function openBillEdit(tabRow: any) {
+    const { data: orders } = await supabase.from('orders').select('*').eq('tab_id', tabRow.id).neq('status', 'dismissed').order('created_at', { ascending: true })
+    const flat: typeof editBillItems = []
+    ;(orders || []).forEach((o: any) => {
+      (o.items || []).forEach((it: any, idx: number) => {
+        flat.push({ orderId: o.id, itemIndex: idx, id: it.id, name: it.name, name_en: it.name_en || it.name, price: Number(it.price), quantity: Number(it.quantity), newQuantity: Number(it.quantity) })
+      })
+    })
+    setEditBillOrders(orders || [])
+    setEditBillItems(flat)
+    setEditAddedItems([])
+    setEditBillReason('')
+    setEditBillMethod(tabRow.payment_method === 'debt' ? 'debt' : (tabRow.payment_method || 'cash'))
+    setEditBillSearch('')
+    setEditingBill(tabRow)
+  }
+
+  function editBillSetQty(orderId: string, itemIndex: number, qty: number) {
+    setEditBillItems(prev => prev.map(it => (it.orderId === orderId && it.itemIndex === itemIndex) ? { ...it, newQuantity: Math.max(0, qty) } : it))
+  }
+
+  function editBillAddItem(menuItem: MenuItem) {
+    setEditAddedItems(prev => {
+      const existing = prev.find(p => p.id === menuItem.id)
+      if (existing) return prev.map(p => p.id === menuItem.id ? { ...p, quantity: p.quantity + 1 } : p)
+      return [...prev, { id: menuItem.id, name: menuItem.name, name_en: menuItem.name_en || menuItem.name, price: Number(menuItem.price), quantity: 1 }]
+    })
+  }
+
+  function editBillSetAddedQty(id: string, qty: number) {
+    setEditAddedItems(prev => qty <= 0 ? prev.filter(p => p.id !== id) : prev.map(p => p.id === id ? { ...p, quantity: qty } : p))
+  }
+
+  const editBillNewTotal = editBillItems.reduce((s, it) => s + it.price * it.newQuantity, 0) + editAddedItems.reduce((s, it) => s + it.price * it.quantity, 0)
+  const editBillDelta = editingBill ? editBillNewTotal - Number(editingBill.total) : 0
+
+  async function confirmBillEdit() {
+    if (!editingBill) return
+    if (!editBillReason.trim()) { alert('Lütfen düzenleme nedeni girin.'); return }
+    if (editBillNewTotal <= 0) { alert('Fiş en az bir ürün içermeli. Tüm ürünleri kaldırmak yerine "Yeniden Aç" veya "İade" kullanın.'); return }
+
+    let debtorId: string | null = null
+    if (editBillDelta !== 0 && editBillMethod === 'debt') {
+      debtorId = await findDebtorForTab(editingBill.id)
+      if (!debtorId) { alert('✗ Bu fişe bağlı bir borçlu bulunamadı. Farkı nakit, kart veya havale olarak seçin.'); return }
+    }
+
+    setEditBillSaving(true)
+    try {
+      const restoreStock: { id: string, quantity: number }[] = []
+      const decrementStock: { id: string, quantity: number }[] = []
+
+      // Apply quantity changes to the original orders — one update per
+      // affected order, same as the existing void/cancel flows.
+      const byOrder = new Map<string, any[]>()
+      editBillItems.forEach(it => { if (!byOrder.has(it.orderId)) byOrder.set(it.orderId, []) ; byOrder.get(it.orderId)!.push(it) })
+
+      for (const [orderId, changedItems] of byOrder.entries()) {
+        const order = editBillOrders.find((o: any) => o.id === orderId)
+        if (!order) continue
+        const newItems = (order.items || []).map((raw: any, idx: number) => {
+          const edited = changedItems.find(c => c.itemIndex === idx)
+          if (!edited) return raw
+          if (edited.newQuantity !== edited.quantity) {
+            const diff = edited.quantity - edited.newQuantity
+            if (diff > 0) restoreStock.push({ id: edited.id, quantity: diff })
+            else decrementStock.push({ id: edited.id, quantity: -diff })
+          }
+          return { ...raw, quantity: edited.newQuantity, subtotal: edited.price * edited.newQuantity }
+        }).filter((raw: any) => Number(raw.quantity) > 0)
+        const newOrderTotal = newItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
+        await supabase.from('orders').update({ items: newItems, total: newOrderTotal, status: newItems.length === 0 ? 'dismissed' : order.status, handled_by: staffName }).eq('id', orderId)
+
+        for (const edited of changedItems) {
+          const diff = edited.quantity - edited.newQuantity
+          if (diff > 0) {
+            await supabase.from('voids').insert({
+              order_id: orderId, table_name: editingBill.table_name, item_name: edited.name,
+              quantity: diff, amount: edited.price * diff, reason: `Fiş Düzenleme — ${editBillReason.trim()}`, voided_by: staffName,
+            })
+          }
+        }
+      }
+
+      if (editAddedItems.length > 0) {
+        const orderItems = editAddedItems.map(it => ({ id: it.id, name: it.name, name_en: it.name_en, price: it.price, quantity: it.quantity, subtotal: it.price * it.quantity }))
+        await supabase.from('orders').insert({
+          table_name: editingBill.table_name, items: orderItems, total: orderItems.reduce((s, it) => s + it.subtotal, 0),
+          status: 'served', tab_id: editingBill.id, created_by: staffName, handled_by: staffName,
+        })
+        editAddedItems.forEach(it => decrementStock.push({ id: it.id, quantity: it.quantity }))
+      }
+
+      if (restoreStock.length > 0) await supabase.rpc('restore_stock_for_items', { p_items: restoreStock })
+      if (decrementStock.length > 0) await supabase.rpc('decrement_stock_for_order', { p_items: decrementStock })
+
+      const amountCol = editBillMethod === 'cash' ? 'cash_amount' : editBillMethod === 'card' ? 'card_amount' : editBillMethod === 'transfer' ? 'transfer_amount' : 'debt_amount'
+      const tabUpdate: any = { total: editBillNewTotal }
+      if (editBillDelta !== 0) tabUpdate[amountCol] = Number(editingBill[amountCol] || 0) + editBillDelta
+      const { error: tabErr } = await supabase.from('tabs').update(tabUpdate).eq('id', editingBill.id)
+      if (tabErr) { alert('✗ Fiş güncellenemedi.\n\n' + tabErr.message); setEditBillSaving(false); return }
+
+      if (editBillDelta !== 0 && editBillMethod === 'debt' && debtorId) {
+        await supabase.from('debt_transactions').insert({
+          debtor_id: debtorId, tab_id: editingBill.id, fatura_no: editingBill.fatura_no,
+          type: editBillDelta > 0 ? 'borç' : 'ödeme', amount: Math.abs(editBillDelta),
+          note: `Fiş Düzenleme — ${editBillReason.trim()}`, created_by: staffName,
+        })
+        await loadDebtors()
+      } else if (editBillDelta < 0 && editBillMethod === 'cash') {
+        await supabase.from('cash_movements').insert({
+          type: 'out', amount: Math.abs(editBillDelta),
+          reason: `Fiş Düzenleme İadesi — ${editingBill.table_name}${editingBill.fatura_no ? ` · Fiş #${String(editingBill.fatura_no).padStart(6, '0')}` : ''} — ${editBillReason.trim()}`,
+          created_by: staffName,
+        })
+      }
+
+      setEditingBill(null)
+      setEditBillReason('')
+      await searchReceipts()
+      alert('✓ Fiş güncellendi.')
+    } catch (err: any) {
+      alert('✗ Beklenmeyen bir hata oluştu.\n\n' + (err?.message || String(err)))
+    }
+    setEditBillSaving(false)
+  }
+
   // A refund against a debt-paid tab, or a debt-tab reopen, needs to know
   // which debtor the original 'borç' entry belongs to so the ledger can
   // be corrected too, not just the tab/cash side.
@@ -1399,6 +1543,19 @@ export default function AdminPage() {
     if (!refundTarget) return
     if (!refundReason.trim()) { alert('Lütfen yeniden açma nedeni girin.'); return }
     const tab = refundTarget
+
+    // If a customer is sitting at this table right now, there's already a
+    // *different* open tab for the same table_name. Reopening this old,
+    // unrelated bill on top of that would give the table two open tabs at
+    // once — the floor plan and get_or_create_open_tab can only ever see
+    // one of them, so orders could silently attach to the wrong bill. Block
+    // it and point at "Fişi Düzenle" instead, which never touches the
+    // floor plan at all.
+    const { data: liveTab } = await supabase.from('tabs').select('id').eq('table_name', tab.table_name).eq('status', 'open').maybeSingle()
+    if (liveTab) {
+      alert(`✗ ${tab.table_name} şu anda dolu — masada aktif bir hesap var.\n\nBu eski fişi yeniden açarsam masada iki ayrı hesap birden olur ve siparişler karışabilir.\n\nBunun yerine "✏️ Fişi Düzenle" ile bu fişi masayı hiç etkilemeden düzeltebilirsin.`)
+      return
+    }
 
     const { error } = await supabase.from('tabs').update({
       status: 'open', closed_at: null, payment_method: null,
@@ -2669,6 +2826,113 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* Fişi Düzenle — edit a closed bill's items directly, no reopen,
+            no floor-plan involvement, so it can never collide with the
+            table's current live tab. */}
+        {editingBill && (
+          <div style={{ position:'fixed', inset:0, zIndex:230, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => !editBillSaving && setEditingBill(null)}>
+            <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:520, maxHeight:'90vh', overflowY:'auto', background:'var(--a-bg2)', borderRadius:20, border:'1px solid rgba(39,174,96,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+              <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ color:'#5FD08C', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>✏️ {editingBill.table_name} — Fişi Düzenle</div>
+                <button onClick={() => setEditingBill(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+              </div>
+              <div style={{ padding:20 }}>
+                <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:16 }}>
+                  {editingBill.fatura_no ? `Fiş #${String(editingBill.fatura_no).padStart(6, '0')}` : ''} — masa hiç etkilenmez, fiş "kapalı" kalır.
+                </div>
+
+                <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:8, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>ÜRÜNLER</label>
+                {editBillItems.length === 0 && <div style={{ color:'var(--a-text2)', fontSize:13, marginBottom:12 }}>Bu fişte aktif ürün yok.</div>}
+                {editBillItems.map(it => (
+                  <div key={`${it.orderId}-${it.itemIndex}`} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--a-border)' }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ color: it.newQuantity === 0 ? 'var(--a-text3)' : 'var(--a-text)', fontSize:14, textDecoration: it.newQuantity === 0 ? 'line-through' : 'none' }}>{it.name}</div>
+                      <div style={{ color:'var(--a-text2)', fontSize:11 }}>₺{it.price} / adet</div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <button onClick={() => editBillSetQty(it.orderId, it.itemIndex, it.newQuantity - 1)} style={{ width:30, height:30, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', color:'var(--a-text)', cursor:'pointer', fontSize:16 }}>−</button>
+                      <span style={{ width:22, textAlign:'center', color:'var(--a-text)', fontFamily:"'IBM Plex Mono', monospace" }}>{it.newQuantity}</span>
+                      <button onClick={() => editBillSetQty(it.orderId, it.itemIndex, it.newQuantity + 1)} style={{ width:30, height:30, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', color:'var(--a-text)', cursor:'pointer', fontSize:16 }}>+</button>
+                    </div>
+                  </div>
+                ))}
+
+                {editAddedItems.length > 0 && (
+                  <>
+                    <div style={{ color:'#5FD08C', fontSize:11, marginTop:14, marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>EKLENEN ÜRÜNLER</div>
+                    {editAddedItems.map(it => (
+                      <div key={it.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--a-border)' }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ color:'var(--a-text)', fontSize:14 }}>{it.name}</div>
+                          <div style={{ color:'var(--a-text2)', fontSize:11 }}>₺{it.price} / adet</div>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <button onClick={() => editBillSetAddedQty(it.id, it.quantity - 1)} style={{ width:30, height:30, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', color:'var(--a-text)', cursor:'pointer', fontSize:16 }}>−</button>
+                          <span style={{ width:22, textAlign:'center', color:'var(--a-text)', fontFamily:"'IBM Plex Mono', monospace" }}>{it.quantity}</span>
+                          <button onClick={() => editBillSetAddedQty(it.id, it.quantity + 1)} style={{ width:30, height:30, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', color:'var(--a-text)', cursor:'pointer', fontSize:16 }}>+</button>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginTop:16, marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>ÜRÜN EKLE</label>
+                <input value={editBillSearch} onChange={e => setEditBillSearch(e.target.value)} placeholder="Ürün ara..."
+                  style={{ width:'100%', height:44, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'0 14px', color:'var(--a-text)', fontSize:14, marginBottom:8 }} />
+                {editBillSearch.trim() && (
+                  <div style={{ maxHeight:160, overflowY:'auto', border:'1px solid var(--a-border)', marginBottom:14 }}>
+                    {items.filter((mi: any) => mi.name.toLocaleLowerCase('tr-TR').includes(editBillSearch.trim().toLocaleLowerCase('tr-TR'))).slice(0, 8).map((mi: any) => (
+                      <button key={mi.id} onClick={() => { editBillAddItem(mi); setEditBillSearch('') }}
+                        style={{ width:'100%', display:'flex', justifyContent:'space-between', padding:'10px 12px', background:'var(--a-bg1)', border:'none', borderBottom:'1px solid var(--a-border)', color:'var(--a-text)', fontSize:13, cursor:'pointer', textAlign:'left' }}>
+                        <span>{mi.name}</span><span style={{ color:'#C9A84C' }}>₺{mi.price}</span>
+                      </button>
+                    ))}
+                    {items.filter((mi: any) => mi.name.toLocaleLowerCase('tr-TR').includes(editBillSearch.trim().toLocaleLowerCase('tr-TR'))).length === 0 && (
+                      <div style={{ padding:'10px 12px', color:'var(--a-text2)', fontSize:13 }}>Sonuç yok.</div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--a-text2)', marginBottom:4 }}>
+                  <span>Eski Toplam</span><span>₺{formatTL(Number(editingBill.total))}</span>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:17, fontWeight:700, color:'var(--a-text)', marginBottom:6 }}>
+                  <span>Yeni Toplam</span><span>₺{formatTL(editBillNewTotal)}</span>
+                </div>
+                {editBillDelta !== 0 && (
+                  <div style={{ color: editBillDelta > 0 ? '#e67e22' : '#5FD08C', fontSize:13, fontWeight:600, marginBottom:16 }}>
+                    {editBillDelta > 0 ? `+₺${formatTL(editBillDelta)} fazladan alınacak` : `₺${formatTL(Math.abs(editBillDelta))} iade edilecek`}
+                  </div>
+                )}
+
+                {editBillDelta !== 0 && (
+                  <>
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>FARK HANGİ YÖNTEMLE {editBillDelta > 0 ? 'ALINACAK' : 'İADE EDİLECEK'}</label>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginBottom:16 }}>
+                      {(['cash','card','transfer','debt'] as const).map(m => (
+                        <button key={m} onClick={() => setEditBillMethod(m)}
+                          style={{ height:48, background: editBillMethod===m ? 'rgba(95,208,140,.14)' : 'transparent', border: editBillMethod===m ? '1px solid #5FD08C' : '1px solid var(--a-border)', color: editBillMethod===m ? '#5FD08C' : 'var(--a-text3)', fontWeight:600, fontSize:12, cursor:'pointer' }}>
+                          {m==='cash' ? '💵 Nakit' : m==='card' ? '💳 Kart' : m==='transfer' ? '🏦 Havale' : '🧾 Borç'}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>DÜZENLEME NEDENİ (zorunlu)</label>
+                <textarea value={editBillReason} onChange={e => setEditBillReason(e.target.value)} rows={2}
+                  placeholder="Örn. yanlış ürün girildi, müşteri fazladan sipariş verdi"
+                  style={{ width:'100%', background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'10px 14px', color:'var(--a-text)', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif", marginBottom:18, resize:'vertical' }} />
+
+                <button onClick={confirmBillEdit} disabled={editBillSaving}
+                  style={{ width:'100%', height:52, background:'#27ae60', border:'none', color:'#fff', fontSize:15, cursor: editBillSaving ? 'not-allowed' : 'pointer', fontWeight:700, opacity: editBillSaving ? 0.6 : 1 }}>
+                  {editBillSaving ? 'Kaydediliyor...' : '✓ Fişi Güncelle'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* CATEGORIES */}
         {/* ORDERS TAB */}
         {tab === 'orders' && (
@@ -3834,6 +4098,7 @@ export default function AdminPage() {
                   <button onClick={() => reprintReceipt(r)} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid var(--a-border2)', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>🖨️ Yazdır</button>
                   {!isLimitedStaff && (
                     <>
+                      <button onClick={() => openBillEdit(r)} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid rgba(39,174,96,.4)', color: '#5FD08C', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>✏️ Düzenle</button>
                       <button onClick={() => openRefund(r, 'refund')} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid rgba(230,126,34,.4)', color: '#e67e22', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>💸 İade</button>
                       <button onClick={() => openRefund(r, 'reopen')} style={{ height: 40, padding: '0 14px', background: 'transparent', border: '1px solid rgba(52,152,219,.4)', color: '#3498db', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>↩️ Yeniden Aç</button>
                     </>
