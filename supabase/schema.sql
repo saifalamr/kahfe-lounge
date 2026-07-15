@@ -142,14 +142,39 @@ for each row execute function assign_fatura_no();
 update tabs set fatura_no = nextval('fatura_seq') where status = 'closed' and fatura_no is null;
 
 -- Atomic tab creation/transfer/merge (race-condition safe)
+--
+-- Normalizes the Turkish İ vs plain ASCII I difference on both sides
+-- when matching an existing open tab, and snaps a newly-created tab to
+-- whichever spelling is canonical in settings.tables when a normalized
+-- match exists there. Needed because a caller (a QR code baked with the
+-- wrong variant, a manual entry, etc.) can hand in an already-uppercase
+-- table name that JS's toLocaleUpperCase('tr-TR') can't fix client-side
+-- (it only converts lowercase i -> İ; it leaves an already-uppercase
+-- ASCII I alone) — without this, that becomes an invisible ghost tab.
 create or replace function get_or_create_open_tab(p_table_name text)
 returns uuid language plpgsql security definer set search_path = public as $$
-declare v_tab_id uuid;
+declare
+  v_tab_id uuid;
+  v_canonical text;
 begin
-  perform pg_advisory_xact_lock(hashtext(p_table_name));
-  select id into v_tab_id from tabs where table_name = p_table_name and status = 'open' limit 1;
+  perform pg_advisory_xact_lock(hashtext(upper(replace(p_table_name, 'İ', 'I'))));
+
+  select id into v_tab_id
+  from tabs
+  where status = 'open'
+    and upper(replace(table_name, 'İ', 'I')) = upper(replace(p_table_name, 'İ', 'I'))
+  limit 1;
   if v_tab_id is not null then return v_tab_id; end if;
-  insert into tabs(table_name, status) values (p_table_name, 'open') returning id into v_tab_id;
+
+  select t.value into v_canonical
+  from (
+    select jsonb_array_elements_text(value) as value
+    from settings where key = 'tables'
+  ) t
+  where upper(replace(t.value, 'İ', 'I')) = upper(replace(p_table_name, 'İ', 'I'))
+  limit 1;
+
+  insert into tabs(table_name, status) values (coalesce(v_canonical, p_table_name), 'open') returning id into v_tab_id;
   return v_tab_id;
 end; $$;
 grant execute on function get_or_create_open_tab(text) to anon, authenticated;
