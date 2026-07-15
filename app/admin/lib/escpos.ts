@@ -162,8 +162,21 @@ function bytesToBase64(bytes: Uint8Array): string {
 // Sends raw ESC/POS bytes to RawBT (must be installed on the Android device).
 // Only works on Android with RawBT installed — on a laptop/desktop this link
 // has nothing to open and will just do nothing or show "no app found".
+//
+// Uses a real, appended-then-clicked <a> element instead of
+// window.location.href = url. Chrome's "Always open in RawBT" choice for a
+// custom URL scheme is tied to genuine link-click navigation - a plain
+// location.href reassignment doesn't reliably keep that choice remembered,
+// so it can keep re-prompting on every single print even after choosing
+// "Always" once. A programmatic click on a real anchor is treated the same
+// way as the user directly tapping a link, which Chrome does remember.
 export function printViaRawBT(bytes: Uint8Array) {
   const base64 = bytesToBase64(bytes)
   const url = `rawbt:base64,${base64}`
-  window.location.href = url
+  const a = document.createElement('a')
+  a.href = url
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }

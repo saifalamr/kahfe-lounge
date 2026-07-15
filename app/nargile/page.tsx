@@ -38,6 +38,12 @@ export default function NargilePage() {
   // to verify that from here, so the toggle staying on with a printer
   // that's misconfigured/offline will silently do nothing rather than error.
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false)
+  // Android/Chrome won't reliably let a page silently launch RawBT with
+  // zero user interaction behind it - that's a real browser security rule,
+  // not something togglable in our code. One tap anywhere on this screen
+  // satisfies it for the rest of that page session (until reload), so this
+  // just needs confirming once each time the tablet opens/reloads this page.
+  const [printingActivated, setPrintingActivated] = useState(false)
 
   // Reuses the same login session as /admin — if someone's already logged
   // into the admin panel on this device, the nargile screen opens straight up
@@ -150,8 +156,10 @@ export default function NargilePage() {
   // every later update - including the toggle switching itself off.
   const autoPrintEnabledRef = useRef(false)
   const itemStationMapRef = useRef<Record<string, 'kitchen'|'nargile'>>({})
+  const printingActivatedRef = useRef(false)
   useEffect(() => { autoPrintEnabledRef.current = autoPrintEnabled }, [autoPrintEnabled])
   useEffect(() => { itemStationMapRef.current = itemStationMap }, [itemStationMap])
+  useEffect(() => { printingActivatedRef.current = printingActivated }, [printingActivated])
 
   useEffect(() => {
     if (!auth) return
@@ -168,7 +176,7 @@ export default function NargilePage() {
           // once per order (INSERT fires exactly once; the UPDATE handler
           // below never re-triggers a print, so marking Hazır/reconnecting
           // can't cause a reprint).
-          if (autoPrintEnabledRef.current) {
+          if (autoPrintEnabledRef.current && printingActivatedRef.current) {
             const nargileItems = (payload.new.items || []).filter((it: any) => itemStationMapRef.current[it.id] === 'nargile')
             if (nargileItems.length > 0) {
               printViaRawBT(buildKitchenTicketEscPos(payload.new.table_name, [{ ...payload.new, items: nargileItems }]))
@@ -214,11 +222,24 @@ export default function NargilePage() {
   return (
     <div style={{ background: '#0A0A0A', minHeight: '100vh', padding: '24px 32px', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <ConnectivityBanner />
+
+      {autoPrintEnabled && !printingActivated && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.94)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={() => setPrintingActivated(true)}>
+          <div style={{ textAlign: 'center', maxWidth: 340 }}>
+            <div style={{ fontSize: 54, marginBottom: 18 }}>🖨️</div>
+            <div style={{ color: '#F0EDE8', fontSize: 20, fontWeight: 700, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 10 }}>Otomatik Yazdırmayı Etkinleştir</div>
+            <div style={{ color: '#8A8A8A', fontSize: 14, lineHeight: 1.6, marginBottom: 26 }}>Android'in güvenlik kuralları gereği, siparişler geldiğinde otomatik yazdırma yapabilmek için ekrana bir kez dokunmanız gerekiyor. Bu, cihaz yeniden başlatılana/sayfa yenilenene kadar geçerlidir.</div>
+            <button onClick={() => setPrintingActivated(true)} style={{ width: '100%', height: 56, background: '#C9A84C', border: 'none', color: '#0A0A0A', fontWeight: 700, fontSize: 16, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>Dokun ve Başlat</button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ color: '#F0EDE8', fontSize: 30, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif", letterSpacing: '-0.01em' }}>💨 Nargile Ekranı</div>
-          <div title="Ayarlar > Otomatik Yazdırma'dan kontrol edilir" style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.05em', color: autoPrintEnabled ? '#5FD08C' : '#8A8A8A', background: autoPrintEnabled ? 'rgba(39,174,96,.14)' : 'transparent', border: autoPrintEnabled ? '1px solid #27ae60' : '1px solid #383838' }}>
-            {autoPrintEnabled ? '🖨️ OTO YAZDIRMA AKTİF' : '🖨️ OTO YAZDIRMA KAPALI'}
+          <div title="Ayarlar > Otomatik Yazdırma'dan kontrol edilir" style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.05em', color: !autoPrintEnabled ? '#8A8A8A' : printingActivated ? '#5FD08C' : '#f39c12', background: !autoPrintEnabled ? 'transparent' : printingActivated ? 'rgba(39,174,96,.14)' : 'rgba(243,156,18,.14)', border: !autoPrintEnabled ? '1px solid #383838' : printingActivated ? '1px solid #27ae60' : '1px solid #f39c12' }}>
+            {!autoPrintEnabled ? '🖨️ OTO YAZDIRMA KAPALI' : printingActivated ? '🖨️ OTO YAZDIRMA AKTİF' : '🖨️ DOKUNUŞ BEKLENİYOR'}
           </div>
         </div>
         <div style={{ color: '#8A8A8A', fontSize: 17, fontFamily: "'IBM Plex Mono', monospace" }}>{nargileOrders.length} bekleyen sipariş</div>
