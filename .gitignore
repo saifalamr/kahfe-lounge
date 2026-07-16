@@ -5,3 +5,8 @@ node_modules/
 *.log
 .DS_Store
 tsconfig.tsbuildinfo
+
+# Backup workflow scratch space — the actual backup data only ever lives
+# on the `backups` branch, never here on main.
+/backups/
+/backups-branch/

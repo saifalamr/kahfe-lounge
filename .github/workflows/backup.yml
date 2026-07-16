@@ -1,0 +1,70 @@
+name: Daily database backup
+
+on:
+  schedule:
+    # 02:00 UTC = 05:00 Istanbul — well outside café hours
+    - cron: '0 2 * * *'
+  workflow_dispatch: {} # lets this be triggered manually too, for testing
+
+# Commits only ever go to a dedicated `backups` branch, never `main` — this
+# workflow can never trigger a Vercel production deploy.
+#
+# Two independent checkouts side by side (rather than switching branches
+# within one working tree) so there's no risk of git refusing to switch
+# branches over locally-modified/deleted files partway through a run:
+#   ./                 -> main, for scripts/backup.mjs
+#   ./backups-branch/  -> the backups branch, where the script reads
+#                         yesterday's files and writes/prunes today's
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main (for the backup script)
+        uses: actions/checkout@v4
+
+      - name: Checkout or create the backups branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --heads origin backups > /dev/null 2>&1; then
+            git clone --branch backups --single-branch "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" backups-branch
+          else
+            mkdir backups-branch
+            cd backups-branch
+            git init -q
+            git config user.name "Kahfe Backup Bot"
+            git config user.email "backup@kahfelounge.local"
+            git checkout -q --orphan backups
+            git commit -q --allow-empty -m "Initialize backups branch"
+            git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Run backup
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_OUT_DIR: backups-branch/backups
+        run: node scripts/backup.mjs
+
+      - name: Commit and push
+        working-directory: backups-branch
+        run: |
+          git config user.name "Kahfe Backup Bot"
+          git config user.email "backup@kahfelounge.local"
+          git add backups/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Backup $(date -u +%Y-%m-%d)"
+            git push origin backups
+          fi
