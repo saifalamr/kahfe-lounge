@@ -266,7 +266,8 @@ export default function AdminPage() {
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'map'|'list'|'floor'>('map')
+  const [viewMode, setViewMode] = useState<'map'|'list'|'floor'|'category'>('map')
+  const [tableCategoryFilter, setTableCategoryFilter] = useState<string | null>(null)
   const [openTabs, setOpenTabs] = useState<any[]>([])
   const [tabOrders, setTabOrders] = useState<any[]>([])
   const [activeTableModal, setActiveTableModal] = useState<string | null>(null)
@@ -279,6 +280,16 @@ export default function AdminPage() {
     'VİP-ODA',
   ]
   const [ALL_TABLES, setAllTables] = useState<string[]>(DEFAULT_TABLES)
+  // Shared grouping by table-name prefix — used by the map view (all groups
+  // stacked) and the category-tap view (one group at a time), so the two
+  // never define "what counts as MASALAR/KİTAPLIK/etc." differently.
+  const tableGroups = [
+    { label: 'MASALAR', icon: '🪑', tables: ALL_TABLES.filter(t => t.startsWith('MASA')) },
+    { label: 'KİTAPLIK', icon: '📚', tables: ALL_TABLES.filter(t => t.startsWith('KİTAPLIK')) },
+    { label: 'OKEY', icon: '🀄', tables: ALL_TABLES.filter(t => t.startsWith('OKEY')) },
+    { label: 'KAHFE', icon: '☕', tables: ALL_TABLES.filter(t => t.startsWith('KAHFE')) },
+    { label: 'VİP', icon: '⭐', tables: ALL_TABLES.filter(t => t.startsWith('VİP')) },
+  ].filter(g => g.tables.length > 0)
   const [telegramRecipients, setTelegramRecipients] = useState<{ name: string, chat_id: string }[]>([])
   const [telegramEnabled, setTelegramEnabled] = useState(true)
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false)
@@ -469,6 +480,45 @@ export default function AdminPage() {
     await loadTableMapData()
   }
 
+  // Move a single item (not the whole tab) to another table — e.g. a
+  // customer grabbed a drink and walked over to sit with friends at another
+  // table. Splits just that line off the source order into the destination
+  // table's open tab (created via the same advisory-locked RPC every other
+  // order attach uses, so it can't race a simultaneous order on that table).
+  const [movingItem, setMovingItem] = useState<{ order: any, itemIndex: number } | null>(null)
+
+  async function moveItemToTable(sourceTableName: string, destTableName: string) {
+    if (!movingItem) return
+    const { order, itemIndex } = movingItem
+    const item = order.items[itemIndex]
+
+    const { data: destTabId, error: tabError } = await supabase.rpc('get_or_create_open_tab', { p_table_name: destTableName })
+    if (tabError || !destTabId) { alert('✗ Hedef masa açılamadı.\n\n' + (tabError?.message || '')); return }
+
+    const remainingItems = order.items.filter((_: any, i: number) => i !== itemIndex)
+    const remainingTotal = remainingItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
+    const sourceUpdate: any = { items: remainingItems, total: remainingTotal, handled_by: staffName }
+    if (remainingItems.length === 0) sourceUpdate.status = 'dismissed'
+
+    const { error: sourceError } = await supabase.from('orders').update(sourceUpdate).eq('id', order.id)
+    if (sourceError) { alert('✗ Ürün taşınamadı.\n\n' + sourceError.message); return }
+
+    const { error: destError } = await supabase.from('orders').insert({
+      table_name: destTableName, items: [item], total: Number(item.subtotal), status: order.status,
+      tab_id: destTabId, created_by: order.created_by, handled_by: staffName,
+    })
+    if (destError) {
+      // Roll back the source removal so the item isn't lost if the insert failed
+      await supabase.from('orders').update({ items: order.items, total: order.total, status: order.status }).eq('id', order.id)
+      alert('✗ Ürün hedef masaya eklenemedi.\n\n' + destError.message)
+      return
+    }
+
+    setMovingItem(null)
+    setActiveTableModal(null)
+    await loadTableMapData()
+  }
+
   async function updateOrderStatus(id: string, status: string) {
     await supabase.from('orders').update({ status, handled_by: staffName }).eq('id', id)
     setNotifications(prev => prev.filter(n => n.id !== id))
@@ -513,6 +563,46 @@ export default function AdminPage() {
     await supabase.rpc('restore_stock_for_items', { p_items: [{ id: item.id, quantity: item.quantity }] })
     setVoidingItem(null)
     setVoidReason('')
+    await Promise.all([loadOrders(dateFilter), loadTableMapData()])
+  }
+
+  // Item-level price edit — corrects a wrong unit price on a still-open
+  // order before the table ever closes/pays, same reason-required pattern
+  // as void. Logged to price_edits, separate from the closed-bill edit flow
+  // (Fişi Düzenle) which only ever touches already-paid tabs.
+  const [editingPriceItem, setEditingPriceItem] = useState<{ order: any, itemIndex: number } | null>(null)
+  const [editPriceValue, setEditPriceValue] = useState('')
+  const [editPriceReason, setEditPriceReason] = useState('')
+
+  function openPriceEdit(order: any, itemIndex: number) {
+    setEditingPriceItem({ order, itemIndex })
+    setEditPriceValue(String(Number(order.items[itemIndex].price)))
+    setEditPriceReason('')
+  }
+
+  async function confirmPriceEdit() {
+    if (!editingPriceItem) return
+    const newPrice = parseFloat(editPriceValue)
+    if (isNaN(newPrice) || newPrice < 0) { alert('Lütfen geçerli bir fiyat girin.'); return }
+    if (!editPriceReason.trim()) { alert('Lütfen bir düzenleme nedeni girin.'); return }
+    const { order, itemIndex } = editingPriceItem
+    const item = order.items[itemIndex]
+    const oldPrice = Number(item.price)
+    if (newPrice === oldPrice) { setEditingPriceItem(null); return }
+
+    const newItems = order.items.map((it: any, i: number) => i === itemIndex ? { ...it, price: newPrice, subtotal: newPrice * Number(it.quantity) } : it)
+    const newTotal = newItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
+
+    const { error } = await supabase.from('orders').update({ items: newItems, total: newTotal, handled_by: staffName }).eq('id', order.id)
+    if (error) { alert('✗ Fiyat güncellenemedi.\n\n' + error.message); return }
+
+    await supabase.from('price_edits').insert({
+      order_id: order.id, table_name: order.table_name, item_name: item.name, quantity: item.quantity,
+      old_price: oldPrice, new_price: newPrice, reason: editPriceReason.trim(), edited_by: staffName,
+    })
+    setEditingPriceItem(null)
+    setEditPriceValue('')
+    setEditPriceReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
@@ -2968,6 +3058,8 @@ export default function AdminPage() {
                                 <span><span style={{ color:'#C9A84C', fontFamily:"'IBM Plex Mono', monospace" }}>{item.quantity}×</span> {item.name}</span>
                                 <span style={{ display:'flex', alignItems:'center', gap:8 }}>
                                   <span style={{ color:'var(--a-text3)', fontFamily:"'IBM Plex Mono', monospace" }}>{item.subtotal} ₺</span>
+                                  {!isLimitedStaff && <button onClick={() => openPriceEdit(order, i)} title="Fiyatı düzenle" style={{ background:'transparent', border:'1px solid var(--a-border2)', color:'#5FD08C', width:26, height:26, cursor:'pointer', fontSize:12, lineHeight:1 }}>💲</button>}
+                                  {!isLimitedStaff && <button onClick={() => setMovingItem({ order, itemIndex: i })} title="Başka masaya taşı" style={{ background:'transparent', border:'1px solid var(--a-border2)', color:'#6FB9E8', width:26, height:26, cursor:'pointer', fontSize:12, lineHeight:1 }}>↪️</button>}
                                   {!isLimitedStaff && <button onClick={() => openVoid(order, i)} title="Ürünü iptal et" style={{ background:'transparent', border:'1px solid var(--a-border2)', color:'var(--a-text2)', width:26, height:26, cursor:'pointer', fontSize:12, lineHeight:1 }}>✕</button>}
                                 </span>
                               </div>
@@ -3047,6 +3139,38 @@ export default function AdminPage() {
             {/* Transfer/merge destination picker */}
             {showTransferPicker && (
               <TransferPickerModal sourceTable={showTransferPicker} allTables={ALL_TABLES} getTableInfo={getTableInfo} onTransfer={transferOrMergeTab} onClose={() => setShowTransferPicker(null)} />
+            )}
+
+            {/* Move a single item to another table */}
+            {movingItem && (
+              <TransferPickerModal sourceTable={movingItem.order.table_name} allTables={ALL_TABLES} getTableInfo={getTableInfo} onTransfer={moveItemToTable} onClose={() => setMovingItem(null)}
+                title={`↪️ ${movingItem.order.items[movingItem.itemIndex].name} — Nereye?`}
+                subtitle="Bu ürün seçilen masaya taşınır, geri kalan sipariş bu masada kalır." />
+            )}
+
+            {/* Price edit on an active (still open) item — mandatory reason, logged to price_edits */}
+            {editingPriceItem && (
+              <div style={{ position:'fixed', inset:0, zIndex:225, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setEditingPriceItem(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:420, background:'var(--a-bg2)', borderRadius:20, border:'1px solid rgba(95,208,140,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+                  <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ color:'#5FD08C', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>💲 {editingPriceItem.order.items[editingPriceItem.itemIndex].name} — Fiyatı Düzenle</div>
+                    <button onClick={() => setEditingPriceItem(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>BİRİM FİYAT (₺)</label>
+                    <input type="number" value={editPriceValue} onChange={e => setEditPriceValue(e.target.value)}
+                      style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace", marginBottom:14 }} />
+
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>DÜZENLEME NEDENİ (zorunlu)</label>
+                    <textarea value={editPriceReason} onChange={e => setEditPriceReason(e.target.value)} rows={2}
+                      placeholder="Örn. yanlış fiyat girildi, personel indirimi"
+                      style={{ width:'100%', background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'10px 14px', color:'var(--a-text)', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif", marginBottom:18, resize:'vertical' }} />
+
+                    <button onClick={confirmPriceEdit}
+                      style={{ width:'100%', height:52, background:'#27ae60', border:'none', color:'#fff', fontSize:15, cursor:'pointer', fontWeight:700 }}>✓ Fiyatı Güncelle</button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Staff order builder - punch in a walk-in/phone/verbal order */}
@@ -3291,14 +3415,58 @@ export default function AdminPage() {
             })()}
 
 
-            <div style={{ display:'flex', gap:6, marginBottom:14 }}>
-              <button onClick={() => setViewMode('map')}
-                style={{ flex:1, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='map' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
+            <div style={{ display:'flex', gap:6, marginBottom:14, flexWrap:'wrap' }}>
+              <button onClick={() => setViewMode('category')}
+                style={{ flex:'1 0 auto', minWidth:100, height:48, background: viewMode==='category' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='category' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='category' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🏷️ Kategori</button>
               <button onClick={() => setViewMode('list')}
-                style={{ flex:1, height:48, background: viewMode==='list' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='list' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='list' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📋 Liste</button>
+                style={{ flex:'1 0 auto', minWidth:100, height:48, background: viewMode==='list' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='list' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='list' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📋 Liste</button>
+              <button onClick={() => setViewMode('map')}
+                style={{ flex:'1 0 auto', minWidth:100, height:48, background: viewMode==='map' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='map' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='map' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>🗺️ Masa Haritası</button>
               <button onClick={() => setViewMode('floor')}
-                style={{ flex:1, height:48, background: viewMode==='floor' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='floor' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='floor' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📐 Kat Planı</button>
+                style={{ flex:'1 0 auto', minWidth:100, height:48, background: viewMode==='floor' ? 'rgba(201,168,76,.14)' : 'transparent', border: viewMode==='floor' ? '1px solid #C9A84C' : '1px solid var(--a-border)', borderRadius: 8, color: viewMode==='floor' ? '#C9A84C' : 'var(--a-text2)', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:"'IBM Plex Sans', sans-serif" }}>📐 Kat Planı</button>
             </div>
+
+            {viewMode === 'category' && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:12, marginBottom:16, fontSize:11, color:'var(--a-text2)', fontFamily:"'IBM Plex Mono', monospace" }}>
+                  <span>🔴 Sipariş Bekliyor</span>
+                  <span>🔵 Hesap İstendi</span>
+                  <span>🟡 Dolu</span>
+                  <span>⚪ Boş</span>
+                </div>
+                <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:4, marginBottom:16 }}>
+                  <button onClick={() => setTableCategoryFilter(null)}
+                    style={{ flexShrink:0, height:44, padding:'0 16px', background: tableCategoryFilter===null ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: tableCategoryFilter===null ? '1px solid rgba(201,168,76,.5)' : '1px solid var(--a-border)', borderRadius: 999, color: tableCategoryFilter===null ? '#C9A84C' : 'var(--a-text2)', fontSize:13, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
+                  {tableGroups.map(group => (
+                    <button key={group.label} onClick={() => setTableCategoryFilter(group.label)}
+                      style={{ flexShrink:0, height:44, padding:'0 16px', background: tableCategoryFilter===group.label ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: tableCategoryFilter===group.label ? '1px solid rgba(201,168,76,.5)' : '1px solid var(--a-border)', borderRadius: 999, color: tableCategoryFilter===group.label ? '#C9A84C' : 'var(--a-text2)', fontSize:13, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{group.icon} {group.label}</button>
+                  ))}
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(96px, 140px))', gap:10 }}>
+                  {tableGroups.filter(g => tableCategoryFilter === null || g.label === tableCategoryFilter).flatMap(g => g.tables).map(tableName => {
+                    const info = getTableInfo(tableName)
+                    const palette: Record<string, { bg:string, border:string, topAccent:string, text:string, labelText:string, label:string }> = {
+                      empty:     { bg:'#161616', border:'var(--a-border)', topAccent:'transparent', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
+                      occupied:  { bg:'#221E12', border:'rgba(201,168,76,.5)', topAccent:'#C9A84C', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
+                      pending:   { bg:'#241413', border:'rgba(192,57,43,.55)', topAccent:'#C0392B', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
+                      bill:      { bg:'#12202A', border:'rgba(52,152,219,.55)', topAccent:'#3498DB', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
+                    }
+                    const p = palette[info.status]
+                    const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
+                    const openedMinutesAgo = info.status !== 'empty' && info.tabData?.opened_at ? minutesSince(info.tabData.opened_at) : null
+                    return (
+                      <button key={tableName} onClick={() => setActiveTableModal(tableName)}
+                        style={{ background:p.bg, border:`1px solid ${p.border}`, borderTop:`3px solid ${p.topAccent}`, borderRadius: 8, padding:'12px 10px', cursor:'pointer', textAlign:'left', minHeight:72, display:'flex', flexDirection:'column', justifyContent:'space-between', animation: info.status === 'pending' ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
+                        <div style={{ color:p.text, fontWeight:700, fontSize:16, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
+                        <div style={{ color:p.labelText, fontSize:10, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em', textTransform:'uppercase', marginTop:6 }}>
+                          {p.label}{info.status !== 'empty' && itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo} dk` : ''}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {viewMode === 'map' && (
               <div style={{ marginBottom: 20 }}>
@@ -3309,13 +3477,7 @@ export default function AdminPage() {
                   <span>🟡 Dolu</span>
                   <span>⚪ Boş</span>
                 </div>
-                {[
-                  { label: 'MASALAR', tables: ALL_TABLES.filter(t => t.startsWith('MASA')) },
-                  { label: 'KİTAPLIK', tables: ALL_TABLES.filter(t => t.startsWith('KİTAPLIK')) },
-                  { label: 'OKEY', tables: ALL_TABLES.filter(t => t.startsWith('OKEY')) },
-                  { label: 'KAHFE', tables: ALL_TABLES.filter(t => t.startsWith('KAHFE')) },
-                  { label: 'VİP', tables: ALL_TABLES.filter(t => t.startsWith('VİP')) },
-                ].map(group => (
+                {tableGroups.map(group => (
                   <div key={group.label} style={{ marginBottom: 18 }}>
                     <div style={{ color:'var(--a-text2)', fontSize:11, letterSpacing:'0.14em', marginBottom:8, fontWeight:600, fontFamily:"'IBM Plex Mono', monospace" }}>{group.label}</div>
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(96px, 140px))', gap:10 }}>

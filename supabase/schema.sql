@@ -684,6 +684,32 @@ drop policy if exists "nargile_timers public update" on public.nargile_timers;
 create policy "nargile_timers public update" on public.nargile_timers for update using (true);
 grant select, insert, update on public.nargile_timers to anon, authenticated;
 
+-- ---------------------------------------------------------------------------
+-- price_edits — audit log for manually correcting an item's unit price on
+-- a still-open (active) tab, before it's ever closed/paid. Distinct from
+-- voids (removal) and the closed-bill edit flow (which logs to voids/orders
+-- since the bill is already paid) — this is purely "the price was wrong,
+-- fix it before checkout," logged for accountability.
+-- ---------------------------------------------------------------------------
+create table if not exists public.price_edits (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid references public.orders(id),
+  table_name text,
+  item_name text,
+  quantity numeric,
+  old_price numeric,
+  new_price numeric,
+  reason text,
+  edited_by text,
+  created_at timestamptz not null default now()
+);
+alter table public.price_edits enable row level security;
+drop policy if exists "price_edits public read" on public.price_edits;
+create policy "price_edits public read" on public.price_edits for select using (true);
+drop policy if exists "price_edits public insert" on public.price_edits;
+create policy "price_edits public insert" on public.price_edits for insert with check (true);
+grant select, insert on public.price_edits to anon, authenticated;
+
 -- =============================================================================
 -- END — if this whole file ran without errors, the database is fully caught up.
 -- =============================================================================
