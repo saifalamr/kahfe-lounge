@@ -29,7 +29,7 @@ export default function Sidebar({
   const isActive = (t: string) => tab === t || (t === 'reports' && (tab === 'receipts' || tab === 'accountability'))
 
   return (
-    <aside className="kahfe-sidebar" style={{ flexDirection: 'column', width: 232, minWidth: 232, minHeight: '100vh', background: 'var(--a-bg1)', borderRight: '1px solid var(--a-border)', padding: '20px 14px', position: 'sticky', top: 0 }}>
+    <aside className="kahfe-sidebar" style={{ flexDirection: 'column', width: 232, minWidth: 232, background: 'var(--a-bg1)', borderRight: '1px solid var(--a-border)', padding: '20px 14px', position: 'sticky', top: 0 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, padding: '0 6px' }}>
         <div>
           <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>

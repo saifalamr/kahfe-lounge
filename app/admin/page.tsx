@@ -2828,7 +2828,26 @@ export default function AdminPage() {
         .kahfe-topnav-header { display: flex; }
         @media (min-width: 700px) {
           .kahfe-app-wrap { display: flex; align-items: flex-start; }
-          .kahfe-sidebar { display: flex; }
+          .kahfe-sidebar {
+            display: flex;
+            /* The sidebar is position:sticky/top:0. It used to be
+               min-height:100vh with no overflow of its own, so whenever the
+               nav list + footer block didn't fit on screen it simply grew
+               TALLER than the viewport — and a sticky element pinned at
+               top:0 can't be scrolled to reveal its own bottom. The lower
+               items (Ayarlar, Borç, Raporlar, Çıkış) only came into reach
+               once the main content on the right had been scrolled all the
+               way to its end, which dragged the sticky element up with it.
+               Pinning it to exactly one viewport and giving it its own
+               scroll decouples the two completely. */
+            height: 100vh;
+            height: 100dvh; /* accounts for mobile browser chrome; ignored where unsupported */
+            overflow-y: auto;
+            /* overflow-y:auto would otherwise compute overflow-x to 'auto'
+               too and make this a horizontal scroll trap — same spec rule
+               as the strips above, just the other axis. */
+            overflow-x: hidden;
+          }
           .kahfe-topnav, .kahfe-topnav-header { display: none; }
         }
 
