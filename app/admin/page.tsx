@@ -606,6 +606,48 @@ export default function AdminPage() {
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
+  // Whole-bill price edit on a still-open tab — same idea as the per-item
+  // 💲 above but for the total, not one line. Rather than rewriting every
+  // item's price to force a target total (which would corrupt what was
+  // actually sold, for kitchen tickets and item-sales reports alike), the
+  // difference is recorded as its own transparent adjustment line — visible
+  // on the bill as "Fiyat Ayarlaması", logged to price_edits like every
+  // other correction in the app.
+  const [editingBillTotal, setEditingBillTotal] = useState<{ tableName: string, tabId: string, currentTotal: number } | null>(null)
+  const [editBillTotalValue, setEditBillTotalValue] = useState('')
+  const [editBillTotalReason, setEditBillTotalReason] = useState('')
+
+  function openBillTotalEdit(tableName: string, tabId: string, currentTotal: number) {
+    setEditingBillTotal({ tableName, tabId, currentTotal })
+    setEditBillTotalValue(String(currentTotal))
+    setEditBillTotalReason('')
+  }
+
+  async function confirmBillTotalEdit() {
+    if (!editingBillTotal) return
+    const newTotal = parseFloat(editBillTotalValue)
+    if (isNaN(newTotal) || newTotal < 0) { alert('Lütfen geçerli bir tutar girin.'); return }
+    if (!editBillTotalReason.trim()) { alert('Lütfen bir düzenleme nedeni girin.'); return }
+    const { tableName, tabId, currentTotal } = editingBillTotal
+    const delta = newTotal - currentTotal
+    if (delta === 0) { setEditingBillTotal(null); return }
+
+    const { data: newOrder, error } = await supabase.from('orders').insert({
+      table_name: tableName, items: [{ id: 'adjustment', name: 'Fiyat Ayarlaması', name_en: 'Price Adjustment', price: delta, quantity: 1, subtotal: delta }],
+      total: delta, status: 'served', tab_id: tabId, created_by: staffName, handled_by: staffName,
+    }).select('id').single()
+    if (error || !newOrder) { alert('✗ Tutar güncellenemedi.\n\n' + (error?.message || '')); return }
+
+    await supabase.from('price_edits').insert({
+      order_id: newOrder.id, table_name: tableName, item_name: 'Toplam (Fiyat Ayarlaması)', quantity: 1,
+      old_price: currentTotal, new_price: newTotal, reason: editBillTotalReason.trim(), edited_by: staffName,
+    })
+    setEditingBillTotal(null)
+    setEditBillTotalValue('')
+    setEditBillTotalReason('')
+    await Promise.all([loadOrders(dateFilter), loadTableMapData()])
+  }
+
   // Full order cancellation — cancels an entire order at once (all items)
   // with a mandatory reason, instead of voiding items one by one. Logged
   // to the same voids table as a single consolidated entry.
@@ -3115,6 +3157,7 @@ export default function AdminPage() {
                             <button onClick={() => cancelBillRequest(info.tabData.id)} title="Hesap isteğini iptal et" style={{ flex:1, height:52, background:'rgba(52,152,219,.14)', border:'1px solid #3498db', borderRadius: 8, color:'#6FB9E8', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>✕ Hesap İsteğini İptal Et</button>
                           )}
                           {!isLimitedStaff && <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'var(--a-text3)', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>}
+                          {!isLimitedStaff && activeOrders.length > 0 && <button onClick={() => openBillTotalEdit(activeTableModal, info.tabData.id, tabTotal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid rgba(95,208,140,.4)', borderRadius: 8, color:'#5FD08C', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💲 Toplam Düzenle</button>}
                           {activeOrders.length > 0 && (
                             <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 8, color:'var(--a-bg0)', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
                           )}
@@ -3168,6 +3211,35 @@ export default function AdminPage() {
 
                     <button onClick={confirmPriceEdit}
                       style={{ width:'100%', height:52, background:'#27ae60', border:'none', color:'#fff', fontSize:15, cursor:'pointer', fontWeight:700 }}>✓ Fiyatı Güncelle</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Whole-bill total edit on an active (still open) tab — logs the
+                difference as a visible "Fiyat Ayarlaması" line, mandatory reason */}
+            {editingBillTotal && (
+              <div style={{ position:'fixed', inset:0, zIndex:225, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={() => setEditingBillTotal(null)}>
+                <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:420, background:'var(--a-bg2)', borderRadius:20, border:'1px solid rgba(95,208,140,.4)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+                  <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ color:'#5FD08C', fontWeight:700, fontSize:17, fontFamily:"'Bricolage Grotesque', sans-serif" }}>💲 {editingBillTotal.tableName} — Toplamı Düzenle</div>
+                    <button onClick={() => setEditingBillTotal(null)} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:36, height:36, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
+                  </div>
+                  <div style={{ padding:20 }}>
+                    <div style={{ color:'var(--a-text2)', fontSize:12, marginBottom:16 }}>
+                      Mevcut toplam: ₺{formatTL(editingBillTotal.currentTotal)} — ürün fiyatları değişmez, fark "Fiyat Ayarlaması" olarak fişe eklenir.
+                    </div>
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>YENİ TOPLAM (₺)</label>
+                    <input type="number" value={editBillTotalValue} onChange={e => setEditBillTotalValue(e.target.value)}
+                      style={{ width:'100%', height:52, background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'0 14px', color:'var(--a-text)', fontSize:17, fontFamily:"'IBM Plex Mono', monospace", marginBottom:14 }} />
+
+                    <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.08em' }}>DÜZENLEME NEDENİ (zorunlu)</label>
+                    <textarea value={editBillTotalReason} onChange={e => setEditBillTotalReason(e.target.value)} rows={2}
+                      placeholder="Örn. özel indirim, müşteri anlaşması"
+                      style={{ width:'100%', background:'var(--a-bg0)', border:'1px solid var(--a-border2)', padding:'10px 14px', color:'var(--a-text)', fontSize:14, fontFamily:"'IBM Plex Sans', sans-serif", marginBottom:18, resize:'vertical' }} />
+
+                    <button onClick={confirmBillTotalEdit}
+                      style={{ width:'100%', height:52, background:'#27ae60', border:'none', color:'#fff', fontSize:15, cursor:'pointer', fontWeight:700 }}>✓ Toplamı Güncelle</button>
                   </div>
                 </div>
               </div>
