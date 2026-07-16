@@ -98,7 +98,7 @@ export default function NargilePage() {
   }, [auth])
 
   async function login() {
-    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null, error: any }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw, p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null, error: any }
     if (error) { setLoginSystemError(error.message || 'Bilinmeyen hata'); return }
     setLoginSystemError('')
     if (!data) { setPwError(true); return }

@@ -103,7 +103,7 @@ export default function PatronPage() {
   }, [auth, refreshAll])
 
   async function login() {
-    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pin }).maybeSingle() as { data: { role: string, token: string } | null, error: any }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pin, p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string } | null, error: any }
     if (error || !data || data.role !== 'owner') { setPinError(true); return }
     localStorage.setItem('kahfe_patron_token', data.token)
     setAuth(true)
