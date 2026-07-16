@@ -28,6 +28,12 @@
   --a-text4: #6E6E6E;
   --a-disabled: #666666;
   --a-disabled2: #555555;
+
+  /* Floor-plan tile backgrounds (dark-tinted accent per status) */
+  --a-tile-empty: #161616;
+  --a-tile-occupied: #221E12;
+  --a-tile-pending: #241413;
+  --a-tile-bill: #12202A;
 }
 
 [data-theme="light"] {
@@ -44,6 +50,12 @@
   --a-text4: #9C9688;
   --a-disabled: #B8B2A6;
   --a-disabled2: #C4BEB2;
+
+  /* Light-tinted equivalents of the dark tile backgrounds above */
+  --a-tile-empty: #EDEAE3;
+  --a-tile-occupied: #FBF1D6;
+  --a-tile-pending: #FBE6E3;
+  --a-tile-bill: #E3F0FA;
 }
 
 * {

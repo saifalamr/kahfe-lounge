@@ -3670,10 +3670,10 @@ export default function AdminPage() {
                   {tableGroups.filter(g => tableCategoryFilter === null || g.label === tableCategoryFilter).flatMap(g => g.tables).map(tableName => {
                     const info = getTableInfo(tableName)
                     const palette: Record<string, { bg:string, border:string, topAccent:string, text:string, labelText:string, label:string }> = {
-                      empty:     { bg:'#161616', border:'var(--a-border)', topAccent:'transparent', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
-                      occupied:  { bg:'#221E12', border:'rgba(201,168,76,.5)', topAccent:'#C9A84C', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
-                      pending:   { bg:'#241413', border:'rgba(192,57,43,.55)', topAccent:'#C0392B', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
-                      bill:      { bg:'#12202A', border:'rgba(52,152,219,.55)', topAccent:'#3498DB', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
+                      empty:     { bg:'var(--a-tile-empty)', border:'var(--a-border)', topAccent:'transparent', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
+                      occupied:  { bg:'var(--a-tile-occupied)', border:'rgba(201,168,76,.5)', topAccent:'#C9A84C', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
+                      pending:   { bg:'var(--a-tile-pending)', border:'rgba(192,57,43,.55)', topAccent:'#C0392B', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
+                      bill:      { bg:'var(--a-tile-bill)', border:'rgba(52,152,219,.55)', topAccent:'#3498DB', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
                     }
                     const p = palette[info.status]
                     const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
@@ -3708,10 +3708,10 @@ export default function AdminPage() {
                       {group.tables.map(tableName => {
                         const info = getTableInfo(tableName)
                         const palette: Record<string, { bg:string, border:string, topAccent:string, text:string, labelText:string, label:string }> = {
-                          empty:     { bg:'#161616', border:'var(--a-border)', topAccent:'transparent', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
-                          occupied:  { bg:'#221E12', border:'rgba(201,168,76,.5)', topAccent:'#C9A84C', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
-                          pending:   { bg:'#241413', border:'rgba(192,57,43,.55)', topAccent:'#C0392B', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
-                          bill:      { bg:'#12202A', border:'rgba(52,152,219,.55)', topAccent:'#3498DB', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
+                          empty:     { bg:'var(--a-tile-empty)', border:'var(--a-border)', topAccent:'transparent', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
+                          occupied:  { bg:'var(--a-tile-occupied)', border:'rgba(201,168,76,.5)', topAccent:'#C9A84C', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
+                          pending:   { bg:'var(--a-tile-pending)', border:'rgba(192,57,43,.55)', topAccent:'#C0392B', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
+                          bill:      { bg:'var(--a-tile-bill)', border:'rgba(52,152,219,.55)', topAccent:'#3498DB', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
                         }
                         const p = palette[info.status]
                         const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
@@ -3754,10 +3754,10 @@ export default function AdminPage() {
                     {ALL_TABLES.map(tableName => {
                       const info = getTableInfo(tableName)
                       const palette: Record<string, { bg:string, border:string, text:string, labelText:string, label:string }> = {
-                        empty:     { bg:'#161616', border:'var(--a-border)', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
-                        occupied:  { bg:'#221E12', border:'rgba(201,168,76,.6)', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
-                        pending:   { bg:'#241413', border:'rgba(192,57,43,.65)', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
-                        bill:      { bg:'#12202A', border:'rgba(52,152,219,.65)', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
+                        empty:     { bg:'var(--a-tile-empty)', border:'var(--a-border)', text:'var(--a-text2)', labelText:'var(--a-text4)', label:'Boş' },
+                        occupied:  { bg:'var(--a-tile-occupied)', border:'rgba(201,168,76,.6)', text:'var(--a-text)', labelText:'#C9A84C', label:'Dolu' },
+                        pending:   { bg:'var(--a-tile-pending)', border:'rgba(192,57,43,.65)', text:'var(--a-text)', labelText:'#E8756A', label:'Bekliyor' },
+                        bill:      { bg:'var(--a-tile-bill)', border:'rgba(52,152,219,.65)', text:'var(--a-text)', labelText:'#6FB9E8', label:'Hesap' },
                       }
                       const p = palette[info.status]
                       const itemCount = info.orders.reduce((s:number,o:any)=>s + (o.status!=='dismissed' ? 1 : 0), 0)
