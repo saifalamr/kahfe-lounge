@@ -30,6 +30,17 @@ function toAscii(str: string): string {
   return String(str ?? '').replace(/[şŞğĞıİöÖüÜçÇ]/g, ch => TR_MAP[ch] ?? ch)
 }
 
+// ---- Receipt branding (name/address/footer) -------------------------------
+// Editable from Ayarlar → Fiş Bilgileri instead of being hardcoded here.
+// admin/page.tsx calls setReceiptBranding() once settings load and again
+// whenever they're saved, so both the RawBT path below and the HTML
+// preview in printTemplates.ts always reflect the current values without
+// every print call site needing to pass them through individually.
+export type ReceiptBranding = { name: string, address: string, footer: string }
+let receiptBranding: ReceiptBranding = { name: 'KAHFE LOUNGE', address: '', footer: 'Bizi tercih ettiğiniz için teşekkürler!' }
+export function setReceiptBranding(b: Partial<ReceiptBranding>) { receiptBranding = { ...receiptBranding, ...b } }
+export function getReceiptBranding(): ReceiptBranding { return receiptBranding }
+
 // ---- Low-level ESC/POS byte builder ----------------------------------------
 class EscPosBuilder {
   private chunks: number[][] = []
@@ -114,8 +125,9 @@ export function buildReceiptEscPos(info: {
   b.init()
   b.alignCenter()
   b.bigText(true).bold(true)
-  b.line('KAHFE LOUNGE')
+  b.line(toAscii(receiptBranding.name))
   b.bigText(false).bold(false)
+  if (receiptBranding.address.trim()) b.line(toAscii(receiptBranding.address.trim()))
   b.line(new Date().toLocaleString('tr-TR'))
   if (info.faturaNo) b.line(`FIS NO: ${String(info.faturaNo).padStart(6, '0')}`)
   b.line(`Masa: ${info.table_name}`)
@@ -141,7 +153,7 @@ export function buildReceiptEscPos(info: {
   }
   b.divider('=')
   b.alignCenter()
-  b.line('Bizi tercih ettiginiz icin tesekkurler!')
+  b.line(toAscii(receiptBranding.footer))
   b.feed(3)
   b.cut()
   return b.build()

@@ -16,6 +16,7 @@ import DebtorDetailModal from './components/DebtorDetailModal'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
+import { setReceiptBranding, ReceiptBranding } from './lib/escpos'
 import { formatTL } from './lib/format'
 
 // Manager/Touchscreen/shared-staff-code PINs are verified server-side via
@@ -305,19 +306,73 @@ export default function AdminPage() {
   }, [])
 
   async function loadSettings() {
-    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations', 'auto_print_enabled', 'table_positions'])
+    const { data } = await supabase.from('settings').select('key,value').in('key', ['tables', 'telegram_recipients', 'telegram_enabled', 'category_stations', 'auto_print_enabled', 'table_positions', 'receipt_branding'])
     const tablesRow = data?.find((r: any) => r.key === 'tables')
     const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
     const telegramEnabledRow = data?.find((r: any) => r.key === 'telegram_enabled')
     const stationsRow = data?.find((r: any) => r.key === 'category_stations')
     const autoPrintRow = data?.find((r: any) => r.key === 'auto_print_enabled')
     const positionsRow = data?.find((r: any) => r.key === 'table_positions')
+    const brandingRow = data?.find((r: any) => r.key === 'receipt_branding')
     setAllTables(Array.isArray(tablesRow?.value) && tablesRow.value.length > 0 ? tablesRow.value : DEFAULT_TABLES)
     setTelegramRecipients(Array.isArray(recipientsRow?.value) ? recipientsRow.value : [])
     setTelegramEnabled(telegramEnabledRow?.value !== false)
     setCategoryStations(stationsRow?.value && typeof stationsRow.value === 'object' ? stationsRow.value : {})
     setAutoPrintEnabled(autoPrintRow?.value === true)
     setTablePositions(positionsRow?.value && typeof positionsRow.value === 'object' ? positionsRow.value : {})
+    if (brandingRow?.value && typeof brandingRow.value === 'object') {
+      const b = { name: brandingRow.value.name || 'KAHFE LOUNGE', address: brandingRow.value.address || '', footer: brandingRow.value.footer || 'Bizi tercih ettiğiniz için teşekkürler!' }
+      setReceiptBrandingForm(b)
+      setReceiptBranding(b)
+    }
+  }
+
+  // Terminaller-lite — list of currently-live logins (device_sessions),
+  // with the ability to kick just one device instead of only "log out
+  // everyone." Loaded on demand (Ayarlar tab) rather than polled, since
+  // it's a manager glancing at it occasionally, not a live dashboard.
+  const [sessions, setSessions] = useState<{ token: string, role: string, staff_name: string, user_agent: string | null, created_at: string, last_seen_at: string, expires_at: string }[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+
+  function describeDevice(ua: string | null): string {
+    if (!ua) return 'Bilinmeyen cihaz'
+    if (/iPhone/.test(ua)) return '📱 iPhone'
+    if (/iPad/.test(ua)) return '📱 iPad'
+    if (/Android/.test(ua)) return '📱 Android'
+    if (/Macintosh/.test(ua)) return '💻 Mac'
+    if (/Windows/.test(ua)) return '💻 Windows'
+    return '🖥️ Bilinmeyen cihaz'
+  }
+
+  async function loadSessions() {
+    setSessionsLoading(true)
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    const { data, error } = await supabase.rpc('list_sessions', { p_session_token: sessionToken })
+    if (!error && data) setSessions(data)
+    setSessionsLoading(false)
+  }
+
+  async function revokeSession(targetToken: string, label: string) {
+    const isSelf = targetToken === localStorage.getItem('kahfe_session_token')
+    if (!confirm(isSelf ? 'Bu, kendi cihazınızı oturumdan çıkaracak. Devam edilsin mi?' : `${label} oturumdan çıkarılsın mı?`)) return
+    const sessionToken = localStorage.getItem('kahfe_session_token')
+    const { error } = await supabase.rpc('revoke_session', { p_session_token: sessionToken, p_target_token: targetToken })
+    if (error) { alert('✗ İşlem başarısız oldu.\n\n' + error.message); return }
+    if (isSelf) { clearSession(); return }
+    await loadSessions()
+  }
+
+  // Fiş Bilgileri — café name/address/thank-you footer shown on every
+  // printed receipt, editable here instead of asking for a code change
+  // every time the wording needs to change.
+  const [receiptBrandingForm, setReceiptBrandingForm] = useState<ReceiptBranding>({ name: 'KAHFE LOUNGE', address: '', footer: 'Bizi tercih ettiğiniz için teşekkürler!' })
+  const [receiptBrandingSaved, setReceiptBrandingSaved] = useState(false)
+
+  async function saveReceiptBranding() {
+    await supabase.from('settings').upsert({ key: 'receipt_branding', value: receiptBrandingForm, updated_at: new Date().toISOString() })
+    setReceiptBranding(receiptBrandingForm)
+    setReceiptBrandingSaved(true)
+    setTimeout(() => setReceiptBrandingSaved(false), 2000)
   }
 
   async function toggleTelegramEnabled() {
@@ -2281,7 +2336,10 @@ export default function AdminPage() {
 
   // Re-check every 2 minutes so a remote "log out all devices" (or the 24h
   // expiry) takes effect promptly on a tablet that stays on-screen for days
-  // rather than only being caught on the next full page reload
+  // rather than only being caught on the next full page reload. Also covers
+  // a manager kicking just THIS one device from Terminaller — the global
+  // epoch bump only catches "log out everyone," so this device's own
+  // session_token needs its own liveness check.
   useEffect(() => {
     if (!auth) return
     const interval = setInterval(async () => {
@@ -2290,7 +2348,13 @@ export default function AdminPage() {
       if (!savedAt || Date.now() - savedAt > sessionMaxAgeFor(savedRole)) { clearSession(); return }
       const savedEpoch = localStorage.getItem('kahfe_session_epoch')
       const currentEpoch = await getCurrentSessionEpoch()
-      if (savedEpoch !== currentEpoch) clearSession()
+      if (savedEpoch !== currentEpoch) { clearSession(); return }
+      const token = localStorage.getItem('kahfe_session_token')
+      if (token) {
+        const { data: stillValid } = await supabase.rpc('session_is_valid', { p_session_token: token })
+        if (stillValid === false) { clearSession(); return }
+        await supabase.rpc('touch_session', { p_session_token: token })
+      }
     }, 2 * 60 * 1000)
     return () => clearInterval(interval)
   }, [auth])
@@ -2298,6 +2362,7 @@ export default function AdminPage() {
   // Staff and the shared Touchscreen account can only ever see the orders tab
   useEffect(() => { if (role === 'staff' || role === 'touchscreen') setTab('orders') }, [role])
   useEffect(() => { if ((role === 'staff' || role === 'touchscreen') && dateFilter !== 'today') setDateFilter('today') }, [role, dateFilter])
+  useEffect(() => { if (isManager && tab === 'settings') loadSessions() }, [isManager, tab])
 
   // Ticks every 30s purely so table occupancy timers ("· 42 dk") update
   // live on screen without needing a full data reload
@@ -2458,7 +2523,7 @@ export default function AdminPage() {
     // touchscreen/staff-shared PIN) and, only on success, mints a session
     // token — nobody can obtain a token without passing a real PIN check
     // inside this same database call.
-    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null } | null, error: any }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw, p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null } | null, error: any }
     if (error) {
       setLoginSystemError(error.message || 'Bilinmeyen hata')
       return
@@ -4116,6 +4181,51 @@ export default function AdminPage() {
                 <div style={{ color: 'var(--a-text3)', fontSize: 12, marginBottom: 8 }}>Oturum Güvenliği: girişler 24 saat sonra otomatik sona erer. Bir cihaz kaybolduysa veya çalındıysa, aşağıdaki düğme tüm cihazları anında oturumdan çıkarır.</div>
                 <button onClick={logoutAllDevices} style={{ height: 44, padding: '0 16px', background: 'transparent', border: '1px solid #C0392B', color: '#e74c3c', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>🚪 Tüm Cihazlardan Çıkış Yap</button>
               </div>
+            </div>
+
+            {/* Terminaller-lite — who's actually logged in right now, on what device, and when */}
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 4 }}>
+                <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>💻 Terminaller</div>
+                <button onClick={loadSessions} disabled={sessionsLoading} style={{ height: 32, padding: '0 12px', background: 'transparent', border: '1px solid var(--a-border2)', color: 'var(--a-text2)', fontSize: 11, cursor: sessionsLoading ? 'not-allowed' : 'pointer', fontWeight: 600 }}>{sessionsLoading ? '...' : '↻ Yenile'}</button>
+              </div>
+              <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Şu anda giriş yapmış olan tüm cihazlar. Tek bir cihazı, tüm cihazları çıkarmadan oturumdan çıkarabilirsiniz.</div>
+              {sessions.length === 0 && !sessionsLoading && (
+                <div style={{ color: 'var(--a-text2)', fontSize: 13 }}>Aktif oturum bulunamadı.</div>
+              )}
+              {sessions.map(s => {
+                const isSelf = s.token === (typeof window !== 'undefined' ? localStorage.getItem('kahfe_session_token') : null)
+                const roleLabel = s.role === 'manager' ? 'Yönetici' : s.role === 'touchscreen' ? 'Dokunmatik Ekran' : s.role === 'owner' ? 'Patron' : 'Personel'
+                return (
+                  <div key={s.token} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--a-border)' }}>
+                    <div>
+                      <div style={{ color:'var(--a-text)', fontSize:14, fontWeight:600 }}>{describeDevice(s.user_agent)} — {s.staff_name || roleLabel}{isSelf ? ' · Bu cihaz' : ''}</div>
+                      <div style={{ color:'var(--a-text2)', fontSize:11, fontFamily:"'IBM Plex Mono', monospace" }}>{roleLabel} · Son görülme: {new Date(s.last_seen_at).toLocaleString('tr-TR')}</div>
+                    </div>
+                    <button onClick={() => revokeSession(s.token, `${describeDevice(s.user_agent)} — ${s.staff_name || roleLabel}`)}
+                      style={{ height: 36, padding: '0 12px', background: 'transparent', border: '1px solid #C0392B', color: '#e74c3c', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace:'nowrap' }}>Çıkış Yap</button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Receipt branding — café name/address/thank-you footer, editable instead of hardcoded */}
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+              <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>🧾 Fiş Bilgileri</div>
+              <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Her yazdırılan fişte görünen işletme adı, adres ve teşekkür mesajı.</div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: 'var(--a-text3)', fontSize: 12, marginBottom: 6 }}>İşletme Adı</div>
+                <input type="text" value={receiptBrandingForm.name} onChange={e => setReceiptBrandingForm(f => ({ ...f, name: e.target.value }))} style={{ ...s.input, height: 44, width: '100%' }} />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ color: 'var(--a-text3)', fontSize: 12, marginBottom: 6 }}>Adres (opsiyonel)</div>
+                <input type="text" value={receiptBrandingForm.address} onChange={e => setReceiptBrandingForm(f => ({ ...f, address: e.target.value }))} style={{ ...s.input, height: 44, width: '100%' }} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ color: 'var(--a-text3)', fontSize: 12, marginBottom: 6 }}>Teşekkür Mesajı (fiş altında)</div>
+                <input type="text" value={receiptBrandingForm.footer} onChange={e => setReceiptBrandingForm(f => ({ ...f, footer: e.target.value }))} style={{ ...s.input, height: 44, width: '100%' }} />
+              </div>
+              <button onClick={saveReceiptBranding} style={{ height: 44, padding: '0 20px', background: receiptBrandingSaved ? 'rgba(39,174,96,.14)' : '#C9A84C', border: receiptBrandingSaved ? '1px solid #27ae60' : 'none', color: receiptBrandingSaved ? '#5FD08C' : 'var(--a-bg0)', fontSize: 13, cursor: 'pointer', fontWeight: 700 }}>{receiptBrandingSaved ? '✓ Kaydedildi' : 'Kaydet'}</button>
             </div>
 
             {/* Auto print via RawBT */}

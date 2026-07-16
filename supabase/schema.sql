@@ -480,12 +480,19 @@ grant execute on function get_client_ip() to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- device_sessions (server-minted session tokens)
+-- staff_name/user_agent/last_seen_at (added 2026-07-16) exist so a manager
+-- can actually see "who's logged in, on what device, how recently" —
+-- Terminaller-lite in Ayarlar. Previously this table only had enough to
+-- validate a token, not to show a human-readable device list.
 -- ---------------------------------------------------------------------------
 create table if not exists public.device_sessions (
   token uuid primary key default gen_random_uuid(),
   role text not null,
   created_at timestamptz not null default now(),
-  expires_at timestamptz not null
+  expires_at timestamptz not null,
+  staff_name text,
+  user_agent text,
+  last_seen_at timestamptz not null default now()
 );
 alter table public.device_sessions enable row level security;
 -- No policies — RPC access only.
@@ -496,9 +503,12 @@ alter table public.device_sessions enable row level security;
 -- with the same rate limit as before. Dropped first because its return
 -- signature has changed over time (adding `permission`) and Postgres won't
 -- let create-or-replace change a function's return columns.
+--
+-- p_user_agent (added 2026-07-16): the browser passes navigator.userAgent
+-- so the session list can show "📱 iPhone" instead of nothing.
 -- ---------------------------------------------------------------------------
 drop function if exists login_with_pin(text);
-create or replace function login_with_pin(p_pin text)
+create or replace function login_with_pin(p_pin text, p_user_agent text default null)
 returns table(role text, token uuid, staff_name text, permission text)
 language plpgsql security definer set search_path = public as $$
 declare
@@ -534,13 +544,61 @@ begin
   -- and are the more likely-to-be-compromised case.
   v_expires_at := case when v_role in ('manager', 'touchscreen', 'owner') then now() + interval '100 years' else now() + interval '24 hours' end;
 
-  insert into device_sessions(role, expires_at) values (v_role, v_expires_at) returning device_sessions.token into v_token;
+  insert into device_sessions(role, expires_at, staff_name, user_agent, last_seen_at)
+  values (
+    v_role, v_expires_at,
+    coalesce(v_staff_name, case v_role when 'manager' then 'Yönetici' when 'touchscreen' then 'Dokunmatik Ekran' when 'owner' then 'Patron' else 'Personel (Genel)' end),
+    p_user_agent, now()
+  )
+  returning device_sessions.token into v_token;
   return query select v_role,
     v_token,
     coalesce(v_staff_name, case v_role when 'manager' then 'Yönetici' when 'touchscreen' then 'Dokunmatik Ekran' when 'owner' then 'Patron' else 'Personel (Genel)' end),
     coalesce(v_permission, 'full');
 end; $$;
-grant execute on function login_with_pin(text) to anon, authenticated;
+grant execute on function login_with_pin(text, text) to anon, authenticated;
+
+-- Called every ~2 minutes by the client so last_seen_at reflects real
+-- activity, not just login time — Terminaller-lite's "Son görülme".
+create or replace function touch_session(p_session_token uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update device_sessions set last_seen_at = now() where token = p_session_token and expires_at > now();
+end; $$;
+grant execute on function touch_session(uuid) to anon, authenticated;
+
+-- Lets a device's periodic recheck detect "a manager kicked just me,"
+-- not only the existing global epoch bump ("kicked everyone").
+create or replace function session_is_valid(p_session_token uuid) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  return exists (select 1 from device_sessions where token = p_session_token and expires_at > now());
+end; $$;
+grant execute on function session_is_valid(uuid) to anon, authenticated;
+
+-- Manager-only: list every currently-live session for Terminaller-lite.
+create or replace function list_sessions(p_session_token uuid)
+returns table(token uuid, role text, staff_name text, user_agent text, created_at timestamptz, last_seen_at timestamptz, expires_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+begin
+  perform assert_manager_session(p_session_token);
+  return query
+    select ds.token, ds.role, ds.staff_name, ds.user_agent, ds.created_at, ds.last_seen_at, ds.expires_at
+    from device_sessions ds
+    where ds.expires_at > now()
+    order by ds.last_seen_at desc nulls last, ds.created_at desc;
+end; $$;
+grant execute on function list_sessions(uuid) to anon, authenticated;
+
+-- Manager-only: kick a single device (as opposed to logoutAllDevices'
+-- global epoch bump, which kicks everyone).
+create or replace function revoke_session(p_session_token uuid, p_target_token uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform assert_manager_session(p_session_token);
+  delete from device_sessions where token = p_target_token;
+end; $$;
+grant execute on function revoke_session(uuid, uuid) to anon, authenticated;
 
 -- update_access_pin requires proof of a valid, non-expired manager session —
 -- closes the hole where anyone with the anon key could call it directly and

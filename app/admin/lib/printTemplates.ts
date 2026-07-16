@@ -1,5 +1,5 @@
 import { formatTL } from './format'
-import { buildKitchenTicketEscPos, buildReceiptEscPos, printViaRawBT } from './escpos'
+import { buildKitchenTicketEscPos, buildReceiptEscPos, printViaRawBT, getReceiptBranding } from './escpos'
 
 // Print/export templates for the admin panel. These are pure functions:
 // given data, they open a print window and write an HTML document to it.
@@ -101,7 +101,8 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
     </head>
     <body>
       <div class="center">
-        <h1>KAHFE LOUNGE</h1>
+        <h1>${getReceiptBranding().name}</h1>
+        ${getReceiptBranding().address.trim() ? `<div style="font-size:13px;">${getReceiptBranding().address}</div>` : ''}
         <div style="font-size:14px;">${new Date().toLocaleString('tr-TR')}</div>
         ${info.faturaNo ? `<div class="fatura-no">FİŞ NO: ${String(info.faturaNo).padStart(6, '0')}</div>` : ''}
         <div style="font-size:16px; margin-top:8px;">Masa: <b>${info.table_name}</b></div>
@@ -121,7 +122,7 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
         ${info.method === 'mixed' ? `Nakit: ${formatTL(info.cash)} ₺<br/>Kart: ${formatTL(info.card)} ₺` : ''}
       </div>
       <div class="line"></div>
-      <div class="center" style="font-size:14px; margin-top:14px;">Bizi tercih ettiğiniz için teşekkürler!</div>
+      <div class="center" style="font-size:14px; margin-top:14px;">${getReceiptBranding().footer}</div>
       <script>window.onload = function(){ window.print(); };</script>
     </body>
     </html>
