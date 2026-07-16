@@ -2832,6 +2832,21 @@ export default function AdminPage() {
           .kahfe-topnav, .kahfe-topnav-header { display: none; }
         }
 
+        /* Once a scrollable modal hits its top/bottom, don't hand the
+           remaining scroll off to the page behind it — that "scroll bleed"
+           is why a modal could suddenly stop responding while the list
+           underneath moved instead. */
+        .kahfe-modal { overscroll-behavior: contain; }
+
+        /* Belt-and-braces for the horizontal strips (tab bar, category
+           chips, hour bars): overflow-x:auto silently computes overflow-y
+           to 'auto' as well unless it's set explicitly, which turns them
+           into vertical scroll traps that swallow page swipes. The inline
+           overflowY:'hidden' on each already handles this; this rule keeps
+           it true for any strip added later, and stops a horizontal fling
+           from triggering the browser's back-swipe. */
+        .kahfe-topnav { overscroll-behavior-x: contain; }
+
         .kahfe-modal { max-width: 480px; }
         @media (min-width: 700px) { .kahfe-modal { max-width: 560px; } }
       `}</style>
@@ -2915,12 +2930,12 @@ export default function AdminPage() {
         {/* Kasa Hareketi (manual cash in/out) modal */}
         {showCashMovement && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowCashMovement(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(201,168,76,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+            <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(201,168,76,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>💰 Kasa Hareketi</div>
                 <button onClick={() => setShowCashMovement(false)} style={{ background: 'var(--a-border)', border: 'none', width: 36, height: 36, color: 'var(--a-text2)', cursor: 'pointer', fontSize: 16 }}>✕</button>
               </div>
-              <div style={{ padding: 20, maxHeight: '75vh', overflowY: 'auto' }}>
+              <div style={{ padding: 20 }}>
                 <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Satış dışı nakit hareketlerini kaydedin (malzeme alımı, kasa açılış parası, vb.) — Gün Sonü ve Vardiya hesaplamalarında dikkate alınır.</div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                   <button onClick={() => setCashMoveType('out')} style={{ flex: 1, height: 44, background: cashMoveType === 'out' ? 'rgba(231,76,60,.14)' : 'transparent', border: cashMoveType === 'out' ? '1px solid #e74c3c' : '1px solid var(--a-border2)', color: cashMoveType === 'out' ? '#e74c3c' : 'var(--a-text2)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>➖ Kasadan Çıkış</button>
@@ -2953,12 +2968,12 @@ export default function AdminPage() {
         {/* Shift close (Vardiya Sonu) modal */}
         {showShiftClose && shiftCloseData && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowShiftClose(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(231,76,60,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+            <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(231,76,60,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
               <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ color: '#e74c3c', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>⏹ Vardiya Sonu — {activeShift?.staff_name}</div>
                 <button onClick={() => setShowShiftClose(false)} style={{ background: 'var(--a-border)', border: 'none', width: 36, height: 36, color: 'var(--a-text2)', cursor: 'pointer', fontSize: 16 }}>✕</button>
               </div>
-              <div style={{ padding: 20, maxHeight: '75vh', overflowY: 'auto' }}>
+              <div style={{ padding: 20 }}>
                 <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 16 }}>
                   {activeShift && new Date(activeShift.started_at).toLocaleString('tr-TR')} — {new Date().toLocaleString('tr-TR')}
                 </div>
@@ -3003,7 +3018,14 @@ export default function AdminPage() {
 
         {msg && <div style={{ background: '#1a3a1a', border: '1px solid #2a5a2a', color: '#4CAF50', padding: '12px 20px', fontSize: 14, fontWeight: 600 }}>{msg}</div>}
 
-        <div className="kahfe-topnav" style={{ borderBottom: '1px solid var(--a-border)', overflowX: 'auto' }}>
+        {/* overflowY:'hidden' is required, not cosmetic: per CSS spec, when
+            overflow-x is 'auto' and overflow-y is left at its default
+            'visible', overflow-y COMPUTES to 'auto' too. That silently turns
+            this strip into a vertical scroll container with nothing to
+            scroll, and a vertical swipe starting on it gets swallowed
+            instead of scrolling the page — the "scrolling sometimes gets
+            stuck" bug. Same fix applied to every horizontal strip below. */}
+        <div className="kahfe-topnav" style={{ borderBottom: '1px solid var(--a-border)', overflowX: 'auto', overflowY: 'hidden' }}>
           {(isManager
             ? ([['orders'], ['categories', 'items', 'staff', 'settings'], ['debts', 'reports']] as const)
             : ([['orders']] as const)
@@ -3405,7 +3427,7 @@ export default function AdminPage() {
                   <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:30, height:30, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
                 </div>
 
-                <div style={{ display:'flex', gap:6, padding:'12px 16px', overflowX:'auto', borderBottom:'1px solid var(--a-border)' }}>
+                <div style={{ display:'flex', gap:6, padding:'12px 16px', overflowX:'auto', overflowY:'hidden', borderBottom:'1px solid var(--a-border)' }}>
                   <button onClick={() => setStaffCategoryFilter(null)}
                     style={{ flexShrink:0, background: staffCategoryFilter===null ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: staffCategoryFilter===null ? '1px solid rgba(201,168,76,.4)' : '1px solid var(--a-border)', borderRadius: 8, padding:'7px 14px', color: staffCategoryFilter===null ? '#C9A84C' : 'var(--a-text2)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
                   {categories.map(cat => (
@@ -3658,7 +3680,7 @@ export default function AdminPage() {
                   <span>🟡 Dolu</span>
                   <span>⚪ Boş</span>
                 </div>
-                <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:4, marginBottom:16 }}>
+                <div style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', paddingBottom:4, marginBottom:16 }}>
                   <button onClick={() => setTableCategoryFilter(null)}
                     style={{ flexShrink:0, height:44, padding:'0 16px', background: tableCategoryFilter===null ? 'rgba(201,168,76,.15)' : 'var(--a-bg1)', border: tableCategoryFilter===null ? '1px solid rgba(201,168,76,.5)' : '1px solid var(--a-border)', borderRadius: 999, color: tableCategoryFilter===null ? '#C9A84C' : 'var(--a-text2)', fontSize:13, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>Tümü</button>
                   {tableGroups.map(group => (
@@ -3749,7 +3771,7 @@ export default function AdminPage() {
                 {floorEditMode && (
                   <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 12 }}>Masaları sürükleyerek gerçek oturma düzeninizi oluşturun. Konumlar otomatik kaydedilir.</div>
                 )}
-                <div style={{ position: 'relative', width: '100%', overflow: 'auto', border: '1px solid var(--a-border)', background: 'var(--a-bg4)' }}>
+                <div style={{ position: 'relative', width: '100%', overflowX: 'auto', overflowY: 'hidden', border: '1px solid var(--a-border)', background: 'var(--a-bg4)' }}>
                   <div style={{ position: 'relative', width: floorCanvasWidth, height: floorCanvasHeight }}>
                     {ALL_TABLES.map(tableName => {
                       const info = getTableInfo(tableName)
@@ -3770,7 +3792,7 @@ export default function AdminPage() {
                           onPointerMove={handleFloorPointerMove}
                           onPointerUp={handleFloorPointerUp}
                           onClick={() => { if (!floorEditMode) setActiveTableModal(tableName) }}
-                          style={{ position:'absolute', left:pos.x, top:pos.y, width:FLOOR_TILE, height:FLOOR_TILE, background:p.bg, border:`2px solid ${p.border}`, borderRadius:12, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:6, cursor: floorEditMode ? 'grab' : 'pointer', userSelect:'none', touchAction:'none', zIndex: isDragging ? 10 : 1, boxShadow: isDragging ? '0 8px 20px rgba(0,0,0,.5)' : 'none', animation: info.status === 'pending' && !floorEditMode ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
+                          style={{ position:'absolute', left:pos.x, top:pos.y, width:FLOOR_TILE, height:FLOOR_TILE, background:p.bg, border:`2px solid ${p.border}`, borderRadius:12, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:6, cursor: floorEditMode ? 'grab' : 'pointer', userSelect:'none', touchAction: floorEditMode ? 'none' : 'auto', zIndex: isDragging ? 10 : 1, boxShadow: isDragging ? '0 8px 20px rgba(0,0,0,.5)' : 'none', animation: info.status === 'pending' && !floorEditMode ? 'tilePulse 1.4s ease-in-out infinite' : 'none' }}>
                           <div style={{ color:p.text, fontWeight:700, fontSize:13, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{tableName.replace('-', ' ')}</div>
                           <div style={{ color:p.labelText, fontSize:9, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase', marginTop:4 }}>
                             {p.label}{itemCount > 0 ? ` · ${itemCount}` : ''}{openedMinutesAgo !== null ? ` · ${openedMinutesAgo}dk` : ''}
@@ -4563,7 +4585,7 @@ export default function AdminPage() {
                     </div>
                     <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: 16 }}>
                       <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Saatlik Yoğunluk</div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90, overflowX: 'auto' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90, overflowX: 'auto', overflowY: 'hidden' }}>
                         {a.hourly.map((v, h) => (
                           <div key={h} title={`${h}:00 — ₺${formatTL(v)}`} style={{ flex: '1 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                             <div style={{ width: '100%', minWidth: 6, height: Math.max(2, (v / maxHourly) * 70), background: v > 0 ? '#5FD08C' : 'var(--a-border2)', borderRadius: 2 }} />

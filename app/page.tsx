@@ -119,7 +119,11 @@ function TabRow({
   const posRef   = useRef(0)
   const pausedRef = useRef(false)
   const totalWRef = useRef(0)
-  const dragRef  = useRef({ dragging: false, startX: 0, startPos: 0 })
+  // axis: null until the gesture's direction is known, then locked to 'x'
+  // (drag the carousel) or 'y' (it's a page scroll — leave the carousel
+  // alone). Without this, any vertical swipe that happens to start on the
+  // category row dragged the row sideways while the page scrolled.
+  const dragRef  = useRef({ dragging: false, startX: 0, startY: 0, startPos: 0, axis: null as null | 'x' | 'y' })
   const SPEED    = 0.38
 
   useEffect(() => {
@@ -167,13 +171,26 @@ function TabRow({
 
   return (
     <div dir="ltr" style={{ overflow: 'hidden', cursor: 'grab', userSelect: 'none', padding: '5px 0' }}
-      onMouseDown={e => { dragRef.current = { dragging: false, startX: e.clientX, startPos: posRef.current }; pausedRef.current = true }}
+      onMouseDown={e => { dragRef.current = { dragging: false, startX: e.clientX, startY: e.clientY, startPos: posRef.current, axis: 'x' }; pausedRef.current = true }}
       onMouseMove={e => { if (!pausedRef.current) return; const dx = dragRef.current.startX - e.clientX; if (Math.abs(dx) > 3) dragRef.current.dragging = true; applyDrag(dx) }}
       onMouseUp={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}
       onMouseLeave={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}
-      onTouchStart={e => { dragRef.current = { dragging: false, startX: e.touches[0].clientX, startPos: posRef.current }; pausedRef.current = true }}
-      onTouchMove={e => { const dx = dragRef.current.startX - e.touches[0].clientX; if (Math.abs(dx) > 3) dragRef.current.dragging = true; applyDrag(dx) }}
-      onTouchEnd={() => setTimeout(() => { dragRef.current.dragging = false; pausedRef.current = false }, 300)}>
+      onTouchStart={e => { dragRef.current = { dragging: false, startX: e.touches[0].clientX, startY: e.touches[0].clientY, startPos: posRef.current, axis: null }; pausedRef.current = true }}
+      onTouchMove={e => {
+        const d = dragRef.current
+        const dx = d.startX - e.touches[0].clientX
+        const dy = d.startY - e.touches[0].clientY
+        // Decide the axis once, on the first move that's clearly one or the
+        // other, then stick with it for the rest of the gesture.
+        if (d.axis === null) {
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) d.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+          else return
+        }
+        if (d.axis === 'y') return // vertical: let the page scroll normally
+        if (Math.abs(dx) > 3) d.dragging = true
+        applyDrag(dx)
+      }}
+      onTouchEnd={() => setTimeout(() => { dragRef.current.dragging = false; dragRef.current.axis = null; pausedRef.current = false }, 300)}>
       <div dir="ltr" style={{ display: 'flex', width: 'max-content' }} ref={trackRef}>
         {doubled.map((c, i) => {
           const displayName = getCatName(c, lang)
