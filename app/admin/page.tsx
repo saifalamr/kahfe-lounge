@@ -3399,7 +3399,7 @@ export default function AdminPage() {
 
             {/* Staff order builder - punch in a walk-in/phone/verbal order */}
             {addOrderTable && (
-              <div style={{ position:'fixed', inset:0, zIndex:210, background:'rgba(0,0,0,.92)', backdropFilter:'blur(6px)', display:'flex', flexDirection:'column' }}>
+              <div style={{ position:'fixed', inset:0, zIndex:210, background:'var(--a-bg0)', display:'flex', flexDirection:'column' }}>
                 <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--a-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div style={{ color:'#C9A84C', fontWeight:800, fontSize:15 }}>➕ {addOrderTable} — Sipariş Ekle</div>
                   <button onClick={() => { setAddOrderTable(null); setStaffCart({}) }} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:30, height:30, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
