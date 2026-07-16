@@ -769,5 +769,224 @@ create policy "price_edits public insert" on public.price_edits for insert with 
 grant select, insert on public.price_edits to anon, authenticated;
 
 -- =============================================================================
+-- SECURITY HARDENING (2026-07-16) — supersedes the `using (true)` /
+-- `with check (true)` policies defined earlier in this file for every table
+-- below. Runs last so re-running this whole file top-to-bottom always ends
+-- in the correct, currently-deployed state regardless of what the older
+-- per-table sections above say.
+--
+-- Context: almost every table had fully permissive RLS — anyone holding the
+-- public anon key (visible in any browser's network tab on any page load)
+-- could read or write directly against the REST API, bypassing the app,
+-- its PIN login, and every accountability/reason-required flow entirely.
+-- Deliberately left public: categories/menu_items/item_option_groups/
+-- item_option_choices/settings SELECT (the customer QR menu browses these
+-- with no login) and orders INSERT (placing an order). Everything else —
+-- the actual money and accountability tables — now requires a valid staff
+-- session token.
+-- =============================================================================
+
+-- Reads the staff session token from a custom request header, the same
+-- current_setting('request.headers') mechanism get_client_ip() already
+-- uses in production for login rate-limiting via x-forwarded-for. The
+-- client (lib/supabase.ts) attaches this header on every request once a
+-- PIN login has happened; pages with no session (the customer QR menu)
+-- send no header, which correctly fails closed.
+create or replace function public.has_valid_session(required_roles text[] default null)
+returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_token text;
+begin
+  v_token := current_setting('request.headers', true)::json ->> 'x-session-token';
+  if v_token is null or v_token = '' then
+    return false;
+  end if;
+  return exists (
+    select 1 from device_sessions
+    where token = v_token::uuid
+    and expires_at > now()
+    and (required_roles is null or role = any(required_roles))
+  );
+exception when others then
+  return false;
+end;
+$$;
+grant execute on function has_valid_session(text[]) to anon, authenticated;
+
+-- Lets the customer QR menu compute today's order-number-of-the-day
+-- without needing public SELECT on orders (now gated below).
+create or replace function public.todays_order_count(p_since timestamptz)
+returns bigint
+language sql stable security definer set search_path = public as $$
+  select count(*) from orders where created_at >= p_since;
+$$;
+grant execute on function todays_order_count(timestamptz) to anon, authenticated;
+
+-- orders: SELECT stays public — Realtime's postgres_changes (new-order
+-- alerts, live floor plan, kitchen/nargile tickets, Patron View) evaluates
+-- RLS per-connection over a WebSocket with no way to attach the custom
+-- x-session-token header has_valid_session() depends on, so gating SELECT
+-- here would silently break every live subscription in the app without
+-- any error. INSERT stays public (placing an order); UPDATE is gated,
+-- which is the part that actually matters and isn't realtime-visible the
+-- same way.
+drop policy if exists "orders public read" on public.orders;
+drop policy if exists "orders session read" on public.orders;
+create policy "orders public read" on public.orders for select using (true);
+drop policy if exists "orders public update" on public.orders;
+drop policy if exists "orders session update" on public.orders;
+create policy "orders session update" on public.orders for update using (has_valid_session()) with check (has_valid_session());
+
+-- tabs: SELECT stays public for the same realtime reason (live floor plan,
+-- Patron View both subscribe to tabs changes). INSERT/UPDATE gated — in
+-- practice only ever written via the SECURITY DEFINER
+-- get_or_create_open_tab RPC anyway, which bypasses RLS regardless.
+drop policy if exists "tabs public read" on public.tabs;
+drop policy if exists "tabs session read" on public.tabs;
+create policy "tabs public read" on public.tabs for select using (true);
+drop policy if exists "tabs public insert" on public.tabs;
+drop policy if exists "tabs session insert" on public.tabs;
+create policy "tabs session insert" on public.tabs for insert with check (has_valid_session());
+drop policy if exists "tabs public update" on public.tabs;
+drop policy if exists "tabs session update" on public.tabs;
+create policy "tabs session update" on public.tabs for update using (has_valid_session()) with check (has_valid_session());
+
+-- categories: keep SELECT public, gate writes
+drop policy if exists "categories public insert" on public.categories;
+drop policy if exists "categories session insert" on public.categories;
+create policy "categories session insert" on public.categories for insert with check (has_valid_session());
+drop policy if exists "categories public update" on public.categories;
+drop policy if exists "categories session update" on public.categories;
+create policy "categories session update" on public.categories for update using (has_valid_session()) with check (has_valid_session());
+
+-- menu_items: keep SELECT public, gate writes
+drop policy if exists "menu_items public insert" on public.menu_items;
+drop policy if exists "menu_items session insert" on public.menu_items;
+create policy "menu_items session insert" on public.menu_items for insert with check (has_valid_session());
+drop policy if exists "menu_items public update" on public.menu_items;
+drop policy if exists "menu_items session update" on public.menu_items;
+create policy "menu_items session update" on public.menu_items for update using (has_valid_session()) with check (has_valid_session());
+
+-- item_option_groups / item_option_choices: keep SELECT public, gate writes
+drop policy if exists "option_groups public insert" on public.item_option_groups;
+drop policy if exists "option_groups session insert" on public.item_option_groups;
+create policy "option_groups session insert" on public.item_option_groups for insert with check (has_valid_session());
+drop policy if exists "option_groups public update" on public.item_option_groups;
+drop policy if exists "option_groups session update" on public.item_option_groups;
+create policy "option_groups session update" on public.item_option_groups for update using (has_valid_session()) with check (has_valid_session());
+drop policy if exists "option_groups public delete" on public.item_option_groups;
+drop policy if exists "option_groups session delete" on public.item_option_groups;
+create policy "option_groups session delete" on public.item_option_groups for delete using (has_valid_session());
+
+drop policy if exists "option_choices public insert" on public.item_option_choices;
+drop policy if exists "option_choices session insert" on public.item_option_choices;
+create policy "option_choices session insert" on public.item_option_choices for insert with check (has_valid_session());
+drop policy if exists "option_choices public update" on public.item_option_choices;
+drop policy if exists "option_choices session update" on public.item_option_choices;
+create policy "option_choices session update" on public.item_option_choices for update using (has_valid_session()) with check (has_valid_session());
+drop policy if exists "option_choices public delete" on public.item_option_choices;
+drop policy if exists "option_choices session delete" on public.item_option_choices;
+create policy "option_choices session delete" on public.item_option_choices for delete using (has_valid_session());
+
+-- settings: keep SELECT public, gate writes
+drop policy if exists "settings public insert" on public.settings;
+drop policy if exists "settings session insert" on public.settings;
+create policy "settings session insert" on public.settings for insert with check (has_valid_session());
+drop policy if exists "settings public update" on public.settings;
+drop policy if exists "settings session update" on public.settings;
+create policy "settings session update" on public.settings for update using (has_valid_session()) with check (has_valid_session());
+
+-- Fully gated (SELECT + all writes) — no legitimate anonymous access at all
+drop policy if exists "cash_movements public insert" on public.cash_movements;
+drop policy if exists "cash_movements session insert" on public.cash_movements;
+create policy "cash_movements session insert" on public.cash_movements for insert with check (has_valid_session());
+drop policy if exists "cash_movements public read" on public.cash_movements;
+drop policy if exists "cash_movements session read" on public.cash_movements;
+create policy "cash_movements session read" on public.cash_movements for select using (has_valid_session());
+
+drop policy if exists "day_close public insert" on public.day_close_reports;
+drop policy if exists "day_close session insert" on public.day_close_reports;
+create policy "day_close session insert" on public.day_close_reports for insert with check (has_valid_session());
+drop policy if exists "day_close public read" on public.day_close_reports;
+drop policy if exists "day_close session read" on public.day_close_reports;
+create policy "day_close session read" on public.day_close_reports for select using (has_valid_session());
+
+drop policy if exists "debt_tx public insert" on public.debt_transactions;
+drop policy if exists "debt_tx session insert" on public.debt_transactions;
+create policy "debt_tx session insert" on public.debt_transactions for insert with check (has_valid_session());
+drop policy if exists "debt_tx public read" on public.debt_transactions;
+drop policy if exists "debt_tx session read" on public.debt_transactions;
+create policy "debt_tx session read" on public.debt_transactions for select using (has_valid_session());
+
+drop policy if exists "debtors public insert" on public.debtors;
+drop policy if exists "debtors session insert" on public.debtors;
+create policy "debtors session insert" on public.debtors for insert with check (has_valid_session());
+drop policy if exists "debtors public read" on public.debtors;
+drop policy if exists "debtors session read" on public.debtors;
+create policy "debtors session read" on public.debtors for select using (has_valid_session());
+drop policy if exists "debtors public update" on public.debtors;
+drop policy if exists "debtors session update" on public.debtors;
+create policy "debtors session update" on public.debtors for update using (has_valid_session());
+
+drop policy if exists "discounts public insert" on public.discounts;
+drop policy if exists "discounts session insert" on public.discounts;
+create policy "discounts session insert" on public.discounts for insert with check (has_valid_session());
+drop policy if exists "discounts public read" on public.discounts;
+drop policy if exists "discounts session read" on public.discounts;
+create policy "discounts session read" on public.discounts for select using (has_valid_session());
+
+drop policy if exists "monthly_reports public insert" on public.monthly_reports;
+drop policy if exists "monthly_reports session insert" on public.monthly_reports;
+create policy "monthly_reports session insert" on public.monthly_reports for insert with check (has_valid_session());
+drop policy if exists "monthly_reports public read" on public.monthly_reports;
+drop policy if exists "monthly_reports session read" on public.monthly_reports;
+create policy "monthly_reports session read" on public.monthly_reports for select using (has_valid_session());
+drop policy if exists "monthly_reports public update" on public.monthly_reports;
+drop policy if exists "monthly_reports session update" on public.monthly_reports;
+create policy "monthly_reports session update" on public.monthly_reports for update using (has_valid_session()) with check (has_valid_session());
+
+drop policy if exists "nargile_timers public insert" on public.nargile_timers;
+drop policy if exists "nargile_timers session insert" on public.nargile_timers;
+create policy "nargile_timers session insert" on public.nargile_timers for insert with check (has_valid_session());
+drop policy if exists "nargile_timers public select" on public.nargile_timers;
+drop policy if exists "nargile_timers session select" on public.nargile_timers;
+create policy "nargile_timers session select" on public.nargile_timers for select using (has_valid_session());
+drop policy if exists "nargile_timers public update" on public.nargile_timers;
+drop policy if exists "nargile_timers session update" on public.nargile_timers;
+create policy "nargile_timers session update" on public.nargile_timers for update using (has_valid_session());
+
+drop policy if exists "price_edits public insert" on public.price_edits;
+drop policy if exists "price_edits session insert" on public.price_edits;
+create policy "price_edits session insert" on public.price_edits for insert with check (has_valid_session());
+drop policy if exists "price_edits public read" on public.price_edits;
+drop policy if exists "price_edits session read" on public.price_edits;
+create policy "price_edits session read" on public.price_edits for select using (has_valid_session());
+
+drop policy if exists "refunds public insert" on public.refunds;
+drop policy if exists "refunds session insert" on public.refunds;
+create policy "refunds session insert" on public.refunds for insert with check (has_valid_session());
+drop policy if exists "refunds public select" on public.refunds;
+drop policy if exists "refunds session select" on public.refunds;
+create policy "refunds session select" on public.refunds for select using (has_valid_session());
+
+drop policy if exists "shifts public insert" on public.shifts;
+drop policy if exists "shifts session insert" on public.shifts;
+create policy "shifts session insert" on public.shifts for insert with check (has_valid_session());
+drop policy if exists "shifts public read" on public.shifts;
+drop policy if exists "shifts session read" on public.shifts;
+create policy "shifts session read" on public.shifts for select using (has_valid_session());
+drop policy if exists "shifts public update" on public.shifts;
+drop policy if exists "shifts session update" on public.shifts;
+create policy "shifts session update" on public.shifts for update using (has_valid_session());
+
+drop policy if exists "voids public insert" on public.voids;
+drop policy if exists "voids session insert" on public.voids;
+create policy "voids session insert" on public.voids for insert with check (has_valid_session());
+drop policy if exists "voids public read" on public.voids;
+drop policy if exists "voids session read" on public.voids;
+create policy "voids session read" on public.voids for select using (has_valid_session());
+
+-- =============================================================================
 -- END — if this whole file ran without errors, the database is fully caught up.
 -- =============================================================================

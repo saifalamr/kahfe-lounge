@@ -708,9 +708,7 @@ export default function MenuPage() {
       // not UTC — otherwise this rolls over 3 hours early (Istanbul is
       // UTC+3), same timezone bug as the admin/owner revenue totals had.
       const today = new Date(); today.setHours(0, 0, 0, 0)
-      const { count: todayCount } = await supabase.from('orders')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString())
+      const { data: todayCount } = await supabase.rpc('todays_order_count', { p_since: today.toISOString() })
       const orderNum = (todayCount || 0) + 1
       setOrderNumber(orderNum)
 
@@ -765,9 +763,7 @@ export default function MenuPage() {
     if (!isOnline) return
     flushQueuedOrders(async (order) => {
       const today = new Date(); today.setHours(0, 0, 0, 0)
-      const { count: todayCount } = await supabase.from('orders')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString())
+      const { data: todayCount } = await supabase.rpc('todays_order_count', { p_since: today.toISOString() })
       await sendTelegramNotification(order.table_name, order.items, order.total, order.note || '', todayCount || 0)
     })
   }, [isOnline])
