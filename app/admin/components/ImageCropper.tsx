@@ -73,7 +73,7 @@ export default function ImageCropper({ src, onCrop, onCancel }: { src: string; o
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ color: '#C9A84C', fontSize: 11, letterSpacing: 3, fontWeight: 700, marginBottom: 12 }}>FOTOĞRAF DÜZENLE</div>
-      <div style={{ color: '#8A8A8A', fontSize: 12, marginBottom: 16 }}>Sürükle · Zoom ile boyutlandır · Kırp</div>
+      <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 16 }}>Sürükle · Zoom ile boyutlandır · Kırp</div>
 
       {/* Canvas crop area */}
       <div ref={containerRef} style={{ position: 'relative', border: '2px solid #C9A84C', borderRadius: 8, overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}>
@@ -96,17 +96,17 @@ export default function ImageCropper({ src, onCrop, onCancel }: { src: string; o
 
       {/* Zoom slider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, width: '100%', maxWidth: CROP_W }}>
-        <span style={{ color: '#8A8A8A', fontSize: 12 }}>🔍</span>
+        <span style={{ color: 'var(--a-text2)', fontSize: 12 }}>🔍</span>
         <input type="range" min={0.1} max={3} step={0.01} value={zoom}
           onChange={e => setZoom(parseFloat(e.target.value))}
           style={{ flex: 1, accentColor: '#C9A84C' }} />
         <span style={{ color: '#C9A84C', fontSize: 12, minWidth: 36 }}>{Math.round(zoom * 100)}%</span>
-        <button onClick={resetPos} style={{ background: '#2A2A2A', border: 'none', borderRadius: 8, padding: '6px 12px', color: '#8A8A8A', fontSize: 12, cursor: 'pointer' }}>Sıfırla</button>
+        <button onClick={resetPos} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 12px', color: 'var(--a-text2)', fontSize: 12, cursor: 'pointer' }}>Sıfırla</button>
       </div>
 
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 12, marginTop: 16, width: '100%', maxWidth: CROP_W }}>
-        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: 14, color: '#8A8A8A', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>İptal</button>
+        <button onClick={onCancel} style={{ flex: 1, background: 'transparent', border: '1px solid #2A2A2A', borderRadius: 8, padding: 14, color: 'var(--a-text2)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>İptal</button>
         <button onClick={handleCrop} style={{ flex: 2, background: '#C9A84C', border: 'none', borderRadius: 8, padding: 14, color: '#1A0E06', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>✓ Fotoğrafı Kaydet</button>
       </div>
     </div>

@@ -14,55 +14,55 @@ export default function DayCloseModal({ dayCloseData, countedCash, onCountedCash
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.9)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' }} onClick={onClose}>
-      <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:520, margin:'0 auto', background:'#141414', borderRadius:20, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+      <div className="kahfe-modal" onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:520, margin:'0 auto', background:'var(--a-bg2)', borderRadius:20, maxHeight:'85vh', overflowY:'auto', border:'1px solid rgba(52,152,219,.3)', boxShadow:'0 20px 60px rgba(0,0,0,.6)', animation:'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
         <div style={{ padding:'18px 20px', borderBottom:'1px solid #2A2A2A', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
           <div style={{ color:'#3498db', fontWeight:800, fontSize:16 }}>🌙 Gün Sonu</div>
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={onExportPDF} style={{ background:'rgba(201,168,76,.15)', border:'1px solid rgba(201,168,76,.3)', borderRadius: 8, padding:'6px 10px', color:'#C9A84C', fontSize:11, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>📄 PDF İndir</button>
-            <button onClick={onClose} style={{ background:'#2A2A2A', border:'none', borderRadius: 8, width:30, height:30, color:'#8A8A8A', cursor:'pointer', fontSize:16 }}>✕</button>
+            <button onClick={onClose} style={{ background:'var(--a-border)', border:'none', borderRadius: 8, width:30, height:30, color:'var(--a-text2)', cursor:'pointer', fontSize:16 }}>✕</button>
           </div>
         </div>
         <div style={{ padding:'20px' }}>
           <div style={{ display:'flex', gap:10, marginBottom:16, flexWrap:'wrap' }}>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>KAPANAN MASA</div>
-              <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:20 }}>{dayCloseData.tabCount}</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>KAPANAN MASA</div>
+              <div style={{ color:'var(--a-text)', fontWeight:800, fontSize:20 }}>{dayCloseData.tabCount}</div>
             </div>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>TOPLAM CİRO</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>TOPLAM CİRO</div>
               <div style={{ color:'#C9A84C', fontWeight:800, fontSize:20 }}>{formatTL(dayCloseData.totalRevenue)} ₺</div>
             </div>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>💵 NAKİT (SATIŞ)</div>
-              <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cashTotal)} ₺</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>💵 NAKİT (SATIŞ)</div>
+              <div style={{ color:'var(--a-text)', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cashTotal)} ₺</div>
             </div>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid rgba(201,168,76,.35)', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>🗄️ BEKLENEN KASA</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid rgba(201,168,76,.35)', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>🗄️ BEKLENEN KASA</div>
               <div style={{ color:'#C9A84C', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.expectedCash)} ₺</div>
             </div>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>💳 KART</div>
-              <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cardTotal)} ₺</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>💳 KART</div>
+              <div style={{ color:'var(--a-text)', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.cardTotal)} ₺</div>
             </div>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>🏦 HAVALE</div>
-              <div style={{ color:'#F0EDE8', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.transferTotal || 0)} ₺</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>🏦 HAVALE</div>
+              <div style={{ color:'var(--a-text)', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.transferTotal || 0)} ₺</div>
             </div>
-            <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid rgba(231,76,60,.25)', borderRadius: 8, padding:14, textAlign:'center' }}>
-              <div style={{ color:'#8A8A8A', fontSize:11 }}>🧾 BORÇ</div>
+            <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid rgba(231,76,60,.25)', borderRadius: 8, padding:14, textAlign:'center' }}>
+              <div style={{ color:'var(--a-text2)', fontSize:11 }}>🧾 BORÇ</div>
               <div style={{ color:'#e74c3c', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.debtTotal || 0)} ₺</div>
             </div>
             {dayCloseData.discountTotal > 0 && (
-              <div style={{ flex:'1 1 45%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
-                <div style={{ color:'#8A8A8A', fontSize:11 }}>🏷️ İNDİRİM</div>
+              <div style={{ flex:'1 1 45%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:14, textAlign:'center' }}>
+                <div style={{ color:'var(--a-text2)', fontSize:11 }}>🏷️ İNDİRİM</div>
                 <div style={{ color:'#e74c3c', fontWeight:800, fontSize:18 }}>{formatTL(dayCloseData.discountTotal)} ₺</div>
               </div>
             )}
           </div>
 
-          <label style={{ color:'#8A8A8A', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺) — Beklenen Kasa ile karşılaştırılır</label>
+          <label style={{ color:'var(--a-text2)', fontSize:11, display:'block', marginBottom:6 }}>KASADAKİ SAYILAN NAKİT (₺) — Beklenen Kasa ile karşılaştırılır</label>
           <input type="number" value={countedCash} onChange={e => onCountedCashChange(e.target.value)} placeholder="Örn. 3450"
-            style={{ width:'100%', background:'#1A1A1A', border:'1px solid #2A2A2A', borderRadius: 8, padding:'12px', color:'#F0EDE8', fontSize:16, marginBottom:10 }} />
+            style={{ width:'100%', background:'var(--a-bg1)', border:'1px solid #2A2A2A', borderRadius: 8, padding:'12px', color:'var(--a-text)', fontSize:16, marginBottom:10 }} />
 
           {diff !== null && (
             <div style={{ textAlign:'center', padding:'10px', marginBottom:16, borderRadius: 8, background: diff===0 ? 'rgba(39,174,96,.1)' : diff>0 ? 'rgba(52,152,219,.1)' : 'rgba(192,57,43,.1)', border:`1px solid ${diff===0 ? 'rgba(39,174,96,.3)' : diff>0 ? 'rgba(52,152,219,.3)' : 'rgba(192,57,43,.3)'}` }}>
