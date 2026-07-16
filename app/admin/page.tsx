@@ -263,7 +263,7 @@ export default function AdminPage() {
   // Fiş Geçmişi and İndirim/İptal used to be their own top-level tabs;
   // they're still the exact same views/state under the hood, just reached
   // through the Raporlar hub now instead of two extra tab-bar buttons.
-  const [reportsSubTab, setReportsSubTab] = useState<'overview' | 'receipts' | 'accountability'>('overview')
+  const [reportsSubTab, setReportsSubTab] = useState<'overview' | 'receipts' | 'accountability' | 'analytics'>('overview')
   const [allOrders, setAllOrders] = useState<any[]>([])
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
@@ -1473,6 +1473,93 @@ export default function AdminPage() {
     if (range === 'custom') return itemReportCustomFrom || now.toISOString().split('T')[0]
     return new Date(now.getFullYear(), 0, 1).toISOString()
   }
+
+  // Analitik — a real BI pass over data the app already has: revenue trend,
+  // top items, payment mix, and when the café is actually busy (hour of
+  // day / day of week), plus a loss-rate indicator (voids+discounts as %
+  // of gross). Matches the same "sold = ordered, not dismissed" and
+  // "revenue = closed tabs' cash+card+transfer" conventions already used
+  // by Ürün Raporu / Personel Performansı / the header total, so numbers
+  // here never contradict the rest of the app.
+  const [analyticsRange, setAnalyticsRange] = useState<7 | 30 | 90>(30)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [analyticsData, setAnalyticsData] = useState<{
+    totalRevenue: number, tabCount: number, avgTicket: number,
+    dailyRevenue: { date: string, revenue: number }[],
+    topItemsByRevenue: { name: string, revenue: number, qty: number }[],
+    topItemsByQty: { name: string, revenue: number, qty: number }[],
+    paymentMix: { cash: number, card: number, transfer: number, debt: number },
+    hourly: number[], dayOfWeek: number[],
+    voidTotal: number, discountTotal: number, lossRate: number,
+  } | null>(null)
+
+  async function loadAnalytics(days: 7 | 30 | 90 = analyticsRange) {
+    setAnalyticsRange(days)
+    setAnalyticsLoading(true)
+    const from = new Date(); from.setHours(0, 0, 0, 0); from.setDate(from.getDate() - (days - 1))
+    const fromIso = from.toISOString()
+
+    const [{ data: closedTabs }, { data: orders }, { data: voidsData }, { data: discountsData }] = await Promise.all([
+      supabase.from('tabs').select('total,cash_amount,card_amount,transfer_amount,debt_amount,closed_at').eq('status', 'closed').gte('closed_at', fromIso),
+      supabase.from('orders').select('items,created_at').gte('created_at', fromIso).neq('status', 'dismissed'),
+      supabase.from('voids').select('amount').gte('created_at', fromIso),
+      supabase.from('discounts').select('discount_amount').gte('created_at', fromIso),
+    ])
+
+    const tabs = closedTabs || []
+    const totalRevenue = tabs.reduce((s: number, t: any) => s + Number(t.cash_amount || 0) + Number(t.card_amount || 0) + Number(t.transfer_amount || 0), 0)
+    const paymentMix = tabs.reduce((acc: any, t: any) => {
+      acc.cash += Number(t.cash_amount || 0); acc.card += Number(t.card_amount || 0)
+      acc.transfer += Number(t.transfer_amount || 0); acc.debt += Number(t.debt_amount || 0)
+      return acc
+    }, { cash: 0, card: 0, transfer: 0, debt: 0 })
+
+    // Daily revenue trend, oldest to newest, zero-filled for days with no sales
+    const dayBuckets: Record<string, number> = {}
+    for (let i = 0; i < days; i++) {
+      const d = new Date(from); d.setDate(d.getDate() + i)
+      dayBuckets[d.toISOString().slice(0, 10)] = 0
+    }
+    const dayOfWeekBuckets = [0, 0, 0, 0, 0, 0, 0] // Mon..Sun
+    const hourlyBuckets = new Array(24).fill(0)
+    tabs.forEach((t: any) => {
+      const d = new Date(t.closed_at)
+      const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0, 10)
+      const rev = Number(t.cash_amount || 0) + Number(t.card_amount || 0) + Number(t.transfer_amount || 0)
+      if (key in dayBuckets) dayBuckets[key] += rev
+      const dow = (d.getDay() + 6) % 7 // Mon=0..Sun=6
+      dayOfWeekBuckets[dow] += rev
+      hourlyBuckets[d.getHours()] += rev
+    })
+    const dailyRevenue = Object.entries(dayBuckets).map(([date, revenue]) => ({ date, revenue }))
+
+    // Item-level aggregation, same convention as Ürün Raporu (ordered, not dismissed)
+    const itemMap: Record<string, { name: string, qty: number, revenue: number }> = {}
+    ;(orders || []).forEach((o: any) => {
+      (o.items || []).forEach((it: any) => {
+        if (!itemMap[it.name]) itemMap[it.name] = { name: it.name, qty: 0, revenue: 0 }
+        itemMap[it.name].qty += Number(it.quantity)
+        itemMap[it.name].revenue += Number(it.subtotal)
+      })
+    })
+    const allItems = Object.values(itemMap)
+    const topItemsByRevenue = [...allItems].sort((a, b) => b.revenue - a.revenue).slice(0, 8)
+    const topItemsByQty = [...allItems].sort((a, b) => b.qty - a.qty).slice(0, 8)
+
+    const voidTotal = (voidsData || []).reduce((s: number, v: any) => s + Number(v.amount || 0), 0)
+    const discountTotal = (discountsData || []).reduce((s: number, d: any) => s + Number(d.discount_amount || 0), 0)
+    const grossBeforeLoss = totalRevenue + voidTotal + discountTotal
+    const lossRate = grossBeforeLoss > 0 ? ((voidTotal + discountTotal) / grossBeforeLoss) * 100 : 0
+
+    setAnalyticsData({
+      totalRevenue, tabCount: tabs.length, avgTicket: tabs.length > 0 ? totalRevenue / tabs.length : 0,
+      dailyRevenue, topItemsByRevenue, topItemsByQty, paymentMix,
+      hourly: hourlyBuckets, dayOfWeek: dayOfWeekBuckets,
+      voidTotal, discountTotal, lossRate,
+    })
+    setAnalyticsLoading(false)
+  }
+
 
   async function openItemReport(range: 'today'|'month'|'year'|'custom' = itemReportRange) {
     setItemReportRange(range)
@@ -4368,8 +4455,8 @@ export default function AdminPage() {
         {isManager && tab === 'reports' && (
           <div className="kahfe-section" style={{ padding: '16px 20px 0' }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-              {([['overview', '📊 Genel Bakış'], ['receipts', '🧾 Fiş Geçmişi'], ['accountability', '💸 İndirim & İptal']] as const).map(([key, label]) => (
-                <button key={key} onClick={() => { setReportsSubTab(key); if (key === 'receipts') searchReceipts(); if (key === 'accountability') searchAccountability() }}
+              {([['overview', '📊 Genel Bakış'], ['analytics', '📈 Analitik'], ['receipts', '🧾 Fiş Geçmişi'], ['accountability', '💸 İndirim & İptal']] as const).map(([key, label]) => (
+                <button key={key} onClick={() => { setReportsSubTab(key); if (key === 'receipts') searchReceipts(); if (key === 'accountability') searchAccountability(); if (key === 'analytics' && !analyticsData) loadAnalytics() }}
                   style={{ height: 36, padding: '0 14px', background: reportsSubTab === key ? 'rgba(201,168,76,.14)' : 'transparent', border: reportsSubTab === key ? '1px solid #C9A84C' : '1px solid var(--a-border2)', color: reportsSubTab === key ? '#C9A84C' : 'var(--a-text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                   {label}
                 </button>
@@ -4388,6 +4475,7 @@ export default function AdminPage() {
                 { icon: '📦', label: 'Ürün Raporu', onClick: () => openItemReport('today') },
                 { icon: '👤', label: 'Personel Performansı', onClick: () => openStaffReport(dateFilter === 'custom' ? 'today' : dateFilter) },
                 { icon: '🌙', label: 'Gün Sonu', onClick: openDayClose },
+                { icon: '📈', label: 'Analitik', onClick: () => { setReportsSubTab('analytics'); if (!analyticsData) loadAnalytics() } },
                 { icon: '🧾', label: 'Fiş Geçmişi', onClick: () => { setReportsSubTab('receipts'); searchReceipts() } },
                 { icon: '💸', label: 'İndirim & İptal', onClick: () => { setReportsSubTab('accountability'); searchAccountability() } },
               ].map((r, i) => (
@@ -4399,6 +4487,148 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {isManager && tab === 'reports' && reportsSubTab === 'analytics' && (
+          <div className="kahfe-section" style={s.section}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+              {([7, 30, 90] as const).map(d => (
+                <button key={d} onClick={() => loadAnalytics(d)} style={{ height: 36, padding: '0 16px', background: analyticsRange === d ? 'rgba(201,168,76,.14)' : 'transparent', border: analyticsRange === d ? '1px solid #C9A84C' : '1px solid var(--a-border2)', color: analyticsRange === d ? '#C9A84C' : 'var(--a-text2)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{d} Gün</button>
+              ))}
+            </div>
+
+            {analyticsLoading && <div style={{ color: 'var(--a-text2)', fontSize: 13 }}>Yükleniyor...</div>}
+
+            {!analyticsLoading && analyticsData && (() => {
+              const a = analyticsData
+              const maxDaily = Math.max(1, ...a.dailyRevenue.map(d => d.revenue))
+              const maxItemRev = Math.max(1, ...a.topItemsByRevenue.map(i => i.revenue))
+              const maxItemQty = Math.max(1, ...a.topItemsByQty.map(i => i.qty))
+              const maxHourly = Math.max(1, ...a.hourly)
+              const maxDow = Math.max(1, ...a.dayOfWeek)
+              const dowLabels = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+              const paymentTotal = Math.max(1, a.paymentMix.cash + a.paymentMix.card + a.paymentMix.transfer + a.paymentMix.debt)
+
+              return (
+                <>
+                  {/* KPI cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 20 }}>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: '14px 16px' }}>
+                      <div style={{ color: 'var(--a-text2)', fontSize: 11, marginBottom: 4 }}>TOPLAM CİRO</div>
+                      <div style={{ color: '#C9A84C', fontSize: 20, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(a.totalRevenue)}</div>
+                    </div>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: '14px 16px' }}>
+                      <div style={{ color: 'var(--a-text2)', fontSize: 11, marginBottom: 4 }}>ORTALAMA FİŞ</div>
+                      <div style={{ color: 'var(--a-text)', fontSize: 20, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(a.avgTicket)}</div>
+                    </div>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: '14px 16px' }}>
+                      <div style={{ color: 'var(--a-text2)', fontSize: 11, marginBottom: 4 }}>KAPANAN FİŞ</div>
+                      <div style={{ color: 'var(--a-text)', fontSize: 20, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>{a.tabCount}</div>
+                    </div>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: '14px 16px' }}>
+                      <div style={{ color: 'var(--a-text2)', fontSize: 11, marginBottom: 4 }}>KAYIP ORANI</div>
+                      <div style={{ color: a.lossRate > 5 ? '#e74c3c' : '#5FD08C', fontSize: 20, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>%{a.lossRate.toFixed(1)}</div>
+                      <div style={{ color: 'var(--a-text3)', fontSize: 10, marginTop: 2 }}>İptal ₺{formatTL(a.voidTotal)} · İndirim ₺{formatTL(a.discountTotal)}</div>
+                    </div>
+                  </div>
+
+                  {/* Daily revenue trend */}
+                  <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: '16px 16px 8px', marginBottom: 16 }}>
+                    <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Günlük Ciro Trendi</div>
+                    <svg viewBox={`0 0 ${a.dailyRevenue.length * 10} 100`} preserveAspectRatio="none" style={{ width: '100%', height: 100, display: 'block' }}>
+                      <polyline
+                        points={a.dailyRevenue.map((d, i) => `${i * 10 + 5},${100 - (d.revenue / maxDaily) * 92 - 4}`).join(' ')}
+                        fill="none" stroke="#C9A84C" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                      {a.dailyRevenue.map((d, i) => (
+                        <circle key={i} cx={i * 10 + 5} cy={100 - (d.revenue / maxDaily) * 92 - 4} r="1.6" fill="#C9A84C" />
+                      ))}
+                    </svg>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--a-text3)', fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", marginTop: 4, marginBottom: 8 }}>
+                      <span>{a.dailyRevenue[0]?.date.slice(5)}</span>
+                      <span>{a.dailyRevenue[a.dailyRevenue.length - 1]?.date.slice(5)}</span>
+                    </div>
+                  </div>
+
+                  {/* Day-of-week + hour-of-day */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 16 }}>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: 16 }}>
+                      <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Haftanın Günü</div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 90 }}>
+                        {a.dayOfWeek.map((v, i) => (
+                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <div style={{ width: '100%', height: Math.max(2, (v / maxDow) * 70), background: '#C9A84C', borderRadius: 2 }} />
+                            <div style={{ color: 'var(--a-text3)', fontSize: 10 }}>{dowLabels[i]}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: 16 }}>
+                      <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Saatlik Yoğunluk</div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90, overflowX: 'auto' }}>
+                        {a.hourly.map((v, h) => (
+                          <div key={h} title={`${h}:00 — ₺${formatTL(v)}`} style={{ flex: '1 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <div style={{ width: '100%', minWidth: 6, height: Math.max(2, (v / maxHourly) * 70), background: v > 0 ? '#5FD08C' : 'var(--a-border2)', borderRadius: 2 }} />
+                            {h % 3 === 0 && <div style={{ color: 'var(--a-text3)', fontSize: 8 }}>{h}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top items */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 16 }}>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: 16 }}>
+                      <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>En Çok Ciro Getiren Ürünler</div>
+                      {a.topItemsByRevenue.length === 0 && <div style={{ color: 'var(--a-text2)', fontSize: 13 }}>Bu dönemde satış yok.</div>}
+                      {a.topItemsByRevenue.map((it, i) => (
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--a-text)', marginBottom: 3 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{it.name}</span>
+                            <span style={{ color: '#C9A84C', flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(it.revenue)}</span>
+                          </div>
+                          <div style={{ background: 'var(--a-border)', borderRadius: 3, height: 6 }}>
+                            <div style={{ width: `${(it.revenue / maxItemRev) * 100}%`, background: '#C9A84C', height: 6, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: 16 }}>
+                      <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>En Çok Satılan Ürünler (Adet)</div>
+                      {a.topItemsByQty.length === 0 && <div style={{ color: 'var(--a-text2)', fontSize: 13 }}>Bu dönemde satış yok.</div>}
+                      {a.topItemsByQty.map((it, i) => (
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--a-text)', marginBottom: 3 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{it.name}</span>
+                            <span style={{ color: '#5FD08C', flexShrink: 0, fontFamily: "'IBM Plex Mono', monospace" }}>{it.qty} adet</span>
+                          </div>
+                          <div style={{ background: 'var(--a-border)', borderRadius: 3, height: 6 }}>
+                            <div style={{ width: `${(it.qty / maxItemQty) * 100}%`, background: '#5FD08C', height: 6, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payment mix */}
+                  <div style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 10, padding: 16 }}>
+                    <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Ödeme Yöntemi Dağılımı</div>
+                    {([['cash', '💵 Nakit', '#5FD08C'], ['card', '💳 Kart', '#3498db'], ['transfer', '🏦 Havale', '#C9A84C'], ['debt', '🧾 Borç', '#e67e22']] as const).map(([key, label, color]) => (
+                      <div key={key} style={{ marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--a-text)', marginBottom: 3 }}>
+                          <span>{label}</span>
+                          <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(a.paymentMix[key])} · %{((a.paymentMix[key] / paymentTotal) * 100).toFixed(0)}</span>
+                        </div>
+                        <div style={{ background: 'var(--a-border)', borderRadius: 3, height: 6 }}>
+                          <div style={{ width: `${(a.paymentMix[key] / paymentTotal) * 100}%`, background: color, height: 6, borderRadius: 3 }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        )}
+
 
         {isManager && tab === 'reports' && reportsSubTab === 'receipts' && (
           <div className="kahfe-section" style={s.section}>
