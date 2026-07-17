@@ -24,6 +24,7 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars.')
+  console.log(`::error::Backup failed before starting: env presence — SUPABASE_URL=${!!SUPABASE_URL} SUPABASE_SERVICE_ROLE_KEY=${!!SERVICE_ROLE_KEY}. Check the repo Actions secrets values.`)
   process.exit(1)
 }
 
@@ -108,8 +109,7 @@ async function main() {
 
 main().catch(err => {
   console.error(err)
-  // GitHub Actions workflow command: surfaces the real error as an annotation
-  // in the run summary and failure email, instead of just a buried log line.
-  console.log(`::error::Backup failed: ${String(err && err.message ? err.message : err)}`)
+  const msg = String(err && err.message ? err.message : err).replace(/[\r\n]+/g, ' | ').slice(0, 500)
+  console.log(`::error::Backup failed: ${msg}`)
   process.exit(1)
 })
