@@ -65,6 +65,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Backup $(date -u +%Y-%m-%d)"
+            git commit -m "Backup $(date -u +%Y-%m-%d) [skip vercel]"
             git push origin backups
           fi
