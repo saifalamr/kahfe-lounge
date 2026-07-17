@@ -201,9 +201,12 @@ alter table public.staff add column if not exists permission text not null defau
 alter table public.staff enable row level security;
 -- (no direct select/insert/update/delete policies - all access via RPCs below)
 
-create or replace function verify_staff_pin(p_pin text) returns table(id uuid, name text)
-language sql security definer set search_path = public as $$ select id, name from staff where pin = p_pin and active = true limit 1; $$;
-grant execute on function verify_staff_pin(text) to anon, authenticated;
+-- verify_staff_pin REMOVED (2026-07-17 security audit): superseded by
+-- login_with_pin, no longer called anywhere in the app, but was still
+-- anon-callable with no rate limiting — a working PIN brute-force oracle
+-- that also leaked staff names. The drop is kept here so re-running this
+-- file removes it from any database that still has it.
+drop function if exists verify_staff_pin(text);
 
 -- Small helper reused by every staff-management function below so a valid
 -- manager session is required before any of them will do anything.
@@ -380,11 +383,19 @@ begin
 end; $$;
 grant execute on function decrement_stock_for_order(jsonb) to anon, authenticated;
 
+-- Session-gated (2026-07-17 security audit): only ever called from the admin
+-- app, which always carries x-session-token — but it was anon-callable,
+-- letting anyone with the public anon key inflate stock counts directly.
+-- decrement_stock_for_order above intentionally stays open: the customer QR
+-- menu (no session) needs it when placing an order.
 create or replace function restore_stock_for_items(p_items jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare
   item jsonb;
 begin
+  if not has_valid_session() then
+    raise exception 'not authorized';
+  end if;
   for item in select * from jsonb_array_elements(p_items) loop
     update menu_items
     set stock_quantity = stock_quantity + (item->>'quantity')::int,
@@ -448,11 +459,13 @@ insert into public.access_pins (role, pin) values
   ('owner', '7777')
 on conflict (role) do nothing;
 
-create or replace function verify_access_pin(p_pin text) returns text
-language sql security definer set search_path = public as $$
-  select role from access_pins where pin = p_pin limit 1;
-$$;
-grant execute on function verify_access_pin(text) to anon, authenticated;
+-- verify_access_pin REMOVED (2026-07-17 security audit): superseded by
+-- login_with_pin, no longer called anywhere in the app, but was still
+-- anon-callable with no rate limiting — it let anyone with the public anon
+-- key enumerate all 10,000 4-digit PINs in seconds, bypassing
+-- login_with_pin's IP rate limiting entirely. Drop kept so re-running this
+-- file removes it from any database that still has it.
+drop function if exists verify_access_pin(text);
 
 create or replace function pin_is_reserved(p_pin text) returns boolean
 language sql security definer set search_path = public as $$
@@ -767,6 +780,7 @@ create policy "price_edits public read" on public.price_edits for select using (
 drop policy if exists "price_edits public insert" on public.price_edits;
 create policy "price_edits public insert" on public.price_edits for insert with check (true);
 grant select, insert on public.price_edits to anon, authenticated;
+create index if not exists idx_price_edits_order_id on public.price_edits(order_id);
 
 -- =============================================================================
 -- SECURITY HARDENING (2026-07-16) — supersedes the `using (true)` /
