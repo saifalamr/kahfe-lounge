@@ -5,7 +5,7 @@ import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
 // Manager/Touchscreen/shared-staff-code PINs are verified server-side via
-// the verify_access_pin RPC (see access_pins table, shared with /admin) -
+// the login_with_pin RPC (see access_pins table, shared with /admin) -
 // nothing sensitive is hardcoded in this file.
 
 export default function KitchenPage() {

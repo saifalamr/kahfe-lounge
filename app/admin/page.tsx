@@ -20,7 +20,7 @@ import { setReceiptBranding, ReceiptBranding } from './lib/escpos'
 import { formatTL } from './lib/format'
 
 // Manager/Touchscreen/shared-staff-code PINs are verified server-side via
-// the verify_access_pin RPC (see access_pins table) - nothing sensitive is
+// the login_with_pin RPC (see access_pins table) - nothing sensitive is
 // hardcoded in this file anymore, since anything here ships straight to
 // the browser and is readable by anyone who opens dev tools.
 
