@@ -19,6 +19,12 @@ import { createClient } from '@supabase/supabase-js'
 import { writeFileSync, mkdirSync, readdirSync, unlinkSync, copyFileSync, existsSync } from 'fs'
 import path from 'path'
 
+// Any crash anywhere (including synchronous ones at module top level, like
+// createClient throwing on a malformed URL) surfaces as a GitHub annotation.
+const annotate = (m) => console.log(`::error::${String(m).replace(/[\r\n]+/g, ' | ').slice(0, 500)}`)
+process.on('uncaughtException', (e) => { annotate(`Backup crashed: ${e && e.message ? e.message : e}`); process.exit(1) })
+process.on('unhandledRejection', (e) => { annotate(`Backup crashed (rejection): ${e && e.message ? e.message : e}`); process.exit(1) })
+
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
