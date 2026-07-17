@@ -106,4 +106,10 @@ async function main() {
   console.log('Backup complete.')
 }
 
-main().catch(err => { console.error(err); process.exit(1) })
+main().catch(err => {
+  console.error(err)
+  // GitHub Actions workflow command: surfaces the real error as an annotation
+  // in the run summary and failure email, instead of just a buried log line.
+  console.log(`::error::Backup failed: ${String(err && err.message ? err.message : err)}`)
+  process.exit(1)
+})
