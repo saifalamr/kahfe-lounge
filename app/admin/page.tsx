@@ -575,7 +575,16 @@ export default function AdminPage() {
   }
 
   async function updateOrderStatus(id: string, status: string) {
-    await supabase.from('orders').update({ status, handled_by: staffName }).eq('id', id)
+    const { error } = await supabase.from('orders').update({ status, handled_by: staffName }).eq('id', id)
+    if (error) {
+      // Most likely cause: session expired/invalidated (logged out elsewhere,
+      // device revoked in Terminaller, etc.) so RLS silently rejected the
+      // write. Without this check the button looked like it worked - the
+      // notification vanished locally - while the order stayed pending on
+      // the server with zero feedback that anything went wrong.
+      alert('İşlem başarısız oldu. Oturumunuz sona ermiş olabilir, lütfen tekrar giriş yapın.')
+      return
+    }
     setNotifications(prev => prev.filter(n => n.id !== id))
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
