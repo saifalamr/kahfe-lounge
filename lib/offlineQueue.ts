@@ -80,7 +80,13 @@ export async function flushQueuedOrders(onOrderSynced?: (order: QueuedOrder, tab
       // exists, it succeeded on a previous attempt — treat as done, not
       // an error, rather than queueing it forever.
       if (insertError && (insertError as any).code !== '23505') { remaining.push(order); continue }
-      await supabase.rpc('decrement_stock_for_order', { p_items: order.items })
+      // Order is now safely inserted. A stock-decrement failure here must
+      // NOT re-queue the order (that would double-insert on the next flush,
+      // since the order row already exists) - just log it so stock can be
+      // reconciled. This is the one deliberately-unchecked write in the
+      // replay path, for idempotency.
+      const { error: stockError } = await supabase.rpc('decrement_stock_for_order', { p_items: order.items })
+      if (stockError) console.error('[offline flush] stock decrement failed for', order.client_order_id, stockError)
       if (onOrderSynced) { try { await onOrderSynced(order, tabId) } catch {} }
     } catch {
       remaining.push(order)
