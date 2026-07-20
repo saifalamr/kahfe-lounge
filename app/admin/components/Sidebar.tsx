@@ -5,13 +5,14 @@ export default function Sidebar({
   isManager, tab, setTab, reportsSubTab, setReportsSubTab,
   notifCount, todayRevenue, theme, setTheme, clearSession,
   activeShift, isLimitedStaff, openCashMovement, openShiftClose, startShift,
-  loadOrders, dateFilter, loadDebtTransactions, searchReceipts, searchAccountability,
+  loadOrders, dateFilter, loadDebtTransactions, loadSuppliers, searchReceipts, searchAccountability,
   showNotif, setShowNotif, newOrderAlert, setNewOrderAlert, queuedCount,
 }: any) {
   function go(t: string) {
     setTab(t)
     if (t === 'orders') loadOrders(dateFilter)
     if (t === 'debts') loadDebtTransactions()
+    if (t === 'suppliers') loadSuppliers()
     if (t === 'reports' && reportsSubTab === 'receipts') searchReceipts()
     if (t === 'reports' && reportsSubTab === 'accountability') searchAccountability()
   }
@@ -21,7 +22,7 @@ export default function Sidebar({
   const groups = isManager
     ? [
         { label: 'OPERASYON', items: [['orders', '🍽️', 'Siparişler']] },
-        { label: 'YÖNETİM', items: [['categories', '📋', 'Kategoriler'], ['items', '🍹', 'Ürünler'], ['staff', '👥', 'Personel'], ['settings', '⚙️', 'Ayarlar']] },
+        { label: 'YÖNETİM', items: [['categories', '📋', 'Kategoriler'], ['items', '🍹', 'Ürünler'], ['staff', '👥', 'Personel'], ['suppliers', '🚚', 'Tedarikçiler'], ['settings', '⚙️', 'Ayarlar']] },
         { label: 'FİNANS', items: [['debts', '💳', 'Borç'], ['reports', '📊', 'Raporlar']] },
       ]
     : [{ label: '', items: [['orders', '🍽️', 'Siparişler']] }]

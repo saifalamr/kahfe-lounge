@@ -288,7 +288,7 @@ export default function AdminPage() {
   // without this, that failure looked identical to "wrong password" and
   // was genuinely undiagnosable from the login screen alone.
   const [loginSystemError, setLoginSystemError] = useState('')
-  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'settings' | 'debts' | 'receipts' | 'accountability' | 'reports'>('orders')
+  const [tab, setTab] = useState<'categories' | 'items' | 'orders' | 'staff' | 'suppliers' | 'settings' | 'debts' | 'receipts' | 'accountability' | 'reports'>('orders')
   // Fiş Geçmişi and İndirim/İptal used to be their own top-level tabs;
   // they're still the exact same views/state under the hood, just reached
   // through the Raporlar hub now instead of two extra tab-bar buttons.
@@ -2345,6 +2345,16 @@ export default function AdminPage() {
   const [staffFormPin, setStaffFormPin] = useState('')
   const [staffFormPermission, setStaffFormPermission] = useState<'full'|'limited'>('full')
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
+
+  // Suppliers (Tedarikçiler) — vendor directory. Minimal for now (name +
+  // contact); a future purchases feature will reference these by id.
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [supplierName, setSupplierName] = useState('')
+  const [supplierPhone, setSupplierPhone] = useState('')
+  const [supplierContact, setSupplierContact] = useState('')
+  const [supplierAddress, setSupplierAddress] = useState('')
+  const [supplierNotes, setSupplierNotes] = useState('')
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [filterCat, setFilterCat] = useState('')
@@ -2674,6 +2684,50 @@ export default function AdminPage() {
     await loadData()
   }
 
+  async function loadSuppliers() {
+    const { data } = await supabase.from('suppliers').select('*').order('name')
+    setSuppliers(data || [])
+  }
+
+  function startEditSupplier(sup: any) {
+    setEditingSupplierId(sup.id)
+    setSupplierName(sup.name || '')
+    setSupplierPhone(sup.phone || '')
+    setSupplierContact(sup.contact_person || '')
+    setSupplierAddress(sup.address || '')
+    setSupplierNotes(sup.notes || '')
+  }
+
+  function resetSupplierForm() {
+    setEditingSupplierId(null)
+    setSupplierName(''); setSupplierPhone(''); setSupplierContact(''); setSupplierAddress(''); setSupplierNotes('')
+  }
+
+  async function saveSupplier() {
+    const name = supplierName.trim()
+    if (!name) { alert('Lütfen tedarikçi adını girin.'); return }
+    const payload = {
+      name,
+      phone: supplierPhone.trim() || null,
+      contact_person: supplierContact.trim() || null,
+      address: supplierAddress.trim() || null,
+      notes: supplierNotes.trim() || null,
+    }
+    const res = editingSupplierId
+      ? await supabase.from('suppliers').update(payload).eq('id', editingSupplierId)
+      : await supabase.from('suppliers').insert(payload)
+    if (writeFailed(res, editingSupplierId ? 'Tedarikçi güncelleme' : 'Tedarikçi ekleme')) return
+    resetSupplierForm()
+    await loadSuppliers()
+  }
+
+  async function deleteSupplier(id: string) {
+    if (!confirm('Bu tedarikçiyi silmek istediğinizden emin misiniz?')) return
+    const res = await supabase.from('suppliers').delete().eq('id', id)
+    if (writeFailed(res, 'Tedarikçi silme')) return
+    await loadSuppliers()
+  }
+
   async function login() {
     // One atomic server-side call: checks the PIN (staff PIN or manager/
     // touchscreen/staff-shared PIN) and, only on success, mints a session
@@ -2943,7 +2997,7 @@ export default function AdminPage() {
         isManager={isManager} tab={tab} setTab={setTab} reportsSubTab={reportsSubTab} setReportsSubTab={setReportsSubTab}
         notifCount={notifications.length} todayRevenue={todayRevenue} theme={theme} setTheme={setTheme} clearSession={clearSession}
         activeShift={activeShift} isLimitedStaff={isLimitedStaff} openCashMovement={openCashMovement} openShiftClose={openShiftClose} startShift={startShift}
-        loadOrders={loadOrders} dateFilter={dateFilter} loadDebtTransactions={loadDebtTransactions} searchReceipts={searchReceipts} searchAccountability={searchAccountability}
+        loadOrders={loadOrders} dateFilter={dateFilter} loadDebtTransactions={loadDebtTransactions} loadSuppliers={loadSuppliers} searchReceipts={searchReceipts} searchAccountability={searchAccountability}
         showNotif={showNotif} setShowNotif={setShowNotif} newOrderAlert={newOrderAlert} setNewOrderAlert={setNewOrderAlert} queuedCount={queuedCount}
       />
       <div className="kahfe-shell" style={{ background: 'var(--a-bg0)', minHeight: '100vh', paddingBottom: 40 }}>
@@ -4339,6 +4393,48 @@ export default function AdminPage() {
                   <button onClick={() => startEditStaff(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
                   <button onClick={() => toggleStaffActive(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: s.active ? '#f39c12' : '#27ae60', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>{s.active ? 'Pasifleştir' : 'Aktifleştir'}</button>
                   <button onClick={() => deleteStaff(s.id)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isManager && tab === 'suppliers' && (
+          <div className="kahfe-section" style={s.section}>
+            <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
+              <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 4 }}>{editingSupplierId ? 'Tedarikçiyi Düzenle' : 'Yeni Tedarikçi Ekle'}</div>
+              <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Kahvenin mal aldığı firmalar (içecek, nargile, yiyecek vb.).</div>
+              <input value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="Firma adı (örn. Al Fakher Türkiye)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
+              <input value={supplierPhone} onChange={e => setSupplierPhone(e.target.value)} placeholder="Telefon (örn. 0532 000 00 00)" inputMode="tel" style={{ ...s.input, height: 52, marginBottom: 10 }} />
+              <input value={supplierContact} onChange={e => setSupplierContact(e.target.value)} placeholder="Yetkili kişi (örn. Mehmet Bey)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
+              <input value={supplierAddress} onChange={e => setSupplierAddress(e.target.value)} placeholder="Adres (opsiyonel)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
+              <textarea value={supplierNotes} onChange={e => setSupplierNotes(e.target.value)} placeholder="Notlar (opsiyonel — örn. ödeme koşulları, teslimat günleri)" style={{ ...s.input, minHeight: 70, resize: 'vertical', marginBottom: 12 } as React.CSSProperties} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={saveSupplier} style={{ flex: 1, height: 52, background: '#C9A84C', border: 'none', borderRadius: 8, color: 'var(--a-bg0)', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>{editingSupplierId ? '✓ Kaydet' : '+ Ekle'}</button>
+                {editingSupplierId && (
+                  <button onClick={resetSupplierForm} style={{ height: 52, background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, padding: '0 20px', color: 'var(--a-text2)', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}>İptal</button>
+                )}
+              </div>
+            </div>
+
+            {suppliers.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--a-text2)', padding: 20 }}>Henüz tedarikçi eklenmedi. Yukarıdan ilk tedarikçini ekleyebilirsin.</div>
+            )}
+
+            {suppliers.map(sup => (
+              <div key={sup.id} style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 8, padding: '16px 18px', marginBottom: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{sup.name}</div>
+                  <div style={{ color: 'var(--a-text2)', fontSize: 13, marginTop: 3, display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>
+                    {sup.contact_person && <span>👤 {sup.contact_person}</span>}
+                    {sup.phone && <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>📞 {sup.phone}</span>}
+                  </div>
+                  {sup.address && <div style={{ color: 'var(--a-text2)', fontSize: 12.5, marginTop: 3 }}>📍 {sup.address}</div>}
+                  {sup.notes && <div style={{ color: 'var(--a-text3)', fontSize: 12.5, marginTop: 3, fontStyle: 'italic' }}>{sup.notes}</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => startEditSupplier(sup)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
+                  <button onClick={() => deleteSupplier(sup.id)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C0392B', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Sil</button>
                 </div>
               </div>
             ))}

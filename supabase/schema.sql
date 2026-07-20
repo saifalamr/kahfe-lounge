@@ -353,6 +353,25 @@ create policy "debt_tx public read" on public.debt_transactions for select using
 drop policy if exists "debt_tx public insert" on public.debt_transactions;
 create policy "debt_tx public insert" on public.debt_transactions for insert with check (true);
 
+-- Suppliers (Tedarikçiler) — vendor directory the café buys stock from.
+-- Minimal by design for now (name + contact); a later purchases/stock-in
+-- feature will reference supplier_id from here. RLS is session-gated
+-- (has_valid_session()) to match the hardened live pattern, not the older
+-- permissive using(true) some tables above still show.
+create table if not exists public.suppliers (
+  id uuid primary key default gen_random_uuid(), name text not null, phone text,
+  contact_person text, address text, notes text, created_at timestamptz not null default now()
+);
+alter table public.suppliers enable row level security;
+drop policy if exists "suppliers session read" on public.suppliers;
+create policy "suppliers session read" on public.suppliers for select using (has_valid_session());
+drop policy if exists "suppliers session insert" on public.suppliers;
+create policy "suppliers session insert" on public.suppliers for insert with check (has_valid_session());
+drop policy if exists "suppliers session update" on public.suppliers;
+create policy "suppliers session update" on public.suppliers for update using (has_valid_session());
+drop policy if exists "suppliers session delete" on public.suppliers;
+create policy "suppliers session delete" on public.suppliers for delete using (has_valid_session());
+
 -- ---------------------------------------------------------------------------
 -- menu_items.staff_only — items marked this way are hidden from the customer
 -- QR menu but still selectable by staff in Sipariş Ekle (e.g. VİP Oda
