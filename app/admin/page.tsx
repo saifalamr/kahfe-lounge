@@ -4,7 +4,6 @@ import { supabase, Category, MenuItem } from '@/lib/supabase'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
 import Sidebar from './components/Sidebar'
-import MotionButton from './components/MotionButton'
 import { queueOrder, flushQueuedOrders, queuedOrderCount } from '@/lib/offlineQueue'
 import VoidModal from './components/VoidModal'
 import CancelOrderModal from './components/CancelOrderModal'
@@ -3533,7 +3532,7 @@ export default function AdminPage() {
                           {!isLimitedStaff && <button onClick={() => setShowTransferPicker(activeTableModal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'var(--a-text3)', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>🔀 Taşı</button>}
                           {!isLimitedStaff && activeOrders.length > 0 && <button onClick={() => openBillTotalEdit(activeTableModal, info.tabData.id, tabTotal)} style={{ flex:1, height:52, background:'transparent', border:'1px solid rgba(95,208,140,.4)', borderRadius: 8, color:'#5FD08C', fontSize:14, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💲 Toplam Düzenle</button>}
                           {activeOrders.length > 0 && (
-                            <MotionButton onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 8, color:'var(--a-bg0)', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</MotionButton>
+                            <button onClick={() => openPayment(info.tabData, tabTotal, activeOrders)} style={{ flex:1, height:56, background:'#C9A84C', border:'none', borderRadius: 8, color:'var(--a-bg0)', fontSize:15, cursor:'pointer', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>💳 Ödeme Al</button>
                           )}
                         </div>
                       )}
@@ -3850,10 +3849,10 @@ export default function AdminPage() {
                         style={{ width:'100%', height:48, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'#C9A84C', fontSize:14, cursor:'pointer', fontWeight:600, marginBottom:10 }}>🧾 Fişi Yazdır (Kapatmadan)</button>
                     )}
 
-                    <MotionButton onClick={settleMode==='select' ? confirmPartialPayment : confirmPayment} disabled={!isOnline || (settleMode==='select' && selectedFlat.length===0)}
+                    <button onClick={settleMode==='select' ? confirmPartialPayment : confirmPayment} disabled={!isOnline || (settleMode==='select' && selectedFlat.length===0)}
                       style={{ width:'100%', height:56, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 8, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:16, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>
                       {!isOnline ? '🔴 Bağlantı Yok' : settleMode==='select' ? '✓ Seçili Ürünleri Öde ve Yazdır' : '✓ Ödemeyi Onayla ve Masayı Kapat'}
-                    </MotionButton>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -4133,8 +4132,8 @@ export default function AdminPage() {
                         <button onClick={() => openCancelOrder(order)} title="Siparişi iptal et"
                           style={{ width:56, background:'transparent', border:'1px solid var(--a-border2)', borderRadius: 8, color:'#e74c3c', fontSize:18, cursor:'pointer' }}>🚫</button>
                       )}
-                      <MotionButton onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
-                        style={{ flex:1, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 8, padding:0, height:48, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</MotionButton>
+                      <button onClick={() => updateOrderStatus(order.id, 'served')} disabled={!isOnline}
+                        style={{ flex:1, background: isOnline ? '#27ae60' : 'var(--a-border)', border:'none', borderRadius: 8, padding:0, height:48, color: isOnline ? '#fff' : 'var(--a-disabled)', fontSize:15, cursor: isOnline ? 'pointer' : 'not-allowed', fontWeight:600, fontFamily:"'IBM Plex Sans', sans-serif" }}>{isOnline ? '✓ Tamamlandı' : '🔴 Bağlantı Yok'}</button>
                     </div>
                   )}
                 </div>

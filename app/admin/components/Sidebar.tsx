@@ -1,6 +1,5 @@
 'use client'
 import { formatTL } from '../lib/format'
-import MotionButton from './MotionButton'
 
 export default function Sidebar({
   isManager, tab, setTab, reportsSubTab, setReportsSubTab,
@@ -67,11 +66,11 @@ export default function Sidebar({
           <div key={gi} style={{ marginBottom: 14 }}>
             {g.label && <div style={{ color: 'var(--a-text3)', fontSize: 10, letterSpacing: '0.1em', fontFamily: "'IBM Plex Mono', monospace", padding: '0 10px', marginBottom: 6 }}>{g.label}</div>}
             {g.items.map(([t, icon, label]: any) => (
-              <MotionButton key={t} onClick={() => go(t)}
+              <button key={t} onClick={() => go(t)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '10px', background: isActive(t) ? 'rgba(201,168,76,.14)' : 'transparent', border: isActive(t) ? '1px solid rgba(201,168,76,.4)' : '1px solid transparent', borderRadius: 8, color: isActive(t) ? '#C9A84C' : 'var(--a-text2)', fontWeight: isActive(t) ? 700 : 500, fontSize: 13, cursor: 'pointer', marginBottom: 3, position: 'relative' }}>
                 <span style={{ fontSize: 16 }}>{icon}</span>
                 <span style={{ flex: 1 }}>{label}</span>
-              </MotionButton>
+              </button>
             ))}
           </div>
         ))}
