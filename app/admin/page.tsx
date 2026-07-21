@@ -398,7 +398,8 @@ export default function AdminPage() {
   const [receiptBrandingSaved, setReceiptBrandingSaved] = useState(false)
 
   async function saveReceiptBranding() {
-    await supabase.from('settings').upsert({ key: 'receipt_branding', value: receiptBrandingForm, updated_at: new Date().toISOString() })
+    const r = await supabase.from('settings').upsert({ key: 'receipt_branding', value: receiptBrandingForm, updated_at: new Date().toISOString() })
+    if (writeFailed(r, 'Fiş bilgileri kaydetme')) return
     setReceiptBranding(receiptBrandingForm)
     setReceiptBrandingSaved(true)
     setTimeout(() => setReceiptBrandingSaved(false), 2000)
@@ -406,13 +407,15 @@ export default function AdminPage() {
 
   async function toggleTelegramEnabled() {
     const next = !telegramEnabled
-    await supabase.from('settings').upsert({ key: 'telegram_enabled', value: next, updated_at: new Date().toISOString() })
+    const r = await supabase.from('settings').upsert({ key: 'telegram_enabled', value: next, updated_at: new Date().toISOString() })
+    if (writeFailed(r, 'Telegram ayarı')) return
     setTelegramEnabled(next)
   }
 
   async function toggleAutoPrintEnabled() {
     const next = !autoPrintEnabled
-    await supabase.from('settings').upsert({ key: 'auto_print_enabled', value: next, updated_at: new Date().toISOString() })
+    const r = await supabase.from('settings').upsert({ key: 'auto_print_enabled', value: next, updated_at: new Date().toISOString() })
+    if (writeFailed(r, 'Otomatik yazdırma ayarı')) return
     setAutoPrintEnabled(next)
   }
 
@@ -444,7 +447,8 @@ export default function AdminPage() {
 
   async function setCategoryStation(categoryId: string, station: 'kitchen'|'nargile') {
     const next = { ...categoryStations, [categoryId]: station }
-    await supabase.from('settings').upsert({ key: 'category_stations', value: next, updated_at: new Date().toISOString() })
+    const r = await supabase.from('settings').upsert({ key: 'category_stations', value: next, updated_at: new Date().toISOString() })
+    if (writeFailed(r, 'İstasyon ayarı')) return
     setCategoryStations(next)
   }
 
@@ -462,9 +466,11 @@ export default function AdminPage() {
       .filter((o: any) => o.items.length > 0)
   }
 
-  async function saveTables(newList: string[]) {
-    await supabase.from('settings').upsert({ key: 'tables', value: newList, updated_at: new Date().toISOString() })
+  async function saveTables(newList: string[]): Promise<boolean> {
+    const r = await supabase.from('settings').upsert({ key: 'tables', value: newList, updated_at: new Date().toISOString() })
+    if (writeFailed(r, 'Masa listesi kaydetme')) return false
     setAllTables(newList)
+    return true
   }
 
   async function addTable() {
@@ -475,8 +481,7 @@ export default function AdminPage() {
     const name = newTableName.trim().toLocaleUpperCase('tr-TR')
     if (!name) return
     if (ALL_TABLES.includes(name)) { alert('Bu masa adı zaten var.'); return }
-    await saveTables([...ALL_TABLES, name])
-    setNewTableName('')
+    if (await saveTables([...ALL_TABLES, name])) setNewTableName('')
   }
 
   async function removeTable(name: string) {
@@ -486,9 +491,11 @@ export default function AdminPage() {
     await saveTables(ALL_TABLES.filter(t => t !== name))
   }
 
-  async function saveTelegramRecipients(newList: { name: string, chat_id: string }[]) {
-    await supabase.from('settings').upsert({ key: 'telegram_recipients', value: newList, updated_at: new Date().toISOString() })
+  async function saveTelegramRecipients(newList: { name: string, chat_id: string }[]): Promise<boolean> {
+    const r = await supabase.from('settings').upsert({ key: 'telegram_recipients', value: newList, updated_at: new Date().toISOString() })
+    if (writeFailed(r, 'Telegram alıcıları kaydetme')) return false
     setTelegramRecipients(newList)
+    return true
   }
 
   async function addTelegramRecipient() {
@@ -496,8 +503,9 @@ export default function AdminPage() {
     const chatId = newRecipientChatId.trim()
     if (!name || !/^\d+$/.test(chatId)) { alert('Lütfen bir isim ve sayısal bir Telegram chat ID girin.'); return }
     if (telegramRecipients.some(r => r.chat_id === chatId)) { alert('Bu chat ID zaten ekli.'); return }
-    await saveTelegramRecipients([...telegramRecipients, { name, chat_id: chatId }])
-    setNewRecipientName(''); setNewRecipientChatId('')
+    if (await saveTelegramRecipients([...telegramRecipients, { name, chat_id: chatId }])) {
+      setNewRecipientName(''); setNewRecipientChatId('')
+    }
   }
 
   async function removeTelegramRecipient(chatId: string) {
@@ -2401,14 +2409,16 @@ export default function AdminPage() {
     const name = newGroupName.trim()
     if (!name || !editingItem) return
     const maxOrder = itemOptionGroups.length ? Math.max(...itemOptionGroups.map((g: any) => g.order_index)) + 1 : 0
-    await supabase.from('item_option_groups').insert({ menu_item_id: editingItem.id, name, required: true, order_index: maxOrder })
+    const r = await supabase.from('item_option_groups').insert({ menu_item_id: editingItem.id, name, required: true, order_index: maxOrder })
+    if (writeFailed(r, 'Seçenek grubu ekleme')) return
     setNewGroupName('')
     await loadItemOptionGroups(editingItem.id)
   }
 
   async function deleteOptionGroup(groupId: string) {
     if (!confirm('Bu seçenek grubunu (ve tüm seçeneklerini) silmek istediğinizden emin misiniz?')) return
-    await supabase.from('item_option_groups').delete().eq('id', groupId)
+    const r = await supabase.from('item_option_groups').delete().eq('id', groupId)
+    if (writeFailed(r, 'Seçenek grubu silme')) return
     if (editingItem) await loadItemOptionGroups(editingItem.id)
   }
 
@@ -2417,14 +2427,16 @@ export default function AdminPage() {
     if (!text || !editingItem) return
     const group = itemOptionGroups.find((g: any) => g.id === groupId)
     const maxOrder = group?.choices?.length ? Math.max(...group.choices.map((c: any) => c.order_index)) + 1 : 0
-    await supabase.from('item_option_choices').insert({ group_id: groupId, name: text, price_delta: 0, order_index: maxOrder })
+    const r = await supabase.from('item_option_choices').insert({ group_id: groupId, name: text, price_delta: 0, order_index: maxOrder })
+    if (writeFailed(r, 'Seçenek ekleme')) return
     setNewChoiceText(prev => ({ ...prev, [groupId]: '' }))
     await loadItemOptionGroups(editingItem.id)
   }
 
   async function deleteOptionChoice(choiceId: string) {
     if (!editingItem) return
-    await supabase.from('item_option_choices').delete().eq('id', choiceId)
+    const r = await supabase.from('item_option_choices').delete().eq('id', choiceId)
+    if (writeFailed(r, 'Seçenek silme')) return
     await loadItemOptionGroups(editingItem.id)
   }
 
@@ -2565,7 +2577,11 @@ export default function AdminPage() {
 
   async function saveTablePositions(next: Record<string, { x: number, y: number }>) {
     setTablePositions(next)
-    await supabase.from('settings').upsert({ key: 'table_positions', value: next, updated_at: new Date().toISOString() })
+    // Fires on every drag-end - deliberately logged, not alerted, to avoid
+    // an alert storm mid-drag. A failure here only means the visual layout
+    // didn't persist (cosmetic), never money or orders.
+    const { error } = await supabase.from('settings').upsert({ key: 'table_positions', value: next, updated_at: new Date().toISOString() })
+    if (error) console.error('[settings] table_positions save failed:', error)
   }
 
   function clampFloorPos(x: number, y: number) {
@@ -2762,11 +2778,13 @@ export default function AdminPage() {
     if (!catName.trim()) return
     setLoading(true)
     if (editingCat) {
-      await supabase.from('categories').update({ name: catName, icon: catIcon }).eq('id', editingCat.id)
+      const r = await supabase.from('categories').update({ name: catName, icon: catIcon }).eq('id', editingCat.id)
+      if (writeFailed(r, 'Kategori güncelleme')) { setLoading(false); return }
       showMsg('Kategori güncellendi ✓'); setEditingCat(null)
     } else {
       const maxOrder = categories.length ? Math.max(...categories.map(c => c.order_index)) + 1 : 0
-      await supabase.from('categories').insert({ name: catName, icon: catIcon, order_index: maxOrder })
+      const r = await supabase.from('categories').insert({ name: catName, icon: catIcon, order_index: maxOrder })
+      if (writeFailed(r, 'Kategori ekleme')) { setLoading(false); return }
       showMsg('Kategori eklendi ✓')
     }
     setCatName(''); setCatIcon(''); await loadData(); setLoading(false)
@@ -2774,7 +2792,8 @@ export default function AdminPage() {
 
   async function deleteCategory(id: string) {
     if (!confirm('Bu kategoriyi silmek istediğinizden emin misiniz?')) return
-    await supabase.from('categories').delete().eq('id', id)
+    const r = await supabase.from('categories').delete().eq('id', id)
+    if (writeFailed(r, 'Kategori silme')) return
     showMsg('Kategori silindi'); await loadData()
   }
 
@@ -2794,12 +2813,14 @@ export default function AdminPage() {
       if (croppedBlob) imageUrl = await uploadBlob(croppedBlob)
 
       if (editingItem) {
-        await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, track_stock: itemTrackStock, stock_quantity: itemTrackStock ? (parseInt(itemStockQty) || 0) : 0, low_stock_threshold: parseInt(itemLowStockThreshold) || 5 }).eq('id', editingItem.id)
+        const upRes = await supabase.from('menu_items').update({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, track_stock: itemTrackStock, stock_quantity: itemTrackStock ? (parseInt(itemStockQty) || 0) : 0, low_stock_threshold: parseInt(itemLowStockThreshold) || 5 }).eq('id', editingItem.id)
+        if (writeFailed(upRes, 'Ürün güncelleme')) { setLoading(false); return }
         showMsg('Ürün güncellendi ✓')
         await loadData()
       } else {
         const maxOrder = items.length ? Math.max(...items.map(i => i.order_index)) + 1 : 0
-        const { data: newItem } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, track_stock: itemTrackStock, stock_quantity: itemTrackStock ? (parseInt(itemStockQty) || 0) : 0, low_stock_threshold: parseInt(itemLowStockThreshold) || 5, order_index: maxOrder }).select().single()
+        const { data: newItem, error: insErr } = await supabase.from('menu_items').insert({ name: itemName, description: itemDesc, price: parseFloat(itemPrice), category_id: itemCat, image_url: imageUrl, available: itemAvail, recommended: itemRec, staff_only: itemStaffOnly, track_stock: itemTrackStock, stock_quantity: itemTrackStock ? (parseInt(itemStockQty) || 0) : 0, low_stock_threshold: parseInt(itemLowStockThreshold) || 5, order_index: maxOrder }).select().single()
+        if (writeFailed({ error: insErr }, 'Ürün ekleme')) { setLoading(false); return }
         showMsg('✓ Ürün eklendi. Şimdi isterseniz seçenek (şeker oranı vb.) ekleyebilirsiniz.')
         await loadData()
         if (newItem) { startEditItem(newItem as MenuItem); setLoading(false); return }
@@ -2811,7 +2832,8 @@ export default function AdminPage() {
 
   async function deleteItem(id: string) {
     if (!confirm('Bu ürünü silmek istediğinizden emin misiniz?')) return
-    await supabase.from('menu_items').delete().eq('id', id)
+    const res = await supabase.from('menu_items').delete().eq('id', id)
+    if (writeFailed(res, 'Ürün silme')) return
     showMsg('Ürün silindi'); await loadData()
   }
 
@@ -2819,7 +2841,9 @@ export default function AdminPage() {
     if (!bulkTargetCat || selectedItems.size === 0) { showMsg('Hedef kategori ve ürün seçin'); return }
     setLoading(true)
     const ids = Array.from(selectedItems)
-    await Promise.all(ids.map(id => supabase.from('menu_items').update({ category_id: bulkTargetCat }).eq('id', id)))
+    const results = await Promise.all(ids.map(id => supabase.from('menu_items').update({ category_id: bulkTargetCat }).eq('id', id)))
+    const firstFail = results.find(r => r.error)
+    if (firstFail && writeFailed(firstFail, 'Toplu ürün taşıma')) { setLoading(false); await loadData(); return }
     showMsg(`✓ ${ids.length} ürün taşındı`)
     setSelectedItems(new Set())
     setBulkTargetCat('')
@@ -2837,7 +2861,8 @@ export default function AdminPage() {
   }
 
   async function toggleAvail(item: MenuItem) {
-    await supabase.from('menu_items').update({ available: !item.available }).eq('id', item.id)
+    const res = await supabase.from('menu_items').update({ available: !item.available }).eq('id', item.id)
+    if (writeFailed(res, 'Ürün durumu değiştirme')) return
     await loadData()
   }
 
@@ -4340,10 +4365,10 @@ export default function AdminPage() {
                     {!bulkMode && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <button onClick={() => startEditItem(item)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#C9A84C', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Düzenle</button>
-                      <button onClick={async () => { await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: item.recommended ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
+                      <button onClick={async () => { const r = await supabase.from('menu_items').update({ recommended: !item.recommended }).eq('id', item.id); if (writeFailed(r, 'Öne çıkarma')) return; await loadData() }} style={{ background: item.recommended ? 'rgba(201,168,76,.2)' : 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: item.recommended ? '#C9A84C' : 'var(--a-text2)', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>{item.recommended ? '⭐ Öne Çıkan' : 'Öne Çıkar'}</button>
                       <button onClick={() => deleteItem(item.id)} style={{ background: 'var(--a-border)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#C0392B', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Sil</button>
                       {item.track_stock && (
-                        <button onClick={async () => { await supabase.from('menu_items').update({ stock_quantity: item.stock_quantity + 10, available: true }).eq('id', item.id); await loadData() }} style={{ background: 'rgba(52,152,219,.14)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#6FB9E8', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+10 Stok</button>
+                        <button onClick={async () => { const r = await supabase.from('menu_items').update({ stock_quantity: item.stock_quantity + 10, available: true }).eq('id', item.id); if (writeFailed(r, 'Stok ekleme')) return; await loadData() }} style={{ background: 'rgba(52,152,219,.14)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#6FB9E8', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>+10 Stok</button>
                       )}
                     </div>
                     )}
