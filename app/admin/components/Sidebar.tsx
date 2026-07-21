@@ -6,7 +6,7 @@ export default function Sidebar({
   notifCount, todayRevenue, theme, setTheme, clearSession,
   activeShift, isLimitedStaff, openCashMovement, openShiftClose, startShift,
   loadOrders, dateFilter, loadDebtTransactions, loadSuppliers, searchReceipts, searchAccountability,
-  showNotif, setShowNotif, newOrderAlert, setNewOrderAlert, queuedCount,
+  showNotif, setShowNotif, newOrderAlert, setNewOrderAlert, queuedCount, realtimeUp,
 }: any) {
   function go(t: string) {
     setTab(t)
@@ -40,6 +40,11 @@ export default function Sidebar({
               Bugün: <span style={{ color: '#5FD08C', fontWeight: 700 }}>₺{formatTL(todayRevenue.revenue)}</span>
             </div>
           )}
+          <div title={realtimeUp ? 'Canlı bağlantı aktif — siparişler anında geliyor' : 'Canlı bağlantı yok — siparişler ~15 sn gecikmeyle gelebilir'}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: realtimeUp ? '#5FD08C' : '#f39c12' }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: realtimeUp ? '#5FD08C' : '#f39c12', boxShadow: realtimeUp ? '0 0 5px #5FD08C' : 'none', animation: realtimeUp ? 'none' : 'bellShake 1s ease infinite' }} />
+            {realtimeUp ? 'Canlı' : 'Bağlantı yok'}
+          </div>
         </div>
         <button onClick={() => { setShowNotif(!showNotif); setNewOrderAlert(false) }}
           style={{ position: 'relative', background: newOrderAlert ? 'rgba(192,57,43,.2)' : 'var(--a-border)', border: newOrderAlert ? '1px solid #C0392B' : '1px solid var(--a-border2)', borderRadius: 8, width: 34, height: 34, minWidth: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, animation: newOrderAlert ? 'bellShake .5s ease infinite' : 'none' }}>

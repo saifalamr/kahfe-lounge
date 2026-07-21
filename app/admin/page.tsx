@@ -154,6 +154,21 @@ export default function AdminPage() {
   // their sound alert) get noticed at all until the tab is foregrounded.
   const seenOrderIdsRef = useRef<Set<string> | null>(null)
 
+  // Realtime connection health, shown as a small live/offline dot in the
+  // header. When the websocket drops (bad wifi, backgrounded tab, Supabase
+  // hiccup), the 15s polling fallback still catches orders - but the dot
+  // tells the cashier WHY dings feel laggy instead of leaving them guessing.
+  const [realtimeUp, setRealtimeUp] = useState(false)
+
+  // Ticking clock so the "waiting X min" badges on pending orders age in
+  // real time without needing a data reload. 30s cadence is plenty granular
+  // for minute-resolution badges and costs almost nothing.
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 30000)
+    return () => clearInterval(t)
+  }, [])
+
   async function refreshNotifications() {
     const { data } = await supabase.from('orders').select('*').eq('status', 'pending').order('created_at', { ascending: false })
     if (!data) return
@@ -212,7 +227,11 @@ export default function AdminPage() {
       // not when an order is placed — this is what keeps the header total
       // live the moment any device closes/reopens/refunds a tab.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => { loadTableMapData(); refreshTodayRevenue() })
-      .subscribe()
+      .subscribe((status) => {
+        // SUBSCRIBED = healthy; anything else (CHANNEL_ERROR, TIMED_OUT,
+        // CLOSED) means we're relying on the polling fallback for now.
+        setRealtimeUp(status === 'SUBSCRIBED')
+      })
 
 
     loadTableMapData()
@@ -228,9 +247,22 @@ export default function AdminPage() {
   // popup hasn't been opened for yet — a single beep is too easy to miss
   // over kitchen/nargile/customer noise. Stops the moment the popup is
   // actually open (no point alarming at someone already looking at it).
+  //
+  // Auto-silence: during a real rush the cashier's hands are busy and the
+  // popup may sit unopened for minutes. An endlessly looping alarm becomes
+  // pure stress, so the SOUND caps out after a fixed number of beeps — the
+  // red bell badge and pending count stay visible, only the noise stops.
+  // Any genuinely new incoming order resets newOrderAlert and starts a
+  // fresh burst, so nothing new is ever silent.
+  const MAX_ALARM_BEEPS = 8 // ~32s at 4s spacing
   useEffect(() => {
     if (!newOrderAlert || showNotif) return
-    const alarm = setInterval(playNotifSound, 4000)
+    let beeps = 0
+    const alarm = setInterval(() => {
+      beeps++
+      if (beeps >= MAX_ALARM_BEEPS) { clearInterval(alarm); return }
+      playNotifSound()
+    }, 4000)
     return () => clearInterval(alarm)
   }, [newOrderAlert, showNotif])
 
@@ -3023,7 +3055,7 @@ export default function AdminPage() {
         notifCount={notifications.length} todayRevenue={todayRevenue} theme={theme} setTheme={setTheme} clearSession={clearSession}
         activeShift={activeShift} isLimitedStaff={isLimitedStaff} openCashMovement={openCashMovement} openShiftClose={openShiftClose} startShift={startShift}
         loadOrders={loadOrders} dateFilter={dateFilter} loadDebtTransactions={loadDebtTransactions} loadSuppliers={loadSuppliers} searchReceipts={searchReceipts} searchAccountability={searchAccountability}
-        showNotif={showNotif} setShowNotif={setShowNotif} newOrderAlert={newOrderAlert} setNewOrderAlert={setNewOrderAlert} queuedCount={queuedCount}
+        showNotif={showNotif} setShowNotif={setShowNotif} newOrderAlert={newOrderAlert} setNewOrderAlert={setNewOrderAlert} queuedCount={queuedCount} realtimeUp={realtimeUp}
       />
       <div className="kahfe-shell" style={{ background: 'var(--a-bg0)', minHeight: '100vh', paddingBottom: 40 }}>
         <ConnectivityBanner />
@@ -4061,7 +4093,20 @@ export default function AdminPage() {
                       <span style={{ background:statusColor, color:'#fff', borderRadius: 8, padding:'4px 10px', fontSize:11, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", letterSpacing:'0.05em', textTransform:'uppercase' }}>{statusLabel}</span>
                       <span style={{ color:'var(--a-text)', fontWeight:700, fontSize:18, fontFamily:"'Bricolage Grotesque', sans-serif" }}>{order.table_name.replace('-', ' ')}</span>
                     </div>
-                    <span style={{ color:'var(--a-text2)', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      {order.status === 'pending' && (() => {
+                        const waitMin = Math.max(0, Math.floor((nowTick - new Date(order.created_at).getTime()) / 60000))
+                        // Green <10, yellow 10-20, red >20 - the red ones are
+                        // the tables most likely to complain, so they shout.
+                        const c = waitMin >= 20 ? '#C0392B' : waitMin >= 10 ? '#f39c12' : '#5FD08C'
+                        return (
+                          <span title="Bu sipariş ne kadar süredir bekliyor" style={{ background:`${c}22`, color:c, border:`1px solid ${c}`, borderRadius:8, padding:'3px 8px', fontSize:11, fontWeight:700, fontFamily:"'IBM Plex Mono', monospace", animation: waitMin >= 20 ? 'bellShake 1.5s ease infinite' : 'none' }}>
+                            ⏱ {waitMin} dk
+                          </span>
+                        )
+                      })()}
+                      <span style={{ color:'var(--a-text2)', fontSize:12, fontFamily:"'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'})}</span>
+                    </div>
                   </div>
 
                   {order.items?.map((item:any, i:number) => (

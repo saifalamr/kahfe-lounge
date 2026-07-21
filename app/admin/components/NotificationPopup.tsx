@@ -15,14 +15,20 @@ export default function NotificationPopup({ notifications, onClose, onDismiss, o
         </div>
         {notifications.length === 0 ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--a-text2)' }}>Bekleyen sipariş yok</div>
-        ) : notifications.map((order: any) => (
+        ) : [...notifications].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((order: any) => {
+          const waitMin = Math.max(0, Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000))
+          const wc = waitMin >= 20 ? '#C0392B' : waitMin >= 10 ? '#f39c12' : '#5FD08C'
+          return (
           <div key={order.id} style={{ padding: '16px 18px', borderBottom: '1px solid #2A2A2A' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ background: '#C0392B', color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.05em' }}>YENİ</span>
                 <span style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>🪑 {order.table_name}</span>
               </div>
-              <span style={{ color: 'var(--a-text2)', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span title="Bekleme süresi" style={{ background: `${wc}22`, color: wc, border: `1px solid ${wc}`, borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>⏱ {waitMin} dk</span>
+                <span style={{ color: 'var(--a-text2)', fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>{new Date(order.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
             </div>
             <div style={{ marginBottom: 10 }}>
               {order.items.map((item: any, i: number) => (
@@ -40,7 +46,8 @@ export default function NotificationPopup({ notifications, onClose, onDismiss, o
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
