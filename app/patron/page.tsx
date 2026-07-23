@@ -285,7 +285,10 @@ export default function PatronPage() {
         <div className="patron-card" style={{ background: S.bg1, border: `1px solid ${S.border}`, borderRadius: 18, padding: '18px 18px', marginBottom: 14 }}>
           <div style={{ color: S.text2, fontSize: 12, letterSpacing: '0.08em', marginBottom: 12 }}>BUGÜNKÜ ÖDEME DAĞILIMI</div>
           <div style={{ display: 'flex', width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 12 }}>
-            {mix.map(m => (today![m.key] > 0 ? <div key={m.key} style={{ width: `${(today![m.key] / paymentTotal) * 100}%`, background: m.color }} /> : null))}
+            {mix.map(m => {
+              const val = today?.[m.key] ?? 0
+              return val > 0 ? <div key={m.key} style={{ width: `${(val / paymentTotal) * 100}%`, background: m.color }} /> : null
+            })}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {mix.map(m => (
