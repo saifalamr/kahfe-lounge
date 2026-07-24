@@ -78,6 +78,28 @@ async function outstandingDebt() {
   return Math.max(0, borc - odenen)
 }
 
+// Same borç-minus-ödeme arithmetic as outstandingDebt(), just grouped by
+// debtor instead of summed across all of them, so the owner can see WHO
+// owes money, not just how much in total.
+async function topDebtors(limit: number) {
+  const [{ data: debtors }, { data: txns }] = await Promise.all([
+    supabase.from('debtors').select('id,name'),
+    supabase.from('debt_transactions').select('debtor_id,type,amount'),
+  ])
+  const balances: Record<string, number> = {}
+  ;(txns || []).forEach((t: any) => {
+    const delta = t.type === 'borç' ? Number(t.amount || 0) : -Number(t.amount || 0)
+    balances[t.debtor_id] = (balances[t.debtor_id] || 0) + delta
+  })
+  return (debtors || [])
+    .map((d: any) => ({ name: d.name, balance: balances[d.id] || 0 }))
+    .filter(d => d.balance > 0)
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, limit)
+}
+
+const WEEKDAYS_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
+
 async function todayLoss(fromIso: string) {
   const [{ data: v }, { data: d }] = await Promise.all([
     supabase.from('voids').select('amount').gte('created_at', fromIso),
@@ -104,6 +126,9 @@ export default function PatronPage() {
   const [debtOutstanding, setDebtOutstanding] = useState<number | null>(null)
   const [loss, setLoss] = useState<{ voidTotal: number, discountTotal: number } | null>(null)
   const [topItem, setTopItem] = useState<{ name: string, qty: number } | null>(null)
+  const [sameWeekdayLastWeek, setSameWeekdayLastWeek] = useState<{ revenue: number } | null>(null)
+  const [categoryBreakdown, setCategoryBreakdown] = useState<{ name: string, icon: string, revenue: number }[]>([])
+  const [topDebtorsList, setTopDebtorsList] = useState<{ name: string, balance: number }[]>([])
   const [openTables, setOpenTables] = useState<number | null>(null)
   const [pendingOrders, setPendingOrders] = useState<number | null>(null)
   const [shift, setShift] = useState<{ staff_name: string, started_at: string } | null>(null)
@@ -116,33 +141,55 @@ export default function PatronPage() {
     const weekStart = mondayOf(now)
     const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7)
     const monthStart = startOfMonth(now)
+    const sameWeekdayStart = new Date(todayStart); sameWeekdayStart.setDate(sameWeekdayStart.getDate() - 7)
+    const sameWeekdayEnd = new Date(sameWeekdayStart); sameWeekdayEnd.setDate(sameWeekdayEnd.getDate() + 1)
 
-    const [t, y, w, lw, m, tr, debt, ls, tables, pending, shifts, weekOrders] = await Promise.all([
+    const [t, y, w, lw, m, swlw, tr, debt, debtorList, ls, tables, pending, shifts, weekOrders, menuItems, categories] = await Promise.all([
       periodRevenue(todayStart.toISOString()),
       periodRevenue(yesterdayStart.toISOString(), todayStart.toISOString()),
       periodRevenue(weekStart.toISOString()),
       periodRevenue(lastWeekStart.toISOString(), weekStart.toISOString()),
       periodRevenue(monthStart.toISOString()),
+      periodRevenue(sameWeekdayStart.toISOString(), sameWeekdayEnd.toISOString()),
       dailyTrend(7),
       outstandingDebt(),
+      topDebtors(3),
       todayLoss(todayStart.toISOString()),
       occupiedTablesCount(),
       supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('shifts').select('staff_name,started_at').is('ended_at', null).order('started_at', { ascending: false }).limit(1),
-      supabase.from('orders').select('items').gte('created_at', weekStart.toISOString()),
+      supabase.from('orders').select('items,created_at').gte('created_at', weekStart.toISOString()),
+      supabase.from('menu_items').select('id,category_id'),
+      supabase.from('categories').select('id,name,icon'),
     ])
-    setToday(t); setYesterday(y); setThisWeek(w); setLastWeek(lw); setThisMonth(m)
-    setTrend(tr); setDebtOutstanding(debt); setLoss(ls)
+    setToday(t); setYesterday(y); setThisWeek(w); setLastWeek(lw); setThisMonth(m); setSameWeekdayLastWeek(swlw)
+    setTrend(tr); setDebtOutstanding(debt); setTopDebtorsList(debtorList); setLoss(ls)
     setOpenTables(tables ?? 0)
     setPendingOrders(pending.count ?? 0)
     setShift(shifts.data?.[0] || null)
 
     const itemMap: Record<string, number> = {}
+    const catRevenue: Record<string, number> = {}
     ;(weekOrders.data || []).forEach((o: any) => {
-      (o.items || []).forEach((it: any) => { itemMap[it.name] = (itemMap[it.name] || 0) + Number(it.quantity || 0) })
+      const isToday = new Date(o.created_at) >= todayStart
+      ;(o.items || []).forEach((it: any) => {
+        itemMap[it.name] = (itemMap[it.name] || 0) + Number(it.quantity || 0)
+        if (isToday) {
+          const menuItem = (menuItems.data || []).find((mi: any) => mi.id === it.id)
+          const key = menuItem?.category_id || '__other__'
+          catRevenue[key] = (catRevenue[key] || 0) + Number(it.subtotal || 0)
+        }
+      })
     })
     const top = Object.entries(itemMap).sort((a, b) => b[1] - a[1])[0]
     setTopItem(top ? { name: top[0], qty: top[1] } : null)
+    const catStats = Object.entries(catRevenue)
+      .map(([catId, revenue]) => {
+        const cat = (categories.data || []).find((c: any) => c.id === catId)
+        return { name: cat?.name || 'Diğer', icon: cat?.icon || '📦', revenue }
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+    setCategoryBreakdown(catStats)
     setLastUpdated(new Date())
   }, [])
 
@@ -204,6 +251,7 @@ export default function PatronPage() {
 
   const weekDelta = lastWeek && lastWeek.revenue > 0 ? ((thisWeek!.revenue - lastWeek.revenue) / lastWeek.revenue) * 100 : null
   const yestDelta = yesterday && yesterday.revenue > 0 && today ? ((today.revenue - yesterday.revenue) / yesterday.revenue) * 100 : null
+  const swlwDelta = sameWeekdayLastWeek && sameWeekdayLastWeek.revenue > 0 && today ? ((today.revenue - sameWeekdayLastWeek.revenue) / sameWeekdayLastWeek.revenue) * 100 : null
   const avgTicket = today && today.count > 0 ? today.revenue / today.count : 0
 
   const maxTrend = Math.max(1, ...trend.map(d => d.revenue))
@@ -250,6 +298,14 @@ export default function PatronPage() {
               </span>
             )}
           </div>
+          {swlwDelta !== null && (
+            <div style={{ color: S.text2, fontSize: 12, marginTop: 6 }}>
+              Geçen {WEEKDAYS_TR[new Date().getDay()]}'e göre{' '}
+              <span style={{ color: swlwDelta >= 0 ? S.green : S.red, fontWeight: 700 }}>
+                {swlwDelta >= 0 ? '▲' : '▼'} %{Math.abs(swlwDelta).toFixed(0)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* 7-day trend */}
@@ -306,6 +362,27 @@ export default function PatronPage() {
           )}
         </div>
 
+        {/* Today's category breakdown */}
+        {categoryBreakdown.length > 0 && (
+          <div className="patron-card" style={{ background: S.bg1, border: `1px solid ${S.border}`, borderRadius: 18, padding: '18px 18px', marginBottom: 14 }}>
+            <div style={{ color: S.text2, fontSize: 12, letterSpacing: '0.08em', marginBottom: 12 }}>BUGÜNKÜ KATEGORİ DAĞILIMI</div>
+            {(() => {
+              const catTotal = Math.max(1, categoryBreakdown.reduce((s, c) => s + c.revenue, 0))
+              return categoryBreakdown.map((c, i) => (
+                <div key={i} style={{ marginBottom: i === categoryBreakdown.length - 1 ? 0 : 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: '#F0EDE8', fontSize: 12 }}>{c.icon} {c.name}</span>
+                    <span style={{ color: S.text2, fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(c.revenue)}</span>
+                  </div>
+                  <div style={{ width: '100%', height: 5, borderRadius: 3, background: 'rgba(255,255,255,.06)', overflow: 'hidden' }}>
+                    <div style={{ width: `${(c.revenue / catTotal) * 100}%`, height: '100%', background: S.gold, borderRadius: 3 }} />
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+        )}
+
         {/* This week vs last week */}
         <div className="patron-card" style={{ background: S.bg1, border: `1px solid ${S.border}`, borderRadius: 18, padding: '18px 18px', marginBottom: 14 }}>
           <div style={{ color: S.text2, fontSize: 12, letterSpacing: '0.08em', marginBottom: 10 }}>BU HAFTA</div>
@@ -327,15 +404,27 @@ export default function PatronPage() {
           </div>
         </div>
 
-        {/* Outstanding debt across all debtors */}
-        <div className="patron-card" style={{ background: S.bg1, border: `1px solid ${S.border}`, borderRadius: 18, padding: '16px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 22 }}>📒</span>
-          <div>
-            <div style={{ color: (debtOutstanding ?? 0) > 0 ? S.orange : '#F0EDE8', fontSize: 20, fontWeight: 800, fontFamily: "'IBM Plex Mono', monospace" }}>
-              {debtOutstanding !== null ? `₺${formatTL(debtOutstanding)}` : '—'}
+        {/* Outstanding debt across all debtors, plus who owes the most */}
+        <div className="patron-card" style={{ background: S.bg1, border: `1px solid ${S.border}`, borderRadius: 18, padding: '16px 18px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>📒</span>
+            <div>
+              <div style={{ color: (debtOutstanding ?? 0) > 0 ? S.orange : '#F0EDE8', fontSize: 20, fontWeight: 800, fontFamily: "'IBM Plex Mono', monospace" }}>
+                {debtOutstanding !== null ? `₺${formatTL(debtOutstanding)}` : '—'}
+              </div>
+              <div style={{ color: S.text2, fontSize: 12 }}>Açık veresiye</div>
             </div>
-            <div style={{ color: S.text2, fontSize: 12 }}>Açık veresiye</div>
           </div>
+          {topDebtorsList.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${S.border}` }}>
+              {topDebtorsList.map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: i === topDebtorsList.length - 1 ? 0 : 6 }}>
+                  <span style={{ color: S.text2 }}>{d.name}</span>
+                  <span style={{ color: '#F0EDE8', fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}>₺{formatTL(d.balance)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Who's working */}
