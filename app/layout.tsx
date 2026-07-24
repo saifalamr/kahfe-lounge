@@ -6,6 +6,7 @@ import { Analytics } from '@vercel/analytics/next'
 export const metadata: Metadata = {
   title: 'Kahfe Lounge — Menü',
   description: 'Kahfe Lounge dijital menü. Kahve, nargile, yemek ve daha fazlası.',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
