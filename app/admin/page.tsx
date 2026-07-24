@@ -1342,6 +1342,8 @@ export default function AdminPage() {
     }
   }
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
+  const [showDayReportPicker, setShowDayReportPicker] = useState(false)
+  const [dayReportDate, setDayReportDate] = useState('')
   const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'|'custom'>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -1410,7 +1412,7 @@ export default function AdminPage() {
   }
 
 
-  async function generatePeriodReport(period: 'week'|'month'|'year') {
+  async function generatePeriodReport(period: 'day'|'week'|'month'|'year', customDate?: string) {
     const now = new Date()
     const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
     let firstDay: string, lastDay: string, title: string
@@ -1418,7 +1420,21 @@ export default function AdminPage() {
     // comparison — e.g. the week is Mon-Sun, so "previous" is the Mon-Sun
     // right before it, not just "7 days back" from today.
     let prevFirstDay: string, prevLastDay: string, prevLabel: string
-    if (period === 'week') {
+    if (period === 'day') {
+      // customDate is a plain 'YYYY-MM-DD' from a <input type="date">, same
+      // convention as customFrom/itemReportCustomFrom elsewhere — parsed as
+      // local midnight, defaults to today if the picker was somehow skipped.
+      const dateStr = customDate || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      const chosen = new Date(`${dateStr}T00:00:00`)
+      firstDay = `${dateStr}T00:00:00.000`
+      lastDay = `${dateStr}T23:59:59.999`
+      title = `${chosen.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} Günlük Raporu`
+      const prevDate = new Date(chosen); prevDate.setDate(chosen.getDate() - 1)
+      const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`
+      prevFirstDay = `${prevDateStr}T00:00:00.000`
+      prevLastDay = `${prevDateStr}T23:59:59.999`
+      prevLabel = 'önceki gün'
+    } else if (period === 'week') {
       const day = now.getDay() === 0 ? 7 : now.getDay() // Monday-start week
       const monday = new Date(now); monday.setDate(now.getDate() - day + 1); monday.setHours(0,0,0,0)
       const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999)
@@ -3256,6 +3272,24 @@ export default function AdminPage() {
             because the trigger button and the modal being in different tabs
             meant clicking the button set the state but nothing appeared
             until you happened to switch to Siparişler afterward. */}
+        {isManager && showDayReportPicker && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setShowDayReportPicker(false)}>
+            <div className="kahfe-modal" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: 'var(--a-bg2)', borderRadius: 20, border: '1px solid rgba(201,168,76,.35)', boxShadow: '0 20px 60px rgba(0,0,0,.6)', animation: 'modalPopIn .3s cubic-bezier(.18,.84,.26,1) both' }}>
+              <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--a-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: '#C9A84C', fontWeight: 700, fontSize: 17, fontFamily: "'Bricolage Grotesque', sans-serif" }}>📆 Günlük Rapor</div>
+                <button onClick={() => setShowDayReportPicker(false)} style={{ background: 'var(--a-border)', border: 'none', width: 36, height: 36, color: 'var(--a-text2)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              </div>
+              <div style={{ padding: 20 }}>
+                <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 14 }}>Herhangi bir günün tam raporunu görüntüleyin — bugün, dün veya geçmişteki başka bir tarih.</div>
+                <input type="date" value={dayReportDate} max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`}
+                  onChange={e => setDayReportDate(e.target.value)}
+                  style={{ width: '100%', height: 50, background: 'var(--a-bg0)', border: '1px solid var(--a-border2)', color: 'var(--a-text)', padding: '0 14px', fontSize: 15, marginBottom: 16, fontFamily: "'IBM Plex Mono', monospace" }} />
+                <button onClick={() => { generatePeriodReport('day', dayReportDate); setShowDayReportPicker(false) }} disabled={!dayReportDate}
+                  style={{ width: '100%', height: 52, background: dayReportDate ? '#C9A84C' : 'var(--a-border)', border: 'none', color: dayReportDate ? 'var(--a-bg0)' : 'var(--a-disabled)', fontSize: 15, fontWeight: 700, cursor: dayReportDate ? 'pointer' : 'not-allowed' }}>✓ Raporu Oluştur</button>
+              </div>
+            </div>
+          </div>
+        )}
         {isManager && showMonthlyReport && (
           <MonthlyReportModal report={showMonthlyReport} onExportPDF={() => exportMonthlyReportPDF(showMonthlyReport)} onClose={() => setShowMonthlyReport(null)} />
         )}
@@ -4745,6 +4779,7 @@ export default function AdminPage() {
             <div style={{ color: 'var(--a-text2)', fontSize: 12, marginBottom: 16 }}>Bir rapor türü seçin — her biri kendi penceresinde açılır, PDF/Excel olarak indirilebilir.</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
               {[
+                { icon: '📆', label: 'Günlük Rapor', onClick: () => { setDayReportDate(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`); setShowDayReportPicker(true) } },
                 { icon: '📅', label: 'Haftalık Rapor', onClick: () => generatePeriodReport('week') },
                 { icon: '🗓️', label: 'Aylık Rapor', onClick: () => generatePeriodReport('month') },
                 { icon: '📈', label: 'Yıllık Rapor', onClick: () => generatePeriodReport('year') },
