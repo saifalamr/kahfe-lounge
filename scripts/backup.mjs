@@ -51,6 +51,33 @@ const TABLES = [
 
 const PAGE_SIZE = 1000
 
+// Columns that must never be written to a backup file. These backups are
+// committed to a branch in the GitHub repo, so anything in them is as exposed
+// as the repo itself — and `access_pins.pin` / `staff.pin` are stored in
+// plaintext, meaning every till, manager and owner PIN was being published in
+// the clear on every nightly run.
+//
+// The rows themselves are kept (names, roles, permissions, active flags all
+// restore normally); only the secret is replaced. After a restore the PINs have
+// to be re-entered once in Ayarlar -> Erisim Sifreleri, which is a small price
+// for not having them sitting in git.
+const REDACTED_COLUMNS = {
+  access_pins: ['pin'],
+  staff: ['pin'],
+}
+
+function redact(table, rows) {
+  const cols = REDACTED_COLUMNS[table]
+  if (!cols) return rows
+  return rows.map(row => {
+    const copy = { ...row }
+    for (const c of cols) {
+      if (c in copy) copy[c] = '__REDACTED__'
+    }
+    return copy
+  })
+}
+
 async function fetchAllRows(table) {
   const rows = []
   let from = 0
@@ -73,8 +100,8 @@ async function main() {
   const snapshot = { generated_at: now.toISOString(), tables: {} }
   for (const table of TABLES) {
     const rows = await fetchAllRows(table)
-    snapshot.tables[table] = rows
-    console.log(`  ${table}: ${rows.length} rows`)
+    snapshot.tables[table] = redact(table, rows)
+    console.log(`  ${table}: ${rows.length} rows${REDACTED_COLUMNS[table] ? ' (secrets redacted)' : ''}`)
   }
 
   const dailyDir = path.join(process.env.BACKUP_OUT_DIR || 'backups', 'daily')

@@ -172,12 +172,34 @@ begin
 end; $$;
 grant execute on function get_or_create_open_tab(text) to anon, authenticated;
 
+-- Session-gated: this is SECURITY DEFINER, so it bypasses RLS and the table
+-- policies cannot protect it. Without the explicit check below, anyone holding
+-- the public anon key (which ships in the browser bundle) could move any open
+-- tab's orders onto another table. The status check matters just as much: a
+-- closed/paid tab must never be draggable onto a live one, or its orders get
+-- billed a second time.
 create or replace function merge_or_transfer_tab(p_source_tab_id uuid, p_destination_table_name text)
 returns uuid language plpgsql security definer set search_path = public as $$
-declare v_dest_tab_id uuid;
+declare v_dest_tab_id uuid; v_source_status text;
 begin
-  perform pg_advisory_xact_lock(hashtext(p_destination_table_name));
-  select id into v_dest_tab_id from tabs where table_name = p_destination_table_name and status = 'open' limit 1;
+  if not has_valid_session() then
+    raise exception 'yetkisiz islem' using errcode = '42501';
+  end if;
+
+  select status into v_source_status from tabs where id = p_source_tab_id;
+  if v_source_status is null then
+    raise exception 'kaynak hesap bulunamadi' using errcode = 'P0002';
+  end if;
+  if v_source_status <> 'open' then
+    raise exception 'kapali hesap tasinamaz' using errcode = '22023';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext(upper(replace(p_destination_table_name, 'İ', 'I'))));
+  -- İ-normalised like get_or_create_open_tab, otherwise "İSKELE 1" would fail
+  -- to match an existing open "ISKELE 1" and silently create a second tab.
+  select id into v_dest_tab_id from tabs
+   where upper(replace(table_name, 'İ', 'I')) = upper(replace(p_destination_table_name, 'İ', 'I'))
+     and status = 'open' and id <> p_source_tab_id limit 1;
   if v_dest_tab_id is null then
     update tabs set table_name = p_destination_table_name where id = p_source_tab_id;
     update orders set table_name = p_destination_table_name where tab_id = p_source_tab_id;
@@ -388,16 +410,57 @@ alter table public.menu_items add column if not exists track_stock boolean not n
 alter table public.menu_items add column if not exists stock_quantity integer not null default 0;
 alter table public.menu_items add column if not exists low_stock_threshold integer not null default 5;
 
+-- Stays anon-callable on purpose (the customer QR menu and the offline replay
+-- queue both call it without a session), but an anonymous caller now has to
+-- prove a real order exists: it can only reduce stock for items genuinely
+-- ordered in the last few minutes, and only by a sane quantity. Without that,
+-- this was a public "mark the entire menu sold out" endpoint.
 create or replace function decrement_stock_for_order(p_items jsonb) returns void
 language plpgsql security definer set search_path = public as $$
 declare
   item jsonb;
+  v_staff boolean;
+  v_qty int;
+  v_id uuid;
 begin
+  v_staff := has_valid_session();
+
   for item in select * from jsonb_array_elements(p_items) loop
+    -- Skip malformed entries rather than aborting, so one bad line can never
+    -- block stock accounting for the rest of a legitimate order.
+    begin
+      v_id := (item->>'id')::uuid;
+      v_qty := coalesce((item->>'quantity')::int, 0);
+    exception when others then
+      continue;
+    end;
+
+    if v_qty <= 0 then continue; end if;
+    if not v_staff and v_qty > 100 then continue; end if;
+
+    if not v_staff then
+      if not exists (
+        select 1 from orders o
+         where o.created_at > now() - interval '5 minutes'
+           and exists (
+             select 1 from jsonb_array_elements(o.items) oi
+              where (oi->>'id') = (item->>'id')
+           )
+      ) then
+        continue;
+      end if;
+    end if;
+
     update menu_items
-    set stock_quantity = greatest(0, stock_quantity - (item->>'quantity')::int),
-        available = (greatest(0, stock_quantity - (item->>'quantity')::int) > 0)
-    where id = (item->>'id')::uuid and track_stock = true;
+       set stock_quantity = greatest(0, stock_quantity - v_qty),
+           -- Only ever switches availability OFF. The previous form recomputed
+           -- this as (remaining > 0), which silently re-enabled an item the
+           -- manager had deliberately marked unavailable.
+           available = case
+             when greatest(0, stock_quantity - v_qty) <= 0 then false
+             else available
+           end
+     where id = v_id and track_stock = true;
   end loop;
 end; $$;
 grant execute on function decrement_stock_for_order(jsonb) to anon, authenticated;
@@ -504,10 +567,32 @@ create index if not exists idx_login_attempts_ip_time on public.login_attempts(i
 alter table public.login_attempts enable row level security;
 -- No policies — RPC access only.
 
+-- Previously this took the LEFTMOST x-forwarded-for entry, which is supplied
+-- by the caller and therefore trivially forged: rotate the header per request
+-- and every attempt looks like a brand-new IP, so login_with_pin's rate limit
+-- never fired and a 4-digit PIN could be brute-forced outright. Prefer
+-- cf-connecting-ip (set by the edge, overwritten inbound, so a client cannot
+-- forge it); otherwise take the RIGHTMOST entry, appended by the nearest
+-- trusted proxy rather than chosen by the client.
 create or replace function get_client_ip() returns text
-language sql stable set search_path = public as $$
-  select split_part(coalesce((current_setting('request.headers', true)::json->>'x-forwarded-for'), 'unknown'), ',', 1);
-$$;
+language plpgsql stable set search_path = public as $$
+declare h json; cf text; xff text; parts text[];
+begin
+  begin
+    h := current_setting('request.headers', true)::json;
+  exception when others then
+    return 'unknown';
+  end;
+  if h is null then return 'unknown'; end if;
+
+  cf := nullif(btrim(coalesce(h->>'cf-connecting-ip', '')), '');
+  if cf is not null then return cf; end if;
+
+  xff := coalesce(h->>'x-forwarded-for', '');
+  if btrim(xff) = '' then return 'unknown'; end if;
+  parts := string_to_array(xff, ',');
+  return coalesce(nullif(btrim(parts[array_length(parts, 1)]), ''), 'unknown');
+end; $$;
 grant execute on function get_client_ip() to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -524,8 +609,13 @@ create table if not exists public.device_sessions (
   expires_at timestamptz not null,
   staff_name text,
   user_agent text,
-  last_seen_at timestamptz not null default now()
+  last_seen_at timestamptz not null default now(),
+  -- Which IP this session logged in from. Used by login_with_pin to recognise
+  -- the cafe's own devices so an outsider hammering the login endpoint can
+  -- never rate-limit real staff out of the till mid-service.
+  ip text
 );
+alter table public.device_sessions add column if not exists ip text;
 alter table public.device_sessions enable row level security;
 -- No policies — RPC access only.
 
@@ -551,10 +641,34 @@ declare
   v_token uuid;
   v_ip text;
   v_expires_at timestamptz;
+  v_trusted boolean;
+  v_ip_fails int;
+  v_global_fails int;
 begin
   v_ip := get_client_ip();
-  if (select count(*) from login_attempts where ip = v_ip and attempted_at > now() - interval '10 minutes') >= 15 then
-    return;
+
+  -- A device already holding a live session (the cafe's tablet, the owner's
+  -- phone) is "trusted": bigger allowance, and it skips the global cap below,
+  -- so an outsider attacking this endpoint can never lock real staff out of
+  -- the till in the middle of service.
+  v_trusted := exists (
+    select 1 from device_sessions
+     where ip is not null and ip = v_ip and expires_at > now()
+  );
+
+  select count(*) into v_ip_fails from login_attempts
+   where ip = v_ip and attempted_at > now() - interval '10 minutes';
+
+  if v_trusted then
+    if v_ip_fails >= 50 then return; end if;
+  else
+    if v_ip_fails >= 15 then return; end if;
+    -- x-forwarded-for can be rotated per request, so a per-IP limit alone was
+    -- bypassable. This bounds total guesses across ALL IPs, which is what
+    -- actually stops a brute force of a short numeric PIN.
+    select count(*) into v_global_fails from login_attempts
+     where attempted_at > now() - interval '10 minutes';
+    if v_global_fails >= 120 then return; end if;
   end if;
 
   select s.id, s.name, s.permission into v_staff_id, v_staff_name, v_permission from staff s where s.pin = p_pin and s.active = true limit 1;
@@ -569,18 +683,18 @@ begin
     return;
   end if;
 
-  -- Manager (1234), Touchscreen (9000), and Owner (7777, the Patron View
-  -- on the owner's personal phone) are fixed, trusted devices that should
-  -- basically never need re-login. Staff PINs (individual + the shared
-  -- 5678) keep the original 24h expiry - those change hands more often
-  -- and are the more likely-to-be-compromised case.
-  v_expires_at := case when v_role in ('manager', 'touchscreen', 'owner') then now() + interval '100 years' else now() + interval '24 hours' end;
+  -- Manager (1234), Touchscreen (9000) and Owner (7777) get a 30-day SLIDING
+  -- window rather than the old 100-year one: touch_session runs every ~2
+  -- minutes while a panel is open and pushes this forward, so a device in
+  -- daily use never logs itself out, while a lost or stolen device stops
+  -- being valid once it goes unused. Staff PINs keep the hard 24h ceiling.
+  v_expires_at := case when v_role in ('manager', 'touchscreen', 'owner') then now() + interval '30 days' else now() + interval '24 hours' end;
 
-  insert into device_sessions(role, expires_at, staff_name, user_agent, last_seen_at)
+  insert into device_sessions(role, expires_at, staff_name, user_agent, last_seen_at, ip)
   values (
     v_role, v_expires_at,
     coalesce(v_staff_name, case v_role when 'manager' then 'Yönetici' when 'touchscreen' then 'Dokunmatik Ekran' when 'owner' then 'Patron' else 'Personel (Genel)' end),
-    p_user_agent, now()
+    p_user_agent, now(), v_ip
   )
   returning device_sessions.token into v_token;
   return query select v_role,
@@ -592,10 +706,22 @@ grant execute on function login_with_pin(text, text) to anon, authenticated;
 
 -- Called every ~2 minutes by the client so last_seen_at reflects real
 -- activity, not just login time — Terminaller-lite's "Son görülme".
+-- Also refreshes the recorded IP (so the cafe's tablet self-registers as a
+-- trusted device without anyone re-entering a PIN) and slides the expiry
+-- forward for the long-lived roles, which is what makes the 30-day window in
+-- login_with_pin a rolling one rather than a hard cutoff.
 create or replace function touch_session(p_session_token uuid) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  update device_sessions set last_seen_at = now() where token = p_session_token and expires_at > now();
+  update device_sessions
+     set last_seen_at = now(),
+         ip = coalesce(get_client_ip(), ip),
+         expires_at = case
+           when role in ('manager', 'touchscreen', 'owner')
+             then greatest(expires_at, now() + interval '30 days')
+           else expires_at
+         end
+   where token = p_session_token and expires_at > now();
 end; $$;
 grant execute on function touch_session(uuid) to anon, authenticated;
 
@@ -1019,6 +1145,75 @@ create policy "voids session insert" on public.voids for insert with check (has_
 drop policy if exists "voids public read" on public.voids;
 drop policy if exists "voids session read" on public.voids;
 create policy "voids session read" on public.voids for select using (has_valid_session());
+
+-- =============================================================================
+-- VALUE-DOMAIN CONSTRAINTS (added 2026-07-25 after an adversarial audit)
+--
+-- The schema previously had only 2 CHECK constraints in total, so the database
+-- happily accepted negative payments, negative order totals, arbitrary status
+-- strings and arbitrary debt types. That matters most for `orders`, which
+-- allows public INSERT (the customer QR menu needs it) — these constraints are
+-- the only thing between an anonymous caller and a bogus money row.
+--
+-- Values below are exactly what the app writes; widen them here if the app
+-- ever gains a new status.
+-- =============================================================================
+alter table public.tabs
+  drop constraint if exists tabs_status_check,
+  add constraint tabs_status_check check (status in ('open', 'closed', 'merged'));
+
+alter table public.tabs
+  drop constraint if exists tabs_amounts_nonneg,
+  add constraint tabs_amounts_nonneg check (
+    coalesce(cash_amount, 0) >= 0 and coalesce(card_amount, 0) >= 0 and
+    coalesce(transfer_amount, 0) >= 0 and coalesce(debt_amount, 0) >= 0
+  );
+
+alter table public.orders
+  drop constraint if exists orders_status_check,
+  add constraint orders_status_check check (status in ('pending', 'served', 'dismissed'));
+
+alter table public.orders
+  drop constraint if exists orders_total_nonneg,
+  add constraint orders_total_nonneg check (coalesce(total, 0) >= 0);
+
+-- Anything other than these two silently vanishes from the ledger, because the
+-- balance maths sums 'borç', subtracts 'ödeme', and ignores everything else.
+alter table public.debt_transactions
+  drop constraint if exists debt_transactions_type_check,
+  add constraint debt_transactions_type_check check (type in ('borç', 'ödeme'));
+
+alter table public.debt_transactions
+  drop constraint if exists debt_transactions_amount_nonneg,
+  add constraint debt_transactions_amount_nonneg check (coalesce(amount, 0) >= 0);
+
+alter table public.voids
+  drop constraint if exists voids_amount_nonneg,
+  add constraint voids_amount_nonneg check (coalesce(amount, 0) >= 0);
+
+alter table public.discounts
+  drop constraint if exists discounts_amount_nonneg,
+  add constraint discounts_amount_nonneg check (
+    coalesce(discount_amount, 0) >= 0 and coalesce(original_amount, 0) >= 0
+  );
+
+alter table public.refunds
+  drop constraint if exists refunds_amount_nonneg,
+  add constraint refunds_amount_nonneg check (coalesce(amount, 0) >= 0);
+
+alter table public.cash_movements
+  drop constraint if exists cash_movements_amount_nonneg,
+  add constraint cash_movements_amount_nonneg check (coalesce(amount, 0) >= 0);
+
+-- Defence in depth behind get_or_create_open_tab's advisory lock: guarantees at
+-- most one open tab per table even if some future code path inserts directly.
+-- İ-normalised so "İSKELE 1" and "ISKELE 1" can't both be open at once.
+create unique index if not exists uniq_open_tab_per_table
+  on public.tabs (upper(replace(table_name, 'İ', 'I')))
+  where status = 'open';
+
+-- Supports the all-IP failure count in login_with_pin's global cap.
+create index if not exists idx_login_attempts_time on public.login_attempts (attempted_at);
 
 -- =============================================================================
 -- END — if this whole file ran without errors, the database is fully caught up.
