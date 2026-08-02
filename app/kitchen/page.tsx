@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getRestaurantSlug, setRealtimeToken, ensureRealtimeAuth, clearRealtimeToken } from '@/lib/supabase'
 import { debounce } from '@/lib/debounce'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
@@ -40,6 +40,7 @@ export default function KitchenPage() {
     localStorage.removeItem('kahfe_session_started_at')
     localStorage.removeItem('kahfe_session_epoch')
     localStorage.removeItem('kahfe_session_token')
+    clearRealtimeToken()
     setAuth(false); setStaffName('')
   }
 
@@ -60,6 +61,7 @@ export default function KitchenPage() {
       if (!savedAt || Date.now() - savedAt > sessionMaxAgeFor(savedRole)) { clearSession(); return }
       const currentEpoch = await getCurrentSessionEpoch()
       if (savedEpoch !== currentEpoch) { clearSession(); return }
+      await ensureRealtimeAuth()
       setAuth(true)
       setStaffName(savedName || 'Mutfak')
     })()
@@ -81,7 +83,7 @@ export default function KitchenPage() {
   }, [auth])
 
   async function login() {
-    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw, p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, staff_name: string } | null, error: any }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw, p_restaurant_slug: getRestaurantSlug(), p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, staff_name: string, access_token: string } | null, error: any }
     if (error) { setLoginSystemError(error.message || 'Bilinmeyen hata'); return }
     setLoginSystemError('')
     if (!data) { setPwError(true); return }
@@ -90,6 +92,7 @@ export default function KitchenPage() {
     localStorage.setItem('kahfe_staff_name', data.staff_name)
     localStorage.setItem('kahfe_session_started_at', String(Date.now()))
     localStorage.setItem('kahfe_session_token', data.token)
+    setRealtimeToken(data.access_token)
     const epoch = await getCurrentSessionEpoch()
     localStorage.setItem('kahfe_session_epoch', epoch)
     setAuth(true); setStaffName(data.staff_name)
