@@ -422,12 +422,24 @@ declare
   v_staff boolean;
   v_qty int;
   v_id uuid;
+  v_recent_ids text[];
 begin
   v_staff := has_valid_session();
 
+  -- For anonymous (QR) callers, fetch every item id ordered in the last 5
+  -- minutes ONCE into a set, then test each basket line against it in memory.
+  -- A basket of N items therefore costs a single indexed recent-orders scan
+  -- rather than N correlated JSONB unnests — the difference that matters when
+  -- many orders land at once.
+  if not v_staff then
+    select array_agg(distinct oi->>'id')
+      into v_recent_ids
+      from orders o, lateral jsonb_array_elements(o.items) oi
+     where o.created_at > now() - interval '5 minutes';
+    v_recent_ids := coalesce(v_recent_ids, array[]::text[]);
+  end if;
+
   for item in select * from jsonb_array_elements(p_items) loop
-    -- Skip malformed entries rather than aborting, so one bad line can never
-    -- block stock accounting for the rest of a legitimate order.
     begin
       v_id := (item->>'id')::uuid;
       v_qty := coalesce((item->>'quantity')::int, 0);
@@ -436,26 +448,14 @@ begin
     end;
 
     if v_qty <= 0 then continue; end if;
-    if not v_staff and v_qty > 100 then continue; end if;
 
     if not v_staff then
-      if not exists (
-        select 1 from orders o
-         where o.created_at > now() - interval '5 minutes'
-           and exists (
-             select 1 from jsonb_array_elements(o.items) oi
-              where (oi->>'id') = (item->>'id')
-           )
-      ) then
-        continue;
-      end if;
+      if v_qty > 100 then continue; end if;
+      if not ((item->>'id') = any(v_recent_ids)) then continue; end if;
     end if;
 
     update menu_items
        set stock_quantity = greatest(0, stock_quantity - v_qty),
-           -- Only ever switches availability OFF. The previous form recomputed
-           -- this as (remaining > 0), which silently re-enabled an item the
-           -- manager had deliberately marked unavailable.
            available = case
              when greatest(0, stock_quantity - v_qty) <= 0 then false
              else available
@@ -645,6 +645,7 @@ declare
   v_ip_fails int;
   v_global_fails int;
 begin
+  if random() < 0.02 then perform cleanup_expired(); end if;
   v_ip := get_client_ip();
 
   -- A device already holding a live session (the cafe's tablet, the owner's
@@ -1216,5 +1217,41 @@ create unique index if not exists uniq_open_tab_per_table
 create index if not exists idx_login_attempts_time on public.login_attempts (attempted_at);
 
 -- =============================================================================
+-- =============================================================================
+-- SCALE / RELIABILITY HARDENING (added 2026-07-26)
+-- =============================================================================
+
+-- login_with_pin's trusted-device check filters device_sessions by ip; without
+-- an index it seq-scans on every login. Plus an expiry index for pruning.
+create index if not exists idx_device_sessions_ip on public.device_sessions (ip);
+create index if not exists idx_device_sessions_expires on public.device_sessions (expires_at);
+
+-- device_sessions and login_attempts otherwise grow forever (every login adds a
+-- session; every failed attempt adds a row). cleanup_expired prunes what no
+-- longer serves the rate limiter or an active device. pg_cron isn't available
+-- on this project, so login_with_pin calls this ~2% of the time (see above) to
+-- keep both tables self-maintaining without a scheduler.
+create or replace function cleanup_expired() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from device_sessions where expires_at < now() - interval '1 day';
+  delete from login_attempts where attempted_at < now() - interval '1 day';
+end; $$;
+revoke all on function cleanup_expired() from anon, authenticated;
+
+-- orders and tabs see constant inserts + status churn all day. The default 20%
+-- dead-tuple threshold lets bloat accumulate between vacuums on exactly the two
+-- hottest tables; lowering it keeps scans tight through a long service.
+alter table public.orders set (
+  autovacuum_vacuum_scale_factor = 0.05,
+  autovacuum_analyze_scale_factor = 0.02,
+  autovacuum_vacuum_cost_delay = 2
+);
+alter table public.tabs set (
+  autovacuum_vacuum_scale_factor = 0.05,
+  autovacuum_analyze_scale_factor = 0.02,
+  autovacuum_vacuum_cost_delay = 2
+);
+
 -- END — if this whole file ran without errors, the database is fully caught up.
 -- =============================================================================
