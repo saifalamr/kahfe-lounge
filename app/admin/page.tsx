@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
+import { debounce } from '@/lib/debounce'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
 import Sidebar from './components/Sidebar'
@@ -204,6 +205,13 @@ export default function AdminPage() {
     refreshNotifications()
     refreshTodayRevenue()
 
+    // Coalesce the refetches driven by realtime. During a rush many order/tab
+    // events land in a burst; without this each one fired a full
+    // loadTableMapData() (and refreshTodayRevenue() for tab events). Debouncing
+    // collapses a burst into a single refetch shortly after it settles.
+    const debouncedMap = debounce(() => loadTableMapData(), 350)
+    const debouncedMapRevenue = debounce(() => { loadTableMapData(); refreshTodayRevenue() }, 350)
+
     // Real-time subscription for new orders
     const channel = supabase
       .channel('orders-channel')
@@ -222,11 +230,11 @@ export default function AdminPage() {
           playNotifSound()
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadTableMapData())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => debouncedMap())
       // Revenue is only actually earned when a tab CLOSES (payment taken),
       // not when an order is placed — this is what keeps the header total
       // live the moment any device closes/reopens/refunds a tab.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => { loadTableMapData(); refreshTodayRevenue() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => debouncedMapRevenue())
       .subscribe((status) => {
         // SUBSCRIBED = healthy; anything else (CHANNEL_ERROR, TIMED_OUT,
         // CLOSED) means we're relying on the polling fallback for now.
@@ -240,7 +248,7 @@ export default function AdminPage() {
     // Supabase project - checks every 15s regardless of which tab is open
     const notifPoll = setInterval(() => { refreshNotifications(); refreshTodayRevenue() }, 15000)
 
-    return () => { supabase.removeChannel(channel); clearInterval(notifPoll) }
+    return () => { debouncedMap.cancel(); debouncedMapRevenue.cancel(); supabase.removeChannel(channel); clearInterval(notifPoll) }
   }, [auth])
 
   // Keep alarming every few seconds for as long as there's a new order the
@@ -2385,15 +2393,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (!auth || tab !== 'orders') return
 
+    // Coalesce burst refetches on the live order list (see lib/debounce).
+    const debouncedList = debounce(() => loadOrders(dateFilter), 350)
     const liveChannel = supabase
       .channel('orders-live-list')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => loadOrders(dateFilter))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders(dateFilter))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => debouncedList())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => debouncedList())
       .subscribe()
 
     const pollId = setInterval(() => loadOrders(dateFilter), 20000)
 
-    return () => { supabase.removeChannel(liveChannel); clearInterval(pollId) }
+    return () => { debouncedList.cancel(); supabase.removeChannel(liveChannel); clearInterval(pollId) }
   }, [auth, tab, dateFilter])
   const [categories, setCategories] = useState<Category[]>([])
   const [staffList, setStaffList] = useState<any[]>([])

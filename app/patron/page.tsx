@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { formatTL } from '../admin/lib/format'
+import { debounce } from '@/lib/debounce'
 
 // Read-only owner dashboard. PIN-gated through the exact same
 // login_with_pin RPC every other login on this app uses (rate limiting,
@@ -202,14 +203,18 @@ export default function PatronPage() {
   useEffect(() => {
     if (!auth) return
     refreshAll()
+    // refreshAll fires ~15 queries; without coalescing, a rush of order/tab/debt
+    // events would run all of them per event. Debounce collapses a burst into
+    // one refresh (see lib/debounce).
+    const debouncedRefresh = debounce(() => refreshAll(), 400)
     const channel = supabase
       .channel('patron-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, refreshAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refreshAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_transactions' }, refreshAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => debouncedRefresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => debouncedRefresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_transactions' }, () => debouncedRefresh())
       .subscribe()
     const poll = setInterval(refreshAll, 30000)
-    return () => { supabase.removeChannel(channel); clearInterval(poll) }
+    return () => { debouncedRefresh.cancel(); supabase.removeChannel(channel); clearInterval(poll) }
   }, [auth, refreshAll])
 
   async function login() {

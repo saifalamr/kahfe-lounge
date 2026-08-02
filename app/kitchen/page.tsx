@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { debounce } from '@/lib/debounce'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 
@@ -122,6 +123,9 @@ export default function KitchenPage() {
   useEffect(() => {
     if (!auth) return
     loadOrders()
+    // Coalesce the UPDATE-driven refetches: a rush fires many status changes in
+    // quick succession, and without this each one triggered a full loadOrders().
+    const debouncedReload = debounce(() => loadOrders(), 350)
     const channel = supabase
       .channel('kitchen-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: any) => {
@@ -130,11 +134,11 @@ export default function KitchenPage() {
           beep()
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => debouncedReload())
       .subscribe()
     const poll = setInterval(loadOrders, 20000)
     const clock = setInterval(() => setNow(Date.now()), 1000)
-    return () => { supabase.removeChannel(channel); clearInterval(poll); clearInterval(clock) }
+    return () => { debouncedReload.cancel(); supabase.removeChannel(channel); clearInterval(poll); clearInterval(clock) }
   }, [auth])
 
   if (!auth) return (

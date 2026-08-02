@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { debounce } from '@/lib/debounce'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { buildKitchenTicketEscPos, printViaRawBT } from '@/app/admin/lib/escpos'
@@ -214,6 +215,8 @@ export default function NargilePage() {
     loadStationMap()
     loadOrders()
     loadNargileTimers()
+    // Coalesce UPDATE-driven refetches during a rush (see lib/debounce).
+    const debouncedReload = debounce(() => loadOrders(), 350)
     const channel = supabase
       .channel('nargile-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload: any) => {
@@ -233,11 +236,11 @@ export default function NargilePage() {
           }
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => loadOrders())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => debouncedReload())
       .subscribe()
     const poll = setInterval(() => { loadOrders(); loadNargileTimers() }, 20000)
     const clock = setInterval(() => setNow(Date.now()), 1000)
-    return () => { supabase.removeChannel(channel); clearInterval(poll); clearInterval(clock) }
+    return () => { debouncedReload.cancel(); supabase.removeChannel(channel); clearInterval(poll); clearInterval(clock) }
   }, [auth])
 
   // Only orders that have at least one nargile-station item, showing only
