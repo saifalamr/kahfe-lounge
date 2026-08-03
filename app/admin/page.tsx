@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { supabase, Category, MenuItem } from '@/lib/supabase'
+import { supabase, Category, MenuItem, getRestaurantSlug, setRealtimeToken, ensureRealtimeAuth, clearRealtimeToken } from '@/lib/supabase'
 import { debounce } from '@/lib/debounce'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
@@ -2536,6 +2536,7 @@ export default function AdminPage() {
     localStorage.removeItem('kahfe_session_started_at')
     localStorage.removeItem('kahfe_session_epoch')
     localStorage.removeItem('kahfe_session_token')
+    clearRealtimeToken()
     setAuth(false); setRole(null); setStaffName(''); setStaffPermission('full')
   }
 
@@ -2563,6 +2564,7 @@ export default function AdminPage() {
       if (!savedAt || Date.now() - savedAt > sessionMaxAgeFor(savedRole)) { clearSession(); return }
       const currentEpoch = await getCurrentSessionEpoch()
       if (savedEpoch !== currentEpoch) { clearSession(); return }
+      await ensureRealtimeAuth()
       setRole(savedRole)
       setAuth(true)
       setStaffName(savedName || (savedRole === 'manager' ? 'Yönetici' : savedRole === 'touchscreen' ? 'Dokunmatik Ekran' : 'Personel'))
@@ -2807,7 +2809,7 @@ export default function AdminPage() {
     // touchscreen/staff-shared PIN) and, only on success, mints a session
     // token — nobody can obtain a token without passing a real PIN check
     // inside this same database call.
-    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw, p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null } | null, error: any }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pw, p_restaurant_slug: getRestaurantSlug(), p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, staff_name: string, permission: string | null, access_token: string } | null, error: any }
     if (error) {
       setLoginSystemError(error.message || 'Bilinmeyen hata')
       return
@@ -2821,6 +2823,7 @@ export default function AdminPage() {
     localStorage.setItem('kahfe_staff_permission', permission)
     localStorage.setItem('kahfe_session_started_at', String(Date.now()))
     localStorage.setItem('kahfe_session_token', data.token)
+    setRealtimeToken(data.access_token)
     const epoch = await getCurrentSessionEpoch()
     localStorage.setItem('kahfe_session_epoch', epoch)
     setRole(normalizedRole)

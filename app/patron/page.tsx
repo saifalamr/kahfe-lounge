@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getRestaurantSlug, setRealtimeToken, ensureRealtimeAuth, clearRealtimeToken } from '@/lib/supabase'
 import { useConnectivity } from '@/lib/useConnectivity'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { formatTL } from '../admin/lib/format'
@@ -195,9 +195,11 @@ export default function PatronPage() {
   }, [])
 
   useEffect(() => {
-    const token = localStorage.getItem('kahfe_session_token')
-    if (token) setAuth(true)
-    setChecking(false)
+    (async () => {
+      const token = localStorage.getItem('kahfe_session_token')
+      if (token) { await ensureRealtimeAuth(); setAuth(true) }
+      setChecking(false)
+    })()
   }, [])
 
   useEffect(() => {
@@ -218,14 +220,16 @@ export default function PatronPage() {
   }, [auth, refreshAll])
 
   async function login() {
-    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pin, p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string } | null, error: any }
+    const { data, error } = await supabase.rpc('login_with_pin', { p_pin: pin, p_restaurant_slug: getRestaurantSlug(), p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }).maybeSingle() as { data: { role: string, token: string, access_token: string } | null, error: any }
     if (error || !data || data.role !== 'owner') { setPinError(true); return }
     localStorage.setItem('kahfe_session_token', data.token)
+    setRealtimeToken(data.access_token)
     setAuth(true)
   }
 
   function logout() {
     localStorage.removeItem('kahfe_session_token')
+    clearRealtimeToken()
     setAuth(false)
     setPin('')
   }
