@@ -23,7 +23,7 @@ function slugify(s: string): string {
 
 type Cafe = {
   id: string; slug: string; name: string; active: boolean
-  last_invoice_no: number; staff_count: number; menu_count: number
+  last_invoice_no: number; staff_count: number; menu_count: number; app_url: string | null
 }
 
 export default function PlatformPage() {
@@ -195,7 +195,7 @@ export default function PlatformPage() {
               <div style={{ color: S.text2, fontSize: 12, fontFamily: mono, marginBottom: 16, lineHeight: 1.6 }}>
                 {c.staff_count} personel · {c.menu_count} ürün<br />son fatura #{c.last_invoice_no}
               </div>
-              <a href={`/admin?r=${encodeURIComponent(c.slug)}`}
+              <a href={c.app_url ? `${c.app_url}/admin` : `/admin?r=${encodeURIComponent(c.slug)}`}
                 style={{ marginTop: 'auto', display: 'block', textAlign: 'center', height: 46, lineHeight: '46px', background: S.gold, borderRadius: 12, color: '#0D0D0D', fontSize: 15, fontWeight: 700, textDecoration: 'none' }}>
                 Yönetim panelini aç →
               </a>
