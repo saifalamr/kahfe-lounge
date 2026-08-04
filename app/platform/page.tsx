@@ -195,9 +195,9 @@ export default function PlatformPage() {
               <div style={{ color: S.text2, fontSize: 12, fontFamily: mono, marginBottom: 16, lineHeight: 1.6 }}>
                 {c.staff_count} personel · {c.menu_count} ürün<br />son fatura #{c.last_invoice_no}
               </div>
-              <a href={`/?r=${encodeURIComponent(c.slug)}`}
+              <a href={`/admin?r=${encodeURIComponent(c.slug)}`}
                 style={{ marginTop: 'auto', display: 'block', textAlign: 'center', height: 46, lineHeight: '46px', background: S.gold, borderRadius: 12, color: '#0D0D0D', fontSize: 15, fontWeight: 700, textDecoration: 'none' }}>
-                Aç →
+                Yönetim panelini aç →
               </a>
             </div>
           ))}
