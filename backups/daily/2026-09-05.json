@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-06T04:55:28.707Z",
+  "generated_at": "2026-09-05T06:29:35.516Z",
   "tables": {
     "access_pins": [
       {
@@ -1054,6 +1054,27 @@
     ],
     "menu_items": [
       {
+        "id": "b6421017-e7e5-4de6-8449-3e9c048b5583",
+        "category_id": "5f268fc4-34c0-473e-80ef-745a66091fe5",
+        "name": "Köfte Ekmek",
+        "description": "Köfte, domates ve patates kızartmasıyla birlikte servis edilen doyurucu köfte ekmek.",
+        "price": 350,
+        "image_url": "https://axjepeqbcbgryopkimzy.supabase.co/storage/v1/object/public/menu-images/items/1781431290457.jpg",
+        "available": true,
+        "order_index": 101,
+        "created_at": "2026-06-14T08:59:15.248052+00:00",
+        "name_en": "Meatball Bread",
+        "name_ar": "خبز كوفتة",
+        "description_en": "Meatballs with tomato and french fries in bread.",
+        "description_ar": "كوفتة مع طماطم وبطاطس مقلية في الخبز.",
+        "recommended": false,
+        "staff_only": false,
+        "track_stock": false,
+        "stock_quantity": 0,
+        "low_stock_threshold": 5,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
         "id": "bc869f64-4548-41a4-8fed-7d553cb1a730",
         "category_id": "5aec6044-760d-4aa9-86a6-4bd75003580a",
         "name": "Flat White",
@@ -1151,6 +1172,27 @@
         "name_ar": "بيض خاص",
         "description_en": "Special egg plate with kavurma, cheese and sujuk. Serves 2.",
         "description_ar": "طبق بيض خاص مع اللحم المحمص والجبن والسجق. يكفي شخصين.",
+        "recommended": false,
+        "staff_only": false,
+        "track_stock": false,
+        "stock_quantity": 0,
+        "low_stock_threshold": 5,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "d661ce13-5556-44ce-a09c-98811dd93873",
+        "category_id": "a0b59b5b-7ee0-40c3-96bb-455854a502cf",
+        "name": "Su",
+        "description": "Soğuk servis edilen doğal içme suyu.",
+        "price": 50,
+        "image_url": "https://axjepeqbcbgryopkimzy.supabase.co/storage/v1/object/public/menu-images/items/1781430306100.jpg",
+        "available": true,
+        "order_index": 136,
+        "created_at": "2026-06-14T08:59:22.792652+00:00",
+        "name_en": "Water",
+        "name_ar": "ماء",
+        "description_en": "Natural drinking water served cold.",
+        "description_ar": "ماء شرب طبيعي يُقدم بارداً.",
         "recommended": false,
         "staff_only": false,
         "track_stock": false,
@@ -1319,27 +1361,6 @@
         "name_ar": "قهوة تركية مزدوجة",
         "description_en": "Double portion Turkish coffee with extra foam and grounds for a richer experience.",
         "description_ar": "قهوة تركية بحصة مضاعفة من الرغوة والثفل لتجربة أغنى.",
-        "recommended": false,
-        "staff_only": false,
-        "track_stock": false,
-        "stock_quantity": 0,
-        "low_stock_threshold": 5,
-        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
-      },
-      {
-        "id": "d661ce13-5556-44ce-a09c-98811dd93873",
-        "category_id": "a0b59b5b-7ee0-40c3-96bb-455854a502cf",
-        "name": "Su",
-        "description": "Soğuk servis edilen doğal içme suyu.",
-        "price": 40,
-        "image_url": "https://axjepeqbcbgryopkimzy.supabase.co/storage/v1/object/public/menu-images/items/1781430306100.jpg",
-        "available": true,
-        "order_index": 136,
-        "created_at": "2026-06-14T08:59:22.792652+00:00",
-        "name_en": "Water",
-        "name_ar": "ماء",
-        "description_en": "Natural drinking water served cold.",
-        "description_ar": "ماء شرب طبيعي يُقدم بارداً.",
         "recommended": false,
         "staff_only": false,
         "track_stock": false,
@@ -2600,27 +2621,6 @@
         "name_ar": "فانتا",
         "description_en": "Refreshing cold Fanta with orange flavor.",
         "description_ar": "فانتا باردة منعشة بنكهة البرتقال.",
-        "recommended": false,
-        "staff_only": false,
-        "track_stock": false,
-        "stock_quantity": 0,
-        "low_stock_threshold": 5,
-        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
-      },
-      {
-        "id": "b6421017-e7e5-4de6-8449-3e9c048b5583",
-        "category_id": "5f268fc4-34c0-473e-80ef-745a66091fe5",
-        "name": "Köfte Ekmek",
-        "description": "Köfte, domates ve patates kızartmasıyla birlikte servis edilen doyurucu köfte ekmek.",
-        "price": 310,
-        "image_url": "https://axjepeqbcbgryopkimzy.supabase.co/storage/v1/object/public/menu-images/items/1781431290457.jpg",
-        "available": true,
-        "order_index": 101,
-        "created_at": "2026-06-14T08:59:15.248052+00:00",
-        "name_en": "Meatball Bread",
-        "name_ar": "خبز كوفتة",
-        "description_en": "Meatballs with tomato and french fries in bread.",
-        "description_ar": "كوفتة مع طماطم وبطاطس مقلية في الخبز.",
         "recommended": false,
         "staff_only": false,
         "track_stock": false,
@@ -5876,10 +5876,33 @@
           }
         ],
         "total": 140,
-        "status": "pending",
+        "status": "served",
         "created_at": "2026-08-05T17:24:30.828663+00:00",
         "note": null,
         "tab_id": "97416012-c2cd-4128-821b-0e55743f9448",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "f2d1d887-a3b6-4c6a-98cb-bdd70bf908b0",
+        "table_name": "MASA-11",
+        "items": [
+          {
+            "id": "cef18949-aa83-4b3f-8127-7ca0277bca58",
+            "name": "Ice Latte",
+            "price": 170,
+            "name_en": "Iced Latte",
+            "quantity": 1,
+            "subtotal": 170
+          }
+        ],
+        "total": 170,
+        "status": "served",
+        "created_at": "2026-08-11T02:29:27.785398+00:00",
+        "note": null,
+        "tab_id": "e541a0d5-e1f7-4008-8c4d-c184a6a350eb",
         "created_by": "Müşteri (QR)",
         "handled_by": null,
         "client_order_id": null,
@@ -5968,6 +5991,83 @@
         "tab_id": "dedf76cc-36e2-4c99-95f5-64539497bc52",
         "created_by": "Yönetici",
         "handled_by": "Yönetici",
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "23e3ae19-2c87-4926-ab9e-708ec417403c",
+        "table_name": "KITAPLIK-3",
+        "items": [
+          {
+            "id": "09fbe263-897a-4e6c-9064-f26cda0842a9",
+            "name": "Daim (Ice Cola)",
+            "price": 450,
+            "name_en": "Daim Hookah (Dejavu)",
+            "quantity": 1,
+            "subtotal": 450
+          },
+          {
+            "id": "73007b0e-8a05-4593-acb1-c1cc22f60648",
+            "name": "Ice Tea",
+            "price": 80,
+            "name_en": "Iced Tea",
+            "quantity": 2,
+            "subtotal": 160
+          }
+        ],
+        "total": 610,
+        "status": "dismissed",
+        "created_at": "2026-08-22T19:26:11.807667+00:00",
+        "note": null,
+        "tab_id": "058f6462-0eb6-4153-bc8a-029c4bfae782",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "f76b5b18-d84f-463b-a5ca-6ec764c8a1a5",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "0fe7b2e8-e4e7-47e7-b457-b61d669b7448",
+            "name": "Sosis Tabağı",
+            "price": 280,
+            "name_en": "Sausage Plate",
+            "quantity": 1,
+            "subtotal": 280
+          }
+        ],
+        "total": 280,
+        "status": "dismissed",
+        "created_at": "2026-08-25T16:54:07.965098+00:00",
+        "note": null,
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "afa44cf3-5136-4378-826b-cf88e54dada0",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "23f06ed7-745b-4054-be93-67d29dcbb3e7",
+            "name": "Churchill",
+            "price": 130,
+            "name_en": "Churchill",
+            "quantity": 2,
+            "subtotal": 260
+          }
+        ],
+        "total": 260,
+        "status": "dismissed",
+        "created_at": "2026-08-25T16:54:34.784596+00:00",
+        "note": "Abi buzlu bardak birisinde tuz olmicak",
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
         "client_order_id": null,
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       },
@@ -6244,6 +6344,161 @@
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       },
       {
+        "id": "dd0203eb-476a-4a22-8020-fa6cf1a18523",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "c486f9cc-7982-4380-b293-6753f5417974",
+            "name": "Berry Hibiskus",
+            "price": 190,
+            "name_en": "Berry Hibiscus",
+            "quantity": 1,
+            "subtotal": 190
+          },
+          {
+            "id": "ad875de6-63f7-4c7a-8ab8-0b492a2e0320",
+            "name": "İnce Belli Çay",
+            "price": 50,
+            "name_en": "Turkish Tea",
+            "quantity": 1,
+            "subtotal": 50
+          }
+        ],
+        "total": 240,
+        "status": "served",
+        "created_at": "2026-08-10T15:53:11.766319+00:00",
+        "note": null,
+        "tab_id": "a2a631cc-1d98-4811-88bd-39062dbf940d",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "277892d3-e948-4116-b577-298afbe01957",
+        "table_name": "MASA-11",
+        "items": [
+          {
+            "id": "918955a6-69d1-475b-b07e-fc5eab6e18d6",
+            "name": "Ice Mocha",
+            "price": 210,
+            "name_en": "Iced Mocha",
+            "quantity": 1,
+            "subtotal": 210
+          },
+          {
+            "id": "cef18949-aa83-4b3f-8127-7ca0277bca58",
+            "name": "Ice Latte",
+            "price": 170,
+            "name_en": "Iced Latte",
+            "quantity": 1,
+            "subtotal": 170
+          }
+        ],
+        "total": 380,
+        "status": "dismissed",
+        "created_at": "2026-08-13T13:46:37.631748+00:00",
+        "note": null,
+        "tab_id": "db09e886-c5f6-41a6-84ed-bd99233e098d",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "4f6b0940-3c98-4a23-befa-19cad8fdec8a",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "84ae39cc-cfa1-4fcd-9285-72a255884b41",
+            "name": "Snickers Pasta",
+            "price": 270,
+            "name_en": "Snickers Cake",
+            "quantity": 1,
+            "subtotal": 270
+          }
+        ],
+        "total": 270,
+        "status": "dismissed",
+        "created_at": "2026-08-23T22:47:45.649797+00:00",
+        "note": null,
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "fc1ea8f6-9098-46f2-b986-b89948a44692",
+        "table_name": "MASA-1",
+        "items": [
+          {
+            "id": "cc938955-bbf4-439b-8ea1-0be029cb3269",
+            "name": "Adalya (Çilek)",
+            "price": 500,
+            "name_en": "Adalya Hookah (Çilek)",
+            "quantity": 1,
+            "subtotal": 500
+          },
+          {
+            "id": "5e8b0898-2b07-48aa-8890-b530f30bd9bf",
+            "name": "Türk Kahvesi Damla Sakızlı (Sade)",
+            "price": 130,
+            "name_en": "Mastic Turkish Coffee (Sade)",
+            "quantity": 1,
+            "subtotal": 130
+          },
+          {
+            "id": "38f3043f-8d90-4d82-966c-e7d619458c3b",
+            "name": "Sahlepli Sıcak Çikolata",
+            "price": 170,
+            "name_en": "Hot Chocolate with Sahlep",
+            "quantity": 1,
+            "subtotal": 170
+          },
+          {
+            "id": "ebee15a9-4648-4895-ae40-5a79d6b9248f",
+            "name": "Sıcak Çikolata",
+            "price": 180,
+            "name_en": "Hot Chocolate",
+            "quantity": 1,
+            "subtotal": 180
+          }
+        ],
+        "total": 980,
+        "status": "served",
+        "created_at": "2026-08-11T22:01:14.782847+00:00",
+        "note": null,
+        "tab_id": "ec43c2b1-5477-45a8-b7a1-95d4d978469c",
+        "created_by": "Yönetici",
+        "handled_by": "Yönetici",
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "f2068b49-f3ac-48c8-abf0-5bcb5d8bab72",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "ad875de6-63f7-4c7a-8ab8-0b492a2e0320",
+            "name": "İnce Belli Çay",
+            "price": 50,
+            "name_en": "Turkish Tea",
+            "quantity": 1,
+            "subtotal": 50
+          }
+        ],
+        "total": 50,
+        "status": "served",
+        "created_at": "2026-08-10T16:13:25.58945+00:00",
+        "note": null,
+        "tab_id": "a2a631cc-1d98-4811-88bd-39062dbf940d",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
         "id": "2f35cab6-1f8a-4c3d-9c70-7bee46ec8123",
         "table_name": "Bilinmiyor",
         "items": [
@@ -6265,10 +6520,72 @@
           }
         ],
         "total": 310,
-        "status": "pending",
+        "status": "dismissed",
         "created_at": "2026-08-03T16:46:20.999806+00:00",
         "note": null,
         "tab_id": "8729e62f-8d1c-4226-8b76-9b2a55b54b8b",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "4c476d1b-0211-45da-9d6f-ea1d80052ebb",
+        "table_name": "MASA-11",
+        "items": [
+          {
+            "id": "cc938955-bbf4-439b-8ea1-0be029cb3269",
+            "name": "Adalya (Love 66)",
+            "price": 500,
+            "name_en": "Adalya Hookah (Lady Killer)",
+            "quantity": 1,
+            "subtotal": 500
+          }
+        ],
+        "total": 500,
+        "status": "dismissed",
+        "created_at": "2026-08-13T13:45:35.877364+00:00",
+        "note": "Lowe Lady karışık",
+        "tab_id": "db09e886-c5f6-41a6-84ed-bd99233e098d",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "988691dd-7396-4ef0-8ef8-a60f899dde8b",
+        "table_name": "MASA-3",
+        "items": [
+          {
+            "id": "d7701304-cabe-4659-ac9c-f5e80ce4a8e9",
+            "name": "Karışık Izgara",
+            "price": 450,
+            "name_en": "Mixed Grill",
+            "quantity": 1,
+            "subtotal": 450
+          },
+          {
+            "id": "64136f9e-2009-4793-96fe-59a4b2e4a797",
+            "name": "Belçika Sıcak Çikolata",
+            "price": 200,
+            "name_en": "Belgian Hot Chocolate",
+            "quantity": 1,
+            "subtotal": 200
+          },
+          {
+            "id": "61f4cf29-b82e-4957-b923-7d29ca333268",
+            "name": "Red Bull",
+            "price": 170,
+            "name_en": "Red Bull",
+            "quantity": 1,
+            "subtotal": 170
+          }
+        ],
+        "total": 820,
+        "status": "dismissed",
+        "created_at": "2026-08-24T09:32:16.737792+00:00",
+        "note": null,
+        "tab_id": "99db2a7d-9c61-4b10-918b-381d791c8718",
         "created_by": "Müşteri (QR)",
         "handled_by": null,
         "client_order_id": null,
@@ -6904,6 +7221,83 @@
         "handled_by": "Yönetici",
         "client_order_id": null,
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "f646bb11-04cb-4318-acff-eded80f19372",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "ad875de6-63f7-4c7a-8ab8-0b492a2e0320",
+            "name": "İnce Belli Çay",
+            "price": 50,
+            "name_en": "Turkish Tea",
+            "quantity": 1,
+            "subtotal": 50
+          }
+        ],
+        "total": 50,
+        "status": "served",
+        "created_at": "2026-08-10T16:15:41.36354+00:00",
+        "note": null,
+        "tab_id": "a2a631cc-1d98-4811-88bd-39062dbf940d",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "c222059a-83c8-451e-a31c-4d3213208a67",
+        "table_name": "KITAPLIK-1",
+        "items": [
+          {
+            "id": "bbbe391c-e5d7-414c-a294-88396ae973ba",
+            "name": "Al Fakher (Cappuccino)",
+            "price": 500,
+            "name_en": "Al Fakher Hookah (Double Apple)",
+            "quantity": 1,
+            "subtotal": 500
+          }
+        ],
+        "total": 500,
+        "status": "dismissed",
+        "created_at": "2026-08-18T18:33:36.967947+00:00",
+        "note": null,
+        "tab_id": "9ae5b485-1d0f-45c0-888c-9a473fca336f",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "b404c3e4-1860-4410-a160-acb90815fdb4",
+        "table_name": "MASA-3",
+        "items": [
+          {
+            "id": "1b1f2b51-8ead-4014-8bbf-11bb99643847",
+            "name": "Türk Kahvesi (Az Şekerli)",
+            "price": 140,
+            "name_en": "Turkish Coffee (Az Şekerli)",
+            "quantity": 1,
+            "subtotal": 140
+          },
+          {
+            "id": "5cc1d609-2a5d-442a-9407-8f5c446eaca7",
+            "name": "Kahfe Special Tost",
+            "price": 320,
+            "name_en": "Kahfe Special Toast",
+            "quantity": 1,
+            "subtotal": 320
+          }
+        ],
+        "total": 460,
+        "status": "dismissed",
+        "created_at": "2026-08-24T09:33:18.998968+00:00",
+        "note": null,
+        "tab_id": "99db2a7d-9c61-4b10-918b-381d791c8718",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       }
     ],
     "price_edits": [
@@ -7117,14 +7511,94 @@
       {
         "id": "97416012-c2cd-4128-821b-0e55743f9448",
         "table_name": "MASA-3",
-        "status": "open",
+        "status": "closed",
         "opened_at": "2026-08-05T17:24:30.364844+00:00",
+        "closed_at": "2026-08-10T17:47:11.477+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 140,
+        "closed_by": "Yönetici",
+        "created_at": "2026-08-05T17:24:30.364844+00:00",
+        "cash_amount": 140,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 24,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "e541a0d5-e1f7-4008-8c4d-c184a6a350eb",
+        "table_name": "MASA-11",
+        "status": "closed",
+        "opened_at": "2026-08-11T02:29:27.559617+00:00",
+        "closed_at": "2026-08-11T22:00:14.26+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 170,
+        "closed_by": "Yönetici",
+        "created_at": "2026-08-11T02:29:27.559617+00:00",
+        "cash_amount": 170,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 26,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "db09e886-c5f6-41a6-84ed-bd99233e098d",
+        "table_name": "MASA-11",
+        "status": "open",
+        "opened_at": "2026-08-13T13:45:35.389179+00:00",
         "closed_at": null,
         "bill_requested": false,
         "payment_method": null,
         "total": 0,
         "closed_by": null,
-        "created_at": "2026-08-05T17:24:30.364844+00:00",
+        "created_at": "2026-08-13T13:45:35.389179+00:00",
+        "cash_amount": 0,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": null,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "058f6462-0eb6-4153-bc8a-029c4bfae782",
+        "table_name": "KİTAPLIK-3",
+        "status": "open",
+        "opened_at": "2026-08-22T19:26:11.494475+00:00",
+        "closed_at": null,
+        "bill_requested": false,
+        "payment_method": null,
+        "total": 0,
+        "closed_by": null,
+        "created_at": "2026-08-22T19:26:11.494475+00:00",
+        "cash_amount": 0,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": null,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "99db2a7d-9c61-4b10-918b-381d791c8718",
+        "table_name": "MASA-3",
+        "status": "open",
+        "opened_at": "2026-08-24T09:32:16.450795+00:00",
+        "closed_at": null,
+        "bill_requested": false,
+        "payment_method": null,
+        "total": 0,
+        "closed_by": null,
+        "created_at": "2026-08-24T09:32:16.450795+00:00",
         "cash_amount": 0,
         "card_amount": 0,
         "discount_amount": 0,
@@ -7550,6 +8024,86 @@
         "discount_amount": 0,
         "discount_reason": null,
         "fatura_no": 23,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "a2a631cc-1d98-4811-88bd-39062dbf940d",
+        "table_name": "MASA-8",
+        "status": "closed",
+        "opened_at": "2026-08-10T15:53:11.291998+00:00",
+        "closed_at": "2026-08-10T17:47:17.213+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 340,
+        "closed_by": "Yönetici",
+        "created_at": "2026-08-10T15:53:11.291998+00:00",
+        "cash_amount": 340,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 25,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "9ae5b485-1d0f-45c0-888c-9a473fca336f",
+        "table_name": "KİTAPLIK-1",
+        "status": "open",
+        "opened_at": "2026-08-18T18:33:36.459364+00:00",
+        "closed_at": null,
+        "bill_requested": false,
+        "payment_method": null,
+        "total": 0,
+        "closed_by": null,
+        "created_at": "2026-08-18T18:33:36.459364+00:00",
+        "cash_amount": 0,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": null,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "table_name": "MASA-8",
+        "status": "open",
+        "opened_at": "2026-08-23T22:47:45.315015+00:00",
+        "closed_at": null,
+        "bill_requested": false,
+        "payment_method": null,
+        "total": 0,
+        "closed_by": null,
+        "created_at": "2026-08-23T22:47:45.315015+00:00",
+        "cash_amount": 0,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": null,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "ec43c2b1-5477-45a8-b7a1-95d4d978469c",
+        "table_name": "MASA-1",
+        "status": "closed",
+        "opened_at": "2026-08-11T22:01:14.517024+00:00",
+        "closed_at": "2026-09-04T22:39:47.94+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 980,
+        "closed_by": "Yönetici",
+        "created_at": "2026-08-11T22:01:14.517024+00:00",
+        "cash_amount": 980,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 27,
         "debt_amount": 0,
         "transfer_amount": 0,
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
