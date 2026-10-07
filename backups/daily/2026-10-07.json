@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T06:46:07.654Z",
+  "generated_at": "2026-10-07T07:53:27.419Z",
   "tables": {
     "access_pins": [
       {
@@ -6072,6 +6072,68 @@
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       },
       {
+        "id": "9f1c7fa9-6cda-46b1-b1cf-653c2c2883d4",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "aaee5dd5-bd42-4fa8-9c6d-78bfd4f62b30",
+            "name": "White Mocha",
+            "price": 190,
+            "name_en": "White Mocha",
+            "quantity": 2,
+            "subtotal": 380
+          },
+          {
+            "id": "5950acf5-7761-4114-bb9a-0b718f708bc3",
+            "name": "Espresso Double",
+            "price": 130,
+            "name_en": "Double Espresso",
+            "quantity": 1,
+            "subtotal": 130
+          }
+        ],
+        "total": 510,
+        "status": "served",
+        "created_at": "2026-10-05T20:51:52.611367+00:00",
+        "note": null,
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "55f4ce18-9131-4bf1-8136-f09d2bf62e51",
+        "table_name": "MASA-9",
+        "items": [
+          {
+            "id": "ad875de6-63f7-4c7a-8ab8-0b492a2e0320",
+            "name": "İnce Belli Çay",
+            "price": 50,
+            "name_en": "Turkish Tea",
+            "quantity": 1,
+            "subtotal": 50
+          },
+          {
+            "id": "d661ce13-5556-44ce-a09c-98811dd93873",
+            "name": "Su",
+            "price": 50,
+            "name_en": "Water",
+            "quantity": 1,
+            "subtotal": 50
+          }
+        ],
+        "total": 100,
+        "status": "served",
+        "created_at": "2026-09-23T19:53:53.776462+00:00",
+        "note": "Çay şekersiz",
+        "tab_id": "4b227efe-f245-43a6-a0e5-353de294eed6",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
         "id": "74bc78d8-3d62-4390-b63a-c92e66dd38f1",
         "table_name": "MASA-10",
         "items": [
@@ -6476,6 +6538,52 @@
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       },
       {
+        "id": "d3469a3a-d30d-41e7-93ae-22b509f7e812",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "84ae39cc-cfa1-4fcd-9285-72a255884b41",
+            "name": "Snickers Pasta",
+            "price": 270,
+            "name_en": "Snickers Cake",
+            "quantity": 1,
+            "subtotal": 270
+          }
+        ],
+        "total": 270,
+        "status": "served",
+        "created_at": "2026-10-05T20:53:07.833897+00:00",
+        "note": null,
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "ab148c3e-44ee-495e-b4a0-45126cc86fe1",
+        "table_name": "KITAPLIK-2",
+        "items": [
+          {
+            "id": "3dfecd26-7bfd-4077-8ae2-0f24cc54c9ec",
+            "name": "Frozen Çilek",
+            "price": 210,
+            "name_en": "Frozen Strawberry",
+            "quantity": 1,
+            "subtotal": 210
+          }
+        ],
+        "total": 210,
+        "status": "served",
+        "created_at": "2026-09-25T18:44:19.063141+00:00",
+        "note": null,
+        "tab_id": "ae2c4593-a3f6-453b-b19f-907184f1d2b8",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
         "id": "f2068b49-f3ac-48c8-abf0-5bcb5d8bab72",
         "table_name": "MASA-8",
         "items": [
@@ -6586,6 +6694,106 @@
         "created_at": "2026-08-24T09:32:16.737792+00:00",
         "note": null,
         "tab_id": "99db2a7d-9c61-4b10-918b-381d791c8718",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "ed362f5c-a425-4fee-bffe-f5d7755b1163",
+        "table_name": "MASA-3",
+        "items": [
+          {
+            "id": "ad875de6-63f7-4c7a-8ab8-0b492a2e0320",
+            "name": "İnce Belli Çay",
+            "price": 50,
+            "name_en": "Turkish Tea",
+            "quantity": 1,
+            "subtotal": 50
+          },
+          {
+            "id": "d661ce13-5556-44ce-a09c-98811dd93873",
+            "name": "Su",
+            "price": 50,
+            "name_en": "Water",
+            "quantity": 1,
+            "subtotal": 50
+          }
+        ],
+        "total": 100,
+        "status": "served",
+        "created_at": "2026-09-07T17:30:23.026902+00:00",
+        "note": null,
+        "tab_id": "99db2a7d-9c61-4b10-918b-381d791c8718",
+        "created_by": "Yönetici",
+        "handled_by": "Yönetici",
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "fdba836b-df07-4297-90f4-d4ac3afe6a26",
+        "table_name": "OKEY-1",
+        "items": [
+          {
+            "id": "bbbe391c-e5d7-414c-a294-88396ae973ba",
+            "name": "Al Fakher (Cappuccino)",
+            "price": 500,
+            "name_en": "Al Fakher Hookah (Cappuccino)",
+            "quantity": 2,
+            "subtotal": 1000
+          }
+        ],
+        "total": 1000,
+        "status": "served",
+        "created_at": "2026-09-07T17:31:16.42099+00:00",
+        "note": null,
+        "tab_id": "41b5cbca-2e02-4845-a1e7-f250bd5e3f7c",
+        "created_by": "Yönetici",
+        "handled_by": "Yönetici",
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "05285d2f-16ec-46cd-80aa-0f0dab4702f8",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "64136f9e-2009-4793-96fe-59a4b2e4a797",
+            "name": "Belçika Sıcak Çikolata",
+            "price": 200,
+            "name_en": "Belgian Hot Chocolate",
+            "quantity": 1,
+            "subtotal": 200
+          }
+        ],
+        "total": 200,
+        "status": "served",
+        "created_at": "2026-10-03T22:07:34.561679+00:00",
+        "note": null,
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "e7e452a1-765c-49e0-a0a8-5723e6a1e71f",
+        "table_name": "MASA-10",
+        "items": [
+          {
+            "id": "d3228928-78a2-473a-81d7-2b3f914e79b2",
+            "name": "Kurabiye Tabağı",
+            "price": 90,
+            "name_en": "Cookie Plate",
+            "quantity": 1,
+            "subtotal": 90
+          }
+        ],
+        "total": 90,
+        "status": "served",
+        "created_at": "2026-09-13T21:10:31.591315+00:00",
+        "note": null,
+        "tab_id": "03b0dc13-e95c-405b-99a5-8ed804bcd6bc",
         "created_by": "Müşteri (QR)",
         "handled_by": null,
         "client_order_id": null,
@@ -7298,6 +7506,52 @@
         "handled_by": null,
         "client_order_id": null,
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "cb25ce46-4641-42e3-82d7-3bba4046e130",
+        "table_name": "MASA-1",
+        "items": [
+          {
+            "id": "721d95d5-b789-4cac-aa03-d61919cf6721",
+            "name": "Mojito Mango",
+            "price": 250,
+            "name_en": "Mango Mojito",
+            "quantity": 2,
+            "subtotal": 500
+          }
+        ],
+        "total": 500,
+        "status": "served",
+        "created_at": "2026-09-15T14:24:51.296256+00:00",
+        "note": null,
+        "tab_id": "0e7e5cba-95bf-4591-bcd8-bba9a9f1af63",
+        "created_by": "Müşteri (QR)",
+        "handled_by": "Yönetici",
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "06a9a22d-7f85-4f54-92be-5cfab5ef6f48",
+        "table_name": "MASA-8",
+        "items": [
+          {
+            "id": "918955a6-69d1-475b-b07e-fc5eab6e18d6",
+            "name": "Ice Mocha",
+            "price": 210,
+            "name_en": "Iced Mocha",
+            "quantity": 1,
+            "subtotal": 210
+          }
+        ],
+        "total": 210,
+        "status": "served",
+        "created_at": "2026-10-03T22:08:11.781869+00:00",
+        "note": null,
+        "tab_id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "created_by": "Müşteri (QR)",
+        "handled_by": null,
+        "client_order_id": null,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       }
     ],
     "price_edits": [
@@ -7591,19 +7845,59 @@
       {
         "id": "99db2a7d-9c61-4b10-918b-381d791c8718",
         "table_name": "MASA-3",
-        "status": "open",
+        "status": "closed",
         "opened_at": "2026-08-24T09:32:16.450795+00:00",
-        "closed_at": null,
+        "closed_at": "2026-10-06T20:19:33.444+00:00",
         "bill_requested": false,
-        "payment_method": null,
-        "total": 0,
-        "closed_by": null,
+        "payment_method": "cash",
+        "total": 100,
+        "closed_by": "Yönetici",
         "created_at": "2026-08-24T09:32:16.450795+00:00",
-        "cash_amount": 0,
+        "cash_amount": 100,
         "card_amount": 0,
         "discount_amount": 0,
         "discount_reason": null,
-        "fatura_no": null,
+        "fatura_no": 29,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "4b227efe-f245-43a6-a0e5-353de294eed6",
+        "table_name": "MASA-9",
+        "status": "closed",
+        "opened_at": "2026-09-23T19:53:53.370434+00:00",
+        "closed_at": "2026-10-06T20:19:50.746+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 100,
+        "closed_by": "Yönetici",
+        "created_at": "2026-09-23T19:53:53.370434+00:00",
+        "cash_amount": 100,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 31,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "03b0dc13-e95c-405b-99a5-8ed804bcd6bc",
+        "table_name": "MASA-10",
+        "status": "closed",
+        "opened_at": "2026-09-13T21:10:31.121587+00:00",
+        "closed_at": "2026-10-06T20:19:54.181+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 90,
+        "closed_by": "Yönetici",
+        "created_at": "2026-09-13T21:10:31.121587+00:00",
+        "cash_amount": 90,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 32,
         "debt_amount": 0,
         "transfer_amount": 0,
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
@@ -8069,26 +8363,6 @@
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
       },
       {
-        "id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
-        "table_name": "MASA-8",
-        "status": "open",
-        "opened_at": "2026-08-23T22:47:45.315015+00:00",
-        "closed_at": null,
-        "bill_requested": false,
-        "payment_method": null,
-        "total": 0,
-        "closed_by": null,
-        "created_at": "2026-08-23T22:47:45.315015+00:00",
-        "cash_amount": 0,
-        "card_amount": 0,
-        "discount_amount": 0,
-        "discount_reason": null,
-        "fatura_no": null,
-        "debt_amount": 0,
-        "transfer_amount": 0,
-        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
-      },
-      {
         "id": "ec43c2b1-5477-45a8-b7a1-95d4d978469c",
         "table_name": "MASA-1",
         "status": "closed",
@@ -8104,6 +8378,86 @@
         "discount_amount": 0,
         "discount_reason": null,
         "fatura_no": 27,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "0e7e5cba-95bf-4591-bcd8-bba9a9f1af63",
+        "table_name": "MASA-1",
+        "status": "closed",
+        "opened_at": "2026-09-15T14:24:50.817455+00:00",
+        "closed_at": "2026-10-06T20:19:30.228+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 500,
+        "closed_by": "Yönetici",
+        "created_at": "2026-09-15T14:24:50.817455+00:00",
+        "cash_amount": 500,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 28,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "0618dcb9-a983-42e4-8d51-1ed7b7b808c1",
+        "table_name": "MASA-8",
+        "status": "closed",
+        "opened_at": "2026-08-23T22:47:45.315015+00:00",
+        "closed_at": "2026-10-06T20:19:45.875+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 1190,
+        "closed_by": "Yönetici",
+        "created_at": "2026-08-23T22:47:45.315015+00:00",
+        "cash_amount": 1190,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 30,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "ae2c4593-a3f6-453b-b19f-907184f1d2b8",
+        "table_name": "KİTAPLIK-2",
+        "status": "closed",
+        "opened_at": "2026-09-25T18:44:18.59137+00:00",
+        "closed_at": "2026-10-06T20:19:57.761+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 210,
+        "closed_by": "Yönetici",
+        "created_at": "2026-09-25T18:44:18.59137+00:00",
+        "cash_amount": 210,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 33,
+        "debt_amount": 0,
+        "transfer_amount": 0,
+        "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
+      },
+      {
+        "id": "41b5cbca-2e02-4845-a1e7-f250bd5e3f7c",
+        "table_name": "OKEY-1",
+        "status": "closed",
+        "opened_at": "2026-09-07T17:31:16.186243+00:00",
+        "closed_at": "2026-10-06T20:20:01.892+00:00",
+        "bill_requested": false,
+        "payment_method": "cash",
+        "total": 1000,
+        "closed_by": "Yönetici",
+        "created_at": "2026-09-07T17:31:16.186243+00:00",
+        "cash_amount": 1000,
+        "card_amount": 0,
+        "discount_amount": 0,
+        "discount_reason": null,
+        "fatura_no": 34,
         "debt_amount": 0,
         "transfer_amount": 0,
         "restaurant_id": "55acf58d-8632-4131-955a-4e527ec925e0"
