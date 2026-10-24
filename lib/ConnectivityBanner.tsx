@@ -20,7 +20,7 @@ export function ConnectivityBanner() {
   if (!isOnline) {
     return (
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999, background: '#C0392B', color: '#fff', textAlign: 'center', padding: '10px 16px', fontSize: 14, fontWeight: 700, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
-        🔴 Bağlantı Yok — Sipariş/ödeme işlemleri çalışmayacaktır. Lütfen internet bağlantısını kontrol edin.
+        🔴 Bağlantı Yok — Yeni siparişler cihazda bekletilir; ödeme için bağlantı gerekir.
       </div>
     )
   }
@@ -35,3 +35,4 @@ export function ConnectivityBanner() {
 
   return null
 }
+

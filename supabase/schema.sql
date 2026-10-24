@@ -1,3 +1,6 @@
+-- HISTORICAL SINGLE-TENANT SCHEMA: DO NOT RUN ON PRODUCTION OR FOR NEW INSTALLS.
+-- Current production is multi-tenant. See docs/OPERATIONS.md and supabase/migrations/.
+-- This file is retained only as historical documentation.
 -- =============================================================================
 -- KAHFE LOUNGE — CONSOLIDATED SCHEMA
 -- =============================================================================
@@ -1255,3 +1258,4 @@ alter table public.tabs set (
 
 -- END — if this whole file ran without errors, the database is fully caught up.
 -- =============================================================================
+

@@ -1,3 +1,4 @@
+import { escapeHTML, escapePrintData } from '@/lib/html'
 import { formatTL } from './format'
 import { buildKitchenTicketEscPos, buildReceiptEscPos, printViaRawBT, getReceiptBranding } from './escpos'
 
@@ -28,6 +29,8 @@ export function printKitchenTicket(tableName: string, orders: any[], autoPrint: 
     printViaRawBT(buildKitchenTicketEscPos(tableName, orders))
     return
   }
+  tableName = escapeHTML(tableName)
+  orders = escapePrintData(orders)
   const win = window.open('', '_blank', 'width=420,height=700')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const activeItems = orders.filter((o: any) => o.status === 'pending')
@@ -74,6 +77,7 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
     printViaRawBT(buildReceiptEscPos(info))
     return
   }
+  info = escapePrintData(info)
   const win = window.open('', '_blank', 'width=460,height=750')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const itemRows = (info.orders || []).flatMap((o: any) => o.items || []).map((it: any) =>
@@ -101,8 +105,8 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
     </head>
     <body>
       <div class="center">
-        <h1>${getReceiptBranding().name}</h1>
-        ${getReceiptBranding().address.trim() ? `<div style="font-size:13px;">${getReceiptBranding().address}</div>` : ''}
+        <h1>${escapeHTML(getReceiptBranding().name)}</h1>
+        ${getReceiptBranding().address.trim() ? `<div style="font-size:13px;">${escapeHTML(getReceiptBranding().address)}</div>` : ''}
         <div style="font-size:14px;">${new Date().toLocaleString('tr-TR')}</div>
         ${info.faturaNo ? `<div class="fatura-no">FİŞ NO: ${String(info.faturaNo).padStart(6, '0')}</div>` : ''}
         <div style="font-size:16px; margin-top:8px;">Masa: <b>${info.table_name}</b></div>
@@ -122,7 +126,7 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
         ${info.method === 'mixed' ? `Nakit: ${formatTL(info.cash)} ₺<br/>Kart: ${formatTL(info.card)} ₺` : ''}
       </div>
       <div class="line"></div>
-      <div class="center" style="font-size:14px; margin-top:14px;">${getReceiptBranding().footer}</div>
+      <div class="center" style="font-size:14px; margin-top:14px;">${escapeHTML(getReceiptBranding().footer)}</div>
       <script>window.onload = function(){ window.print(); };</script>
     </body>
     </html>
@@ -131,6 +135,7 @@ export function printReceipt(info: { table_name: string, total: number, cash: nu
 }
 
 export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', allOrders: any[], revenueSummary: { revenue: number, debt?: number }) {
+  allOrders = escapePrintData(allOrders)
   const win = window.open('', '_blank', 'width=900,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const label = dateFilter === 'today' ? 'Bugün' : dateFilter === 'week' ? 'Bu Hafta' : dateFilter === 'custom' ? 'Özel Aralık' : 'Bu Ay'
@@ -186,6 +191,7 @@ export function exportOrdersPDF(dateFilter: 'today'|'week'|'month'|'custom', all
 }
 
 export function exportMonthlyReportPDF(report: any) {
+  report = escapePrintData(report)
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const title = report.title || `${report.month} ${report.year} Raporu`
@@ -277,6 +283,7 @@ export function exportMonthlyReportPDF(report: any) {
 }
 
 export function printItemReportPDF(itemReportRange: 'today'|'month'|'year'|'custom', itemReportData: any[]) {
+  itemReportData = escapePrintData(itemReportData)
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const label = itemReportRange === 'today' ? 'Bugün' : itemReportRange === 'month' ? 'Bu Ay' : itemReportRange === 'custom' ? 'Özel Aralık' : 'Bu Yıl'
@@ -325,6 +332,7 @@ export function printItemReportPDF(itemReportRange: 'today'|'month'|'year'|'cust
 }
 
 export function printStaffReportPDF(staffReportRange: 'today'|'week'|'month', staffReportData: any[]) {
+  staffReportData = escapePrintData(staffReportData)
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
   const label = staffReportRange === 'today' ? 'Bugün' : staffReportRange === 'week' ? 'Bu Hafta' : 'Bu Ay'
@@ -362,6 +370,7 @@ export function printStaffReportPDF(staffReportRange: 'today'|'week'|'month', st
 }
 
 export function printDayClosePDF(dayCloseData: any, countedCash: string) {
+  dayCloseData = escapePrintData(dayCloseData)
   if (!dayCloseData) return
   const win = window.open('', '_blank', 'width=800,height=900')
   if (!win) { alert('Pop-up engellendi. Lütfen bu site için pop-up izni verip tekrar deneyin.'); return }
@@ -415,3 +424,4 @@ export function printDayClosePDF(dayCloseData: any, countedCash: string) {
   `)
   win.document.close()
 }
+

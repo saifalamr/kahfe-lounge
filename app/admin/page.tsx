@@ -5,7 +5,9 @@ import { debounce } from '@/lib/debounce'
 import ImageCropper from './components/ImageCropper'
 import NotificationPopup from './components/NotificationPopup'
 import Sidebar from './components/Sidebar'
-import { queueOrder, flushQueuedOrders, queuedOrderCount } from '@/lib/offlineQueue'
+import { queueOrder, flushQueuedOrders, queuedOrderCount, removeQueuedOrder, getQueuedOrders } from '@/lib/offlineQueue'
+import { createOrder, isRetryable, orderLines } from '@/lib/orders'
+import { payTab, paymentSnapshot } from '@/lib/payments'
 import VoidModal from './components/VoidModal'
 import CancelOrderModal from './components/CancelOrderModal'
 import TransferPickerModal from './components/TransferPickerModal'
@@ -15,6 +17,7 @@ import ItemReportModal from './components/ItemReportModal'
 import StaffReportModal from './components/StaffReportModal'
 import DebtorDetailModal from './components/DebtorDetailModal'
 import { useConnectivity } from '@/lib/useConnectivity'
+import { QueueStatus } from '@/lib/QueueStatus'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
 import { printKitchenTicket, printReceipt, exportOrdersPDF, exportMonthlyReportPDF, printStaffReportPDF, printDayClosePDF, printItemReportPDF } from './lib/printTemplates'
 import { setReceiptBranding, ReceiptBranding } from './lib/escpos'
@@ -27,6 +30,9 @@ import { formatTL } from './lib/format'
 
 /* ── Main Admin Page ── */
 export default function AdminPage() {
+  const paymentBusy = useRef(false)
+  const paymentAttempt = useRef<{ payload: string; id: string } | null>(null)
+  const staffOrderBusy = useRef(false)
   const isOnline = useConnectivity()
   const [queuedCount, setQueuedCount] = useState(0)
   // Whenever connectivity comes back, try to actually send anything a
@@ -317,10 +323,10 @@ export default function AdminPage() {
   }
 
   async function dismissOrder(id: string) {
-    const res = await supabase.from('orders').update({ status: 'dismissed' }).eq('id', id)
-    if (writeFailed(res, 'Siparişi kapatma')) return
-    setNotifications(prev => prev.filter(n => n.id !== id))
+    const order = notifications.find(n => n.id === id)
+    if (order) openCancelOrder(order)
   }
+
   const [pw, setPw] = useState('')
   const [pwError, setPwError] = useState(false)
   // Distinct from pwError: this fires when the login RPC itself fails
@@ -622,29 +628,7 @@ export default function AdminPage() {
   async function moveItemToTable(sourceTableName: string, destTableName: string) {
     if (!movingItem) return
     const { order, itemIndex } = movingItem
-    const item = order.items[itemIndex]
-
-    const { data: destTabId, error: tabError } = await supabase.rpc('get_or_create_open_tab', { p_table_name: destTableName })
-    if (tabError || !destTabId) { alert('✗ Hedef masa açılamadı.\n\n' + (tabError?.message || '')); return }
-
-    const remainingItems = order.items.filter((_: any, i: number) => i !== itemIndex)
-    const remainingTotal = remainingItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
-    const sourceUpdate: any = { items: remainingItems, total: remainingTotal, handled_by: staffName }
-    if (remainingItems.length === 0) sourceUpdate.status = 'dismissed'
-
-    const { error: sourceError } = await supabase.from('orders').update(sourceUpdate).eq('id', order.id)
-    if (sourceError) { alert('✗ Ürün taşınamadı.\n\n' + sourceError.message); return }
-
-    const { error: destError } = await supabase.from('orders').insert({
-      table_name: destTableName, items: [item], total: Number(item.subtotal), status: order.status,
-      tab_id: destTabId, created_by: order.created_by, handled_by: staffName,
-    })
-    if (destError) {
-      // Roll back the source removal so the item isn't lost if the insert failed
-      await supabase.from('orders').update({ items: order.items, total: order.total, status: order.status }).eq('id', order.id)
-      alert('✗ Ürün hedef masaya eklenemedi.\n\n' + destError.message)
-      return
-    }
+    if (!await adjustmentRPC('pos_move_item', { p_order_id: order.id, p_expected: order.items, p_index: itemIndex, p_destination: destTableName })) return
 
     setMovingItem(null)
     setActiveTableModal(null)
@@ -652,7 +636,7 @@ export default function AdminPage() {
   }
 
   async function updateOrderStatus(id: string, status: string) {
-    const res = await supabase.from('orders').update({ status, handled_by: staffName }).eq('id', id)
+    const res = await supabase.rpc('pos_set_order_status', { p_order_id: id, p_status: status })
     if (writeFailed(res, 'Sipariş durumu güncelleme')) return
     setNotifications(prev => prev.filter(n => n.id !== id))
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
@@ -663,46 +647,34 @@ export default function AdminPage() {
   // silent edit)
   const [voidingItem, setVoidingItem] = useState<{ order: any, itemIndex: number } | null>(null)
   const [voidReason, setVoidReason] = useState('')
+  const [cancellingOrder, setCancellingOrder] = useState<any>(null)
+  const [cancelReason, setCancelReason] = useState('')
 
   function openVoid(order: any, itemIndex: number) {
     setVoidingItem({ order, itemIndex })
     setVoidReason('')
   }
 
+  const adjustmentBusy = useRef(false)
+  const adjustmentAttempt = useRef<{ payload: string; id: string } | null>(null)
+  async function adjustmentRPC(name: string, args: Record<string, any>): Promise<boolean> {
+    if (adjustmentBusy.current) return false
+    adjustmentBusy.current = true
+    try {
+      const payload = JSON.stringify({ name, args })
+      if (adjustmentAttempt.current?.payload !== payload) adjustmentAttempt.current = { payload, id: crypto.randomUUID() }
+      const { error } = await supabase.rpc(name, { ...args, p_request_id: adjustmentAttempt.current.id })
+      if (error) throw error
+      adjustmentAttempt.current = null
+      return true
+    } catch (error: any) { alert('✗ ' + (error.message || 'İşlem doğrulanamadı. Aynı işlemle tekrar deneyin.')); return false }
+    finally { adjustmentBusy.current = false }
+  }
   async function confirmVoid() {
     if (!voidingItem) return
-    if (!voidReason.trim()) { alert('Lütfen bir iptal nedeni girin.'); return }
     const { order, itemIndex } = voidingItem
-    const item = order.items[itemIndex]
-    const newItems = order.items.filter((_: any, i: number) => i !== itemIndex)
-    const newTotal = newItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
-    const updates: any = { items: newItems, total: newTotal, handled_by: staffName }
-    if (newItems.length === 0) updates.status = 'dismissed'
-
-    const { error } = await supabase.from('orders').update(updates).eq('id', order.id)
-    if (error) {
-      alert('✗ İptal edilemedi.\n\n' + error.message)
-      return
-    }
-    // The item is already removed from the order at this point. These two
-    // writes are the accountability + stock side-effects; if either fails
-    // we surface it (so a void can't silently end up with no audit record
-    // or un-restored stock) but don't roll the removal back - the reason is
-    // logged locally and the manager is told to note it.
-    const voidRes = await supabase.from('voids').insert({
-      order_id: order.id,
-      table_name: order.table_name,
-      item_name: item.name,
-      quantity: item.quantity,
-      amount: item.subtotal,
-      reason: voidReason.trim(),
-      voided_by: staffName,
-    })
-    if (writeFailed(voidRes, 'İptal kaydı (denetim)')) { await Promise.all([loadOrders(dateFilter), loadTableMapData()]); return }
-    const stockRes = await supabase.rpc('restore_stock_for_items', { p_items: [{ id: item.id, quantity: item.quantity }] })
-    if (writeFailed(stockRes, 'Stok iadesi')) { await Promise.all([loadOrders(dateFilter), loadTableMapData()]); return }
-    setVoidingItem(null)
-    setVoidReason('')
+    if (!await adjustmentRPC('pos_adjust_order', { p_order_id: order.id, p_expected: order.items, p_action: 'void', p_index: itemIndex, p_value: null, p_reason: voidReason.trim() })) return
+    setVoidingItem(null); setVoidReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
@@ -722,28 +694,11 @@ export default function AdminPage() {
 
   async function confirmPriceEdit() {
     if (!editingPriceItem) return
-    const newPrice = parseFloat(editPriceValue)
-    if (isNaN(newPrice) || newPrice < 0) { alert('Lütfen geçerli bir fiyat girin.'); return }
-    if (!editPriceReason.trim()) { alert('Lütfen bir düzenleme nedeni girin.'); return }
     const { order, itemIndex } = editingPriceItem
-    const item = order.items[itemIndex]
-    const oldPrice = Number(item.price)
-    if (newPrice === oldPrice) { setEditingPriceItem(null); return }
-
-    const newItems = order.items.map((it: any, i: number) => i === itemIndex ? { ...it, price: newPrice, subtotal: newPrice * Number(it.quantity) } : it)
-    const newTotal = newItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
-
-    const { error } = await supabase.from('orders').update({ items: newItems, total: newTotal, handled_by: staffName }).eq('id', order.id)
-    if (error) { alert('✗ Fiyat güncellenemedi.\n\n' + error.message); return }
-
-    const priceEditRes = await supabase.from('price_edits').insert({
-      order_id: order.id, table_name: order.table_name, item_name: item.name, quantity: item.quantity,
-      old_price: oldPrice, new_price: newPrice, reason: editPriceReason.trim(), edited_by: staffName,
-    })
-    writeFailed(priceEditRes, 'Fiyat değişikliği kaydı')
-    setEditingPriceItem(null)
-    setEditPriceValue('')
-    setEditPriceReason('')
+    const value = Number(editPriceValue)
+    if (!Number.isFinite(value) || value < 0) { alert('Geçerli fiyat girin.'); return }
+    if (!await adjustmentRPC('pos_adjust_order', { p_order_id: order.id, p_expected: order.items, p_action: 'price', p_index: itemIndex, p_value: value, p_reason: editPriceReason.trim() })) return
+    setEditingPriceItem(null); setEditPriceValue(''); setEditPriceReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
@@ -766,35 +721,12 @@ export default function AdminPage() {
 
   async function confirmBillTotalEdit() {
     if (!editingBillTotal) return
-    const newTotal = parseFloat(editBillTotalValue)
-    if (isNaN(newTotal) || newTotal < 0) { alert('Lütfen geçerli bir tutar girin.'); return }
-    if (!editBillTotalReason.trim()) { alert('Lütfen bir düzenleme nedeni girin.'); return }
-    const { tableName, tabId, currentTotal } = editingBillTotal
-    const delta = newTotal - currentTotal
-    if (delta === 0) { setEditingBillTotal(null); return }
-
-    const { data: newOrder, error } = await supabase.from('orders').insert({
-      table_name: tableName, items: [{ id: 'adjustment', name: 'Fiyat Ayarlaması', name_en: 'Price Adjustment', price: delta, quantity: 1, subtotal: delta }],
-      total: delta, status: 'served', tab_id: tabId, created_by: staffName, handled_by: staffName,
-    }).select('id').single()
-    if (error || !newOrder) { alert('✗ Tutar güncellenemedi.\n\n' + (error?.message || '')); return }
-
-    const billTotalEditRes = await supabase.from('price_edits').insert({
-      order_id: newOrder.id, table_name: tableName, item_name: 'Toplam (Fiyat Ayarlaması)', quantity: 1,
-      old_price: currentTotal, new_price: newTotal, reason: editBillTotalReason.trim(), edited_by: staffName,
-    })
-    writeFailed(billTotalEditRes, 'Fiyat ayarlaması kaydı')
-    setEditingBillTotal(null)
-    setEditBillTotalValue('')
-    setEditBillTotalReason('')
-    await Promise.all([loadOrders(dateFilter), loadTableMapData()])
+    const value = Number(editBillTotalValue)
+    if (!Number.isFinite(value) || value<0) { alert('Geçerli tutar girin.'); return }
+    if (!await adjustmentRPC('pos_adjust_total', { p_tab_id: editingBillTotal.tabId, p_expected: editingBillTotal.currentTotal, p_value: value, p_reason: editBillTotalReason.trim() })) return
+    setEditingBillTotal(null); setEditBillTotalValue(''); setEditBillTotalReason('')
+    await Promise.all([loadOrders(dateFilter),loadTableMapData()])
   }
-
-  // Full order cancellation — cancels an entire order at once (all items)
-  // with a mandatory reason, instead of voiding items one by one. Logged
-  // to the same voids table as a single consolidated entry.
-  const [cancellingOrder, setCancellingOrder] = useState<any>(null)
-  const [cancelReason, setCancelReason] = useState('')
 
   function openCancelOrder(order: any) {
     setCancellingOrder(order)
@@ -803,36 +735,19 @@ export default function AdminPage() {
 
   async function confirmCancelOrder() {
     if (!cancellingOrder) return
-    if (!cancelReason.trim()) { alert('Lütfen bir iptal nedeni girin.'); return }
-    const order = cancellingOrder
-    const { error } = await supabase.from('orders').update({ status: 'dismissed', handled_by: staffName }).eq('id', order.id)
-    if (error) { alert('✗ İptal edilemedi.\n\n' + error.message); return }
-    const itemCount = (order.items || []).reduce((s: number, it: any) => s + Number(it.quantity), 0)
-    const cancelVoidRes = await supabase.from('voids').insert({
-      order_id: order.id,
-      table_name: order.table_name,
-      item_name: `Tüm Sipariş (${itemCount} ürün)`,
-      quantity: itemCount,
-      amount: order.total,
-      reason: cancelReason.trim(),
-      voided_by: staffName,
-    })
-    if (writeFailed(cancelVoidRes, 'İptal kaydı (denetim)')) { await Promise.all([loadOrders(dateFilter), loadTableMapData()]); return }
-    const cancelStockRes = await supabase.rpc('restore_stock_for_items', { p_items: (order.items || []).map((it: any) => ({ id: it.id, quantity: it.quantity })) })
-    writeFailed(cancelStockRes, 'Stok iadesi')
-    setCancellingOrder(null)
-    setCancelReason('')
+    if (!await adjustmentRPC('pos_adjust_order', { p_order_id: cancellingOrder.id, p_expected: cancellingOrder.items, p_action: 'cancel', p_index: null, p_value: null, p_reason: cancelReason.trim() })) return
+    setCancellingOrder(null); setCancelReason('')
     await Promise.all([loadOrders(dateFilter), loadTableMapData()])
   }
 
   async function requestBill(tabId: string) {
-    const res = await supabase.from('tabs').update({ bill_requested: true }).eq('id', tabId)
+    const res = await supabase.rpc('pos_request_bill', { p_tab_id: tabId, p_requested: true })
     if (writeFailed(res, 'Hesap isteme')) return
     await loadTableMapData()
   }
 
   async function cancelBillRequest(tabId: string) {
-    const res = await supabase.from('tabs').update({ bill_requested: false }).eq('id', tabId)
+    const res = await supabase.rpc('pos_request_bill', { p_tab_id: tabId, p_requested: false })
     if (writeFailed(res, 'Hesap isteğini iptal etme')) return
     await loadTableMapData()
   }
@@ -937,100 +852,27 @@ export default function AdminPage() {
 
 
 
-  async function confirmPayment() {
-    if (!paymentTab) return
-    const discountAmount = computeDiscountAmount(paymentTab.total)
-    if (discountAmount > 0 && !discountReason.trim()) {
-      alert('Lütfen indirim için bir neden girin.')
-      return
-    }
-    const finalTotal = paymentTab.total - discountAmount
-    let cash = 0, card = 0, debtAmount = 0, transferAmount = 0
-    let debtorId = selectedDebtorId
-    if (paymentMethod === 'debt') {
-      if (!debtorId && newDebtorName.trim()) {
-        const { data: newDebtor, error: debtorError } = await supabase.from('debtors')
-          .insert({ name: newDebtorName.trim(), phone: newDebtorPhone.trim() || null }).select('id').single()
-        if (debtorError || !newDebtor) { alert('✗ Borçlu eklenemedi.\n\n' + (debtorError?.message || '')); return }
-        debtorId = newDebtor.id
-      }
-      if (!debtorId) { alert('Lütfen bir borçlu seçin veya yeni bir borçlu ekleyin.'); return }
-      debtAmount = finalTotal
-    } else if (paymentMethod === 'cash') cash = finalTotal
-    else if (paymentMethod === 'card') card = finalTotal
-    else if (paymentMethod === 'transfer') transferAmount = finalTotal
-    else {
-      cash = parseFloat(splitCash) || 0
-      card = parseFloat(splitCard) || 0
-      if (Math.abs((cash + card) - finalTotal) > 0.5) {
-        alert(`Nakit + Kart tutarı ödenecek tutarla eşleşmiyor.\n\nÖdenecek tutar: ${formatTL(finalTotal)} ₺\nGirilen: ${formatTL(cash + card)} ₺`)
-        return
-      }
-    }
-    const { data: closedTab, error: closeError } = await supabase.from('tabs').update({
-      status: 'closed',
-      closed_at: new Date().toISOString(),
-      payment_method: paymentMethod,
-      cash_amount: cash,
-      card_amount: card,
-      transfer_amount: transferAmount,
-      debt_amount: debtAmount,
-      total: finalTotal,
-      discount_amount: discountAmount,
-      discount_reason: discountAmount > 0 ? discountReason.trim() : null,
-      closed_by: staffName,
-    }).eq('id', paymentTab.id).select('fatura_no').single()
-
-    if (closeError) { alert('✗ Ödeme kaydedilemedi.\n\n' + closeError.message); return }
-
-    // A tab can be paid while one of its orders is still sitting at
-    // pending/accepted (e.g. it was rung in seconds before checkout, or a
-    // race with the kitchen screen). Once the bill is closed there's no
-    // legitimate reason for that order to keep showing on Kitchen/Nargile
-    // or inflating the pending-orders count everywhere else — the customer
-    // already paid and left, so whatever was on the bill was served.
-    // Tab is already closed & paid at this point (the critical write above
-    // succeeded). These are cleanup/ledger side-effects - surface failures
-    // so a discount or debt never goes unrecorded against a closed bill,
-    // but the payment itself already stuck.
-    const servedRes = await supabase.from('orders').update({ status: 'served' }).eq('tab_id', paymentTab.id).in('status', ['pending', 'accepted'])
-    writeFailed(servedRes, 'Siparişleri servis edildi olarak işaretleme')
-
-    if (discountAmount > 0) {
-      const discRes = await supabase.from('discounts').insert({
-        tab_id: paymentTab.id,
-        table_name: paymentTab.table_name,
-        original_amount: paymentTab.total,
-        discount_amount: discountAmount,
-        reason: discountReason.trim(),
-        applied_by: staffName,
-      })
-      writeFailed(discRes, 'İndirim kaydı')
-    }
-
-    if (paymentMethod === 'debt' && debtorId) {
-      const debtRes = await supabase.from('debt_transactions').insert({
-        debtor_id: debtorId,
-        tab_id: paymentTab.id,
-        fatura_no: closedTab?.fatura_no,
-        type: 'borç',
-        amount: finalTotal,
-        created_by: staffName,
-      })
-      writeFailed(debtRes, 'Borç kaydı')
-      await loadDebtors()
-    }
-
-    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, transfer: transferAmount, method: paymentMethod, orders: paymentTab.orders, discountAmount, discountReason: discountReason.trim(), originalTotal: paymentTab.total, faturaNo: closedTab?.fatura_no }
-    setPaymentTab(null)
-    setActiveTableModal(null)
-    await loadTableMapData()
-    if (canPrint) {
-      printReceipt(receiptInfo, autoPrintEnabled)
-    } else {
-      alert('✓ Ödeme alındı, masa kapatıldı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
-    }
+  async function executePayment(selection: { order_id: string; index: number }[] | null) {
+    if (!paymentTab || paymentBusy.current) return
+    if (!isOnline) { alert('Ödeme için bağlantı gerekli. Hesap açık tutuldu.'); return }
+    paymentBusy.current = true
+    try {
+      const baseTotal = selection ? getSelectedItems(paymentTab.orders).reduce((sum: number, x: any) => sum + Number(x.item.subtotal), 0) : paymentTab.total
+      const input = { tab: paymentTab, selection, method: paymentMethod, cash: Number(splitCash) || 0, card: Number(splitCard) || 0,
+        discount: computeDiscountAmount(baseTotal), reason: discountReason.trim(), debtorId: selectedDebtorId,
+        debtorName: newDebtorName.trim(), debtorPhone: newDebtorPhone.trim() }
+      const payload = JSON.stringify(input)
+      if (paymentAttempt.current?.payload !== payload) paymentAttempt.current = { payload, id: crypto.randomUUID() }
+      const receipt = await payTab({ ...input, requestId: paymentAttempt.current.id })
+      paymentAttempt.current = null
+      setPaymentTab(null); setActiveTableModal(null); setSelectedItemKeys(new Set())
+      await Promise.all([loadTableMapData(), loadDebtors()])
+      if (canPrint) printReceipt(receipt, autoPrintEnabled)
+      else alert('✓ Ödeme kaydedildi.')
+    } catch (error: any) { alert('✗ ' + (error.message || 'Ödeme doğrulanamadı. Aynı işlemle tekrar deneyin.')) }
+    finally { paymentBusy.current = false }
   }
+  async function confirmPayment() { await executePayment(null) }
 
   function itemKey(orderId: string, itemIndex: number) {
     return `${orderId}::${itemIndex}`
@@ -1062,149 +904,9 @@ export default function AdminPage() {
   // table open with its remaining items untouched.
   async function confirmPartialPayment() {
     if (!paymentTab) return
-    const selectedFlat = getSelectedItems(paymentTab.orders)
-    if (selectedFlat.length === 0) { alert('Lütfen ödenecek en az bir ürün seçin.'); return }
-
-    // If literally every item on the tab was selected, this is just a
-    // full close — use the normal flow so we don't leave an empty open
-    // tab behind.
-    const totalItemCount = paymentTab.orders.reduce((s: number, o: any) => s + ((o.items || []).length), 0)
-    if (selectedFlat.length === totalItemCount) {
-      await confirmPayment()
-      return
-    }
-
-    const selectedTotal = selectedFlat.reduce((s: number, x: any) => s + Number(x.item.subtotal), 0)
-    const discountAmount = computeDiscountAmount(selectedTotal)
-    if (discountAmount > 0 && !discountReason.trim()) {
-      alert('Lütfen indirim için bir neden girin.')
-      return
-    }
-    const finalTotal = selectedTotal - discountAmount
-    let cash = 0, card = 0, debtAmount = 0, transferAmount = 0
-    let debtorId = selectedDebtorId
-    if (paymentMethod === 'debt') {
-      if (!debtorId && newDebtorName.trim()) {
-        const { data: newDebtor, error: debtorError } = await supabase.from('debtors')
-          .insert({ name: newDebtorName.trim(), phone: newDebtorPhone.trim() || null }).select('id').single()
-        if (debtorError || !newDebtor) { alert('✗ Borçlu eklenemedi.\n\n' + (debtorError?.message || '')); return }
-        debtorId = newDebtor.id
-      }
-      if (!debtorId) { alert('Lütfen bir borçlu seçin veya yeni bir borçlu ekleyin.'); return }
-      debtAmount = finalTotal
-    } else if (paymentMethod === 'cash') cash = finalTotal
-    else if (paymentMethod === 'card') card = finalTotal
-    else if (paymentMethod === 'transfer') transferAmount = finalTotal
-    else {
-      cash = parseFloat(splitCash) || 0
-      card = parseFloat(splitCard) || 0
-      if (Math.abs((cash + card) - finalTotal) > 0.5) {
-        alert(`Nakit + Kart tutarı ödenecek tutarla eşleşmiyor.\n\nÖdenecek tutar: ${formatTL(finalTotal)} ₺\nGirilen: ${formatTL(cash + card)} ₺`)
-        return
-      }
-    }
-
-    // Create a fresh tab for just the selected items, then close it —
-    // gets its own fatura_no via the DB trigger, same as a normal close.
-    const { data: newTab, error: newTabError } = await supabase.from('tabs')
-      .insert({ table_name: paymentTab.table_name, status: 'open' }).select('id').single()
-    if (newTabError || !newTab) { alert('✗ Kısmi hesap oluşturulamadı.\n\n' + (newTabError?.message || '')); return }
-
-    // Group the selection back up by order: if every item in a given
-    // order was selected, just move that whole order across. If only
-    // some were, split it into two rows — a new one on the new tab for
-    // the selected items, the original row keeps whatever's left.
-    const byOrder = new Map<string, { order: any, indices: Set<number> }>()
-    selectedFlat.forEach(({ order, itemIndex }: any) => {
-      if (!byOrder.has(order.id)) byOrder.set(order.id, { order, indices: new Set() })
-      byOrder.get(order.id)!.indices.add(itemIndex)
-    })
-
-    for (const { order, indices } of byOrder.values()) {
-      const allItems: any[] = order.items || []
-      if (indices.size === allItems.length) {
-        const { error } = await supabase.from('orders').update({ tab_id: newTab.id }).eq('id', order.id)
-        if (error) { alert('✗ Siparişler taşınamadı.\n\n' + error.message); return }
-        continue
-      }
-      const selectedItems = allItems.filter((_, i) => indices.has(i))
-      const remainingItems = allItems.filter((_, i) => !indices.has(i))
-      const selectedItemsTotal = selectedItems.reduce((s, it) => s + Number(it.subtotal), 0)
-      const remainingItemsTotal = remainingItems.reduce((s, it) => s + Number(it.subtotal), 0)
-
-      const { error: insertError } = await supabase.from('orders').insert({
-        table_name: order.table_name,
-        items: selectedItems,
-        total: selectedItemsTotal,
-        status: order.status,
-        tab_id: newTab.id,
-        created_by: order.created_by,
-        handled_by: staffName,
-      })
-      if (insertError) { alert('✗ Ürünler ayrılamadı.\n\n' + insertError.message); return }
-
-      const { error: updateError } = await supabase.from('orders')
-        .update({ items: remainingItems, total: remainingItemsTotal })
-        .eq('id', order.id)
-      if (updateError) { alert('✗ Kalan ürünler güncellenemedi.\n\n' + updateError.message); return }
-    }
-
-    const { data: closedTab, error: closeError } = await supabase.from('tabs').update({
-      status: 'closed',
-      closed_at: new Date().toISOString(),
-      payment_method: paymentMethod,
-      cash_amount: cash,
-      card_amount: card,
-      transfer_amount: transferAmount,
-      debt_amount: debtAmount,
-      total: finalTotal,
-      discount_amount: discountAmount,
-      discount_reason: discountAmount > 0 ? discountReason.trim() : null,
-      closed_by: staffName,
-    }).eq('id', newTab.id).select('fatura_no').single()
-
-    if (closeError) { alert('✗ Ödeme kaydedilemedi.\n\n' + closeError.message); return }
-
-    // Same as the full-payment path: whatever ended up on this split-off
-    // tab was just paid for, so it can't still be "pending" on a kitchen
-    // screen afterward.
-    const splitServedRes = await supabase.from('orders').update({ status: 'served' }).eq('tab_id', newTab.id).in('status', ['pending', 'accepted'])
-    writeFailed(splitServedRes, 'Siparişleri servis edildi olarak işaretleme')
-
-    if (discountAmount > 0) {
-      const splitDiscRes = await supabase.from('discounts').insert({
-        tab_id: newTab.id,
-        table_name: paymentTab.table_name,
-        original_amount: selectedTotal,
-        discount_amount: discountAmount,
-        reason: discountReason.trim(),
-        applied_by: staffName,
-      })
-      writeFailed(splitDiscRes, 'İndirim kaydı')
-    }
-
-    if (paymentMethod === 'debt' && debtorId) {
-      const splitDebtRes = await supabase.from('debt_transactions').insert({
-        debtor_id: debtorId,
-        tab_id: newTab.id,
-        fatura_no: closedTab?.fatura_no,
-        type: 'borç',
-        amount: finalTotal,
-        created_by: staffName,
-      })
-      writeFailed(splitDebtRes, 'Borç kaydı')
-      await loadDebtors()
-    }
-
-    const receiptInfo = { table_name: paymentTab.table_name, total: finalTotal, cash, card, transfer: transferAmount, method: paymentMethod, orders: [{ items: selectedFlat.map((x: any) => x.item) }], discountAmount, discountReason: discountReason.trim(), originalTotal: selectedTotal, faturaNo: closedTab?.fatura_no }
-    setPaymentTab(null)
-    setSelectedItemKeys(new Set())
-    await loadTableMapData()
-    if (canPrint) {
-      printReceipt(receiptInfo, autoPrintEnabled)
-    } else {
-      alert('✓ Seçili ürünlerin ödemesi alındı.\n\nFiş yazdırma yalnızca dokunmatik ekrandan yapılabilir.')
-    }
+    const selected = getSelectedItems(paymentTab.orders)
+    if (!selected.length) { alert('Lütfen bir ürün seçin.'); return }
+    await executePayment(selected.map((x: any) => ({ order_id: x.order.id, index: x.itemIndex })))
   }
 
   // Staff-entered orders (walk-ins, phone orders, waiter taking a verbal order)
@@ -1262,7 +964,7 @@ export default function AdminPage() {
 
     setStaffExtraItems(prev => ({
       ...prev,
-      [syntheticId]: { ...staffPendingOptionItem, id: syntheticId, price: finalPrice, _baseId: staffPendingOptionItem.id, _optionsText: optionsText }
+      [syntheticId]: { ...staffPendingOptionItem, id: syntheticId, price: finalPrice, _baseId: staffPendingOptionItem.id, _optionsText: optionsText, _optionChoiceIds: groups.map((g:any)=>staffPendingSelections[g.id]) }
     }))
     adjustStaffCart(syntheticId, 1)
     setStaffPendingOptionItem(null)
@@ -1275,79 +977,22 @@ export default function AdminPage() {
   }, 0)
 
   async function submitStaffOrder() {
-    if (!addOrderTable || staffCartCount === 0) return
+    if (!addOrderTable || !staffCartCount || staffOrderBusy.current) return
+    staffOrderBusy.current = true
+    let requestId: string | null = null
     try {
-      const orderItems = Object.entries(staffCart)
-        .map(([id, qty]) => {
-          const item = findMenuItemOrSynthetic(id)
-          if (!item) return null
-          const displayName = item._optionsText ? `${item.name} (${item._optionsText})` : item.name
-          const displayNameEn = item._optionsText ? `${item.name_en || item.name} (${item._optionsText})` : (item.name_en || item.name)
-          return { id: item._baseId || item.id, name: displayName, name_en: displayNameEn, price: item.price, quantity: qty, subtotal: item.price * qty }
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null)
-
-      if (orderItems.length === 0) {
-        alert('Seçilen ürünler artık mevcut değil. Lütfen tekrar seçin.')
-        return
+      const entries = Object.entries(staffCart).map(([id, qty]) => ({ ...findMenuItemOrSynthetic(id), quantity: qty }))
+      const payload = { table_name: addOrderTable, items: orderLines(entries), total: staffCartTotal, note: null, created_by: staffName }
+      requestId = queueOrder(payload)
+      if (isOnline) {
+        try { await createOrder(requestId, payload.table_name, payload.items, null); removeQueuedOrder(requestId) }
+        catch (error: any) { if (!isRetryable(error)) { removeQueuedOrder(requestId); throw error } }
       }
-      const orderTotal = orderItems.reduce((s, i) => s + i.subtotal, 0)
-
-      if (!isOnline) {
-        queueOrder({ table_name: addOrderTable, items: orderItems, total: orderTotal, note: null, created_by: staffName, handled_by: staffName }); setQueuedCount(queuedOrderCount())
-        alert('📥 Bağlantı yok — sipariş kaydedildi, bağlantı gelince otomatik gönderilecek.')
-        setAddOrderTable(null)
-        setStaffCart({})
-        setStaffExtraItems({})
-        return
-      }
-
-      const { data: tabId, error: tabError } = await supabase.rpc('get_or_create_open_tab', { p_table_name: addOrderTable })
-      if (tabError || !tabId) {
-        // Couldn't even reach the RPC — connection likely just dropped
-        // mid-action. Queue rather than lose the order.
-        queueOrder({ table_name: addOrderTable, items: orderItems, total: orderTotal, note: null, created_by: staffName, handled_by: staffName }); setQueuedCount(queuedOrderCount())
-        alert('📥 Bağlantı sorunu — sipariş kaydedildi, bağlantı gelince otomatik gönderilecek.')
-        setAddOrderTable(null)
-        setStaffCart({})
-        setStaffExtraItems({})
-        return
-      }
-
-      // Staff-entered orders still need to be prepared, so they start as
-      // "pending" the same as customer orders — under the simplified
-      // 2-stage flow (Bekliyor → Tamamlandı), there's no intermediate stage
-      const { error: orderError } = await supabase.from('orders').insert({
-        table_name: addOrderTable,
-        items: orderItems,
-        total: orderTotal,
-        status: 'pending',
-        note: null,
-        tab_id: tabId,
-        created_by: staffName,
-        handled_by: staffName,
-      })
-      if (orderError) {
-        queueOrder({ table_name: addOrderTable, items: orderItems, total: orderTotal, note: null, created_by: staffName, handled_by: staffName }); setQueuedCount(queuedOrderCount())
-        alert('📥 Bağlantı sorunu — sipariş kaydedildi, bağlantı gelince otomatik gönderilecek.')
-        setAddOrderTable(null)
-        setStaffCart({})
-        setStaffExtraItems({})
-        return
-      }
-      // Order is already saved at this point; a stock-decrement failure
-      // shouldn't block the staff member or undo the order. Surface it so
-      // stock counts can be corrected, but don't abort.
-      const stockRes = await supabase.rpc('decrement_stock_for_order', { p_items: orderItems })
-      writeFailed(stockRes, 'Stok düşme')
-
+      if (getQueuedOrders().some(o => o.client_order_id === requestId)) alert('Sipariş bağlantı bekliyor; henüz ekibe ulaşmadı.')
+      setQueuedCount(queuedOrderCount()); setAddOrderTable(null); setStaffCart({}); setStaffExtraItems({})
       await loadTableMapData()
-      setAddOrderTable(null)
-      setStaffCart({})
-      setStaffExtraItems({})
-    } catch (err: any) {
-      alert('✗ Beklenmeyen bir hata oluştu.\n\n' + (err?.message || String(err)))
-    }
+    } catch (error: any) { alert('✗ ' + (error.message || 'Sipariş kaydedilemedi.')) }
+    finally { staffOrderBusy.current = false }
   }
   const [showMonthlyReport, setShowMonthlyReport] = useState<any>(null)
   const [showDayReportPicker, setShowDayReportPicker] = useState(false)
@@ -1843,95 +1488,19 @@ export default function AdminPage() {
     if (!editBillReason.trim()) { alert('Lütfen düzenleme nedeni girin.'); return }
     if (editBillNewTotal <= 0) { alert('Fiş en az bir ürün içermeli. Tüm ürünleri kaldırmak yerine "Yeniden Aç" veya "İade" kullanın.'); return }
 
-    let debtorId: string | null = null
-    if (editBillDelta !== 0 && editBillMethod === 'debt') {
-      debtorId = await findDebtorForTab(editingBill.id)
-      if (!debtorId) { alert('✗ Bu fişe bağlı bir borçlu bulunamadı. Farkı nakit, kart veya havale olarak seçin.'); return }
-    }
-
     setEditBillSaving(true)
     try {
-      const restoreStock: { id: string, quantity: number }[] = []
-      const decrementStock: { id: string, quantity: number }[] = []
-
-      // Apply quantity changes to the original orders — one update per
-      // affected order, same as the existing void/cancel flows.
-      const byOrder = new Map<string, any[]>()
-      editBillItems.forEach(it => { if (!byOrder.has(it.orderId)) byOrder.set(it.orderId, []) ; byOrder.get(it.orderId)!.push(it) })
-
-      for (const [orderId, changedItems] of byOrder.entries()) {
-        const order = editBillOrders.find((o: any) => o.id === orderId)
-        if (!order) continue
-        const newItems = (order.items || []).map((raw: any, idx: number) => {
-          const edited = changedItems.find(c => c.itemIndex === idx)
-          if (!edited) return raw
-          if (edited.newQuantity !== edited.quantity) {
-            const diff = edited.quantity - edited.newQuantity
-            if (diff > 0) restoreStock.push({ id: edited.id, quantity: diff })
-            else decrementStock.push({ id: edited.id, quantity: -diff })
-          }
-          return { ...raw, quantity: edited.newQuantity, subtotal: edited.price * edited.newQuantity }
-        }).filter((raw: any) => Number(raw.quantity) > 0)
-        const newOrderTotal = newItems.reduce((s: number, it: any) => s + Number(it.subtotal), 0)
-        const editOrderRes = await supabase.from('orders').update({ items: newItems, total: newOrderTotal, status: newItems.length === 0 ? 'dismissed' : order.status, handled_by: staffName }).eq('id', orderId)
-        if (writeFailed(editOrderRes, 'Sipariş güncelleme')) { setEditBillSaving(false); return }
-
-        for (const edited of changedItems) {
-          const diff = edited.quantity - edited.newQuantity
-          if (diff > 0) {
-            const editVoidRes = await supabase.from('voids').insert({
-              order_id: orderId, table_name: editingBill.table_name, item_name: edited.name,
-              quantity: diff, amount: edited.price * diff, reason: `Fiş Düzenleme — ${editBillReason.trim()}`, voided_by: staffName,
-            })
-            writeFailed(editVoidRes, 'İptal kaydı (denetim)')
-          }
-        }
-      }
-
-      if (editAddedItems.length > 0) {
-        const orderItems = editAddedItems.map(it => ({ id: it.id, name: it.name, name_en: it.name_en, price: it.price, quantity: it.quantity, subtotal: it.price * it.quantity }))
-        const addRes = await supabase.from('orders').insert({
-          table_name: editingBill.table_name, items: orderItems, total: orderItems.reduce((s, it) => s + it.subtotal, 0),
-          status: 'served', tab_id: editingBill.id, created_by: staffName, handled_by: staffName,
-        })
-        if (writeFailed(addRes, 'Ürün ekleme')) { setEditBillSaving(false); return }
-        editAddedItems.forEach(it => decrementStock.push({ id: it.id, quantity: it.quantity }))
-      }
-
-      if (restoreStock.length > 0) { const r = await supabase.rpc('restore_stock_for_items', { p_items: restoreStock }); writeFailed(r, 'Stok iadesi') }
-      if (decrementStock.length > 0) { const r = await supabase.rpc('decrement_stock_for_order', { p_items: decrementStock }); writeFailed(r, 'Stok düşme') }
-
-      const amountCol = editBillMethod === 'cash' ? 'cash_amount' : editBillMethod === 'card' ? 'card_amount' : editBillMethod === 'transfer' ? 'transfer_amount' : 'debt_amount'
-      const tabUpdate: any = { total: editBillNewTotal }
-      if (editBillDelta !== 0) tabUpdate[amountCol] = Number(editingBill[amountCol] || 0) + editBillDelta
-      const { error: tabErr } = await supabase.from('tabs').update(tabUpdate).eq('id', editingBill.id)
-      if (tabErr) { alert('✗ Fiş güncellenemedi.\n\n' + tabErr.message); setEditBillSaving(false); return }
-
-      if (editBillDelta !== 0 && editBillMethod === 'debt' && debtorId) {
-        const r = await supabase.from('debt_transactions').insert({
-          debtor_id: debtorId, tab_id: editingBill.id, fatura_no: editingBill.fatura_no,
-          type: editBillDelta > 0 ? 'borç' : 'ödeme', amount: Math.abs(editBillDelta),
-          note: `Fiş Düzenleme — ${editBillReason.trim()}`, created_by: staffName,
-        })
-        writeFailed(r, 'Borç defteri kaydı')
-        await loadDebtors()
-      } else if (editBillDelta < 0 && editBillMethod === 'cash') {
-        const r = await supabase.from('cash_movements').insert({
-          type: 'out', amount: Math.abs(editBillDelta),
-          reason: `Fiş Düzenleme İadesi — ${editingBill.table_name}${editingBill.fatura_no ? ` · Fiş #${String(editingBill.fatura_no).padStart(6, '0')}` : ''} — ${editBillReason.trim()}`,
-          created_by: staffName,
-        })
-        writeFailed(r, 'Kasa hareketi kaydı')
-      }
-
-      setEditingBill(null)
-      setEditBillReason('')
-      await searchReceipts()
+      const ok = await adjustmentRPC('pos_edit_bill', {
+        p_tab_id: editingBill.id, p_expected: paymentSnapshot(editBillOrders),
+        p_quantities: editBillItems.map(it => ({ order_id: it.orderId, index: it.itemIndex, quantity: it.newQuantity })),
+        p_added: editAddedItems.map(it => ({ id: it.id, quantity: it.quantity })),
+        p_method: editBillMethod, p_reason: editBillReason.trim(),
+      })
+      if (!ok) return
+      setEditingBill(null); setEditBillReason('')
+      await Promise.all([searchReceipts(), loadDebtors()])
       alert('✓ Fiş güncellendi.')
-    } catch (err: any) {
-      alert('✗ Beklenmeyen bir hata oluştu.\n\n' + (err?.message || String(err)))
-    }
-    setEditBillSaving(false)
+    } finally { setEditBillSaving(false) }
   }
 
   // A refund against a debt-paid tab, or a debt-tab reopen, needs to know
@@ -1944,94 +1513,17 @@ export default function AdminPage() {
 
   async function confirmReopenTab() {
     if (!refundTarget) return
-    if (!refundReason.trim()) { alert('Lütfen yeniden açma nedeni girin.'); return }
-    const tab = refundTarget
-
-    // If a customer is sitting at this table right now, there's already a
-    // *different* open tab for the same table_name. Reopening this old,
-    // unrelated bill on top of that would give the table two open tabs at
-    // once — the floor plan and get_or_create_open_tab can only ever see
-    // one of them, so orders could silently attach to the wrong bill. Block
-    // it and point at "Fişi Düzenle" instead, which never touches the
-    // floor plan at all.
-    const { data: liveTab } = await supabase.from('tabs').select('id').eq('table_name', tab.table_name).eq('status', 'open').maybeSingle()
-    if (liveTab) {
-      alert(`✗ ${tab.table_name} şu anda dolu — masada aktif bir hesap var.\n\nBu eski fişi yeniden açarsam masada iki ayrı hesap birden olur ve siparişler karışabilir.\n\nBunun yerine "✏️ Fişi Düzenle" ile bu fişi masayı hiç etkilemeden düzeltebilirsin.`)
-      return
-    }
-
-    const { error } = await supabase.from('tabs').update({
-      status: 'open', closed_at: null, payment_method: null,
-      cash_amount: 0, card_amount: 0, transfer_amount: 0, debt_amount: 0,
-    }).eq('id', tab.id).eq('status', 'closed')
-    if (error) { alert('✗ Yeniden açılamadı.\n\n' + error.message); return }
-
-    // If it had been paid off as debt, cancel that debt out — otherwise
-    // the debtor would still show as owing for a tab that's open again.
-    if (tab.payment_method === 'debt') {
-      const debtorId = await findDebtorForTab(tab.id)
-      if (debtorId) {
-        const r = await supabase.from('debt_transactions').insert({
-          debtor_id: debtorId, tab_id: tab.id, type: 'ödeme',
-          amount: Number(tab.debt_amount || tab.total),
-          note: 'Fiş yeniden açıldı — borç iptal edildi', created_by: staffName,
-        })
-        writeFailed(r, 'Borç iptali kaydı')
-        await loadDebtors()
-      }
-    }
-
-    const reopenRefundRes = await supabase.from('refunds').insert({
-      tab_id: tab.id, table_name: tab.table_name, fatura_no: tab.fatura_no,
-      type: 'reopen', amount: Number(tab.total), reason: refundReason.trim(), staff_name: staffName,
-    })
-    writeFailed(reopenRefundRes, 'İade kaydı')
-
-    setReceiptResults(prev => prev.filter((r: any) => r.id !== tab.id))
-    setRefundTarget(null)
-    setRefundReason('')
-    await loadTableMapData()
-    alert(`✓ ${tab.table_name} yeniden açıldı. Masa Haritası'ndan devam edebilirsiniz.`)
+    if (!await adjustmentRPC('pos_refund', { p_tab_id: refundTarget.id, p_action: 'reopen', p_method: refundTarget.payment_method, p_amount: Number(refundTarget.total), p_reason: refundReason.trim() })) return
+    setReceiptResults(prev => prev.filter((r: any) => r.id !== refundTarget.id))
+    setRefundTarget(null); setRefundReason(''); await Promise.all([loadTableMapData(),loadDebtors()])
   }
-
   async function confirmRefund() {
     if (!refundTarget) return
-    const amt = parseFloat(refundAmount) || 0
-    if (amt <= 0) { alert('Lütfen geçerli bir iade tutarı girin.'); return }
-    if (amt > Number(refundTarget.total)) { alert('İade tutarı fişin toplamından fazla olamaz.'); return }
-    if (!refundReason.trim()) { alert('Lütfen iade nedeni girin.'); return }
-    const tab = refundTarget
-
-    const { error } = await supabase.from('refunds').insert({
-      tab_id: tab.id, table_name: tab.table_name, fatura_no: tab.fatura_no,
-      type: 'refund', method: refundMethod, amount: amt, reason: refundReason.trim(), staff_name: staffName,
-    })
-    if (error) { alert('✗ İade kaydedilemedi.\n\n' + error.message); return }
-
-    if (refundMethod === 'cash') {
-      const r = await supabase.from('cash_movements').insert({
-        type: 'out', amount: amt,
-        reason: `İade — ${tab.table_name}${tab.fatura_no ? ` · Fiş #${String(tab.fatura_no).padStart(6, '0')}` : ''} — ${refundReason.trim()}`,
-        created_by: staffName,
-      })
-      writeFailed(r, 'Kasa hareketi kaydı')
-    } else if (refundMethod === 'debt') {
-      const debtorId = await findDebtorForTab(tab.id)
-      if (debtorId) {
-        const r = await supabase.from('debt_transactions').insert({
-          debtor_id: debtorId, tab_id: tab.id, type: 'ödeme', amount: amt,
-          note: `İade: ${refundReason.trim()}`, created_by: staffName,
-        })
-        writeFailed(r, 'Borç defteri kaydı')
-        await loadDebtors()
-      } else {
-        alert('Not: bu fiş için borçlu bulunamadı, sadece iade kaydı oluşturuldu.')
-      }
-    }
-
-    setRefundTarget(null)
-    setRefundReason('')
-    alert(`✓ ₺${formatTL(amt)} iade kaydedildi.`)
+    const amount = Number(refundAmount)
+    if (!Number.isFinite(amount) || amount<=0) { alert('Geçerli tutar girin.'); return }
+    if (!await adjustmentRPC('pos_refund', { p_tab_id: refundTarget.id, p_action: 'refund', p_method: refundMethod, p_amount: amount, p_reason: refundReason.trim() })) return
+    setRefundTarget(null); setRefundReason(''); await loadDebtors()
+    alert('✓ İade kaydedildi.')
   }
 
   async function searchReceipts() {
@@ -2217,15 +1709,12 @@ export default function AdminPage() {
         { 'Kalem': 'Kasadan Manuel Çıkış', 'Değer': totalCashOut },
       ]
 
-      const XLSX = await import('xlsx')
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summarySheet), 'Özet')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesSheet), 'Satışlar')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(discountSheet), 'İndirimler')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(voidSheet), 'İptaller')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(debtSheet), 'Borç Hareketleri')
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cashMoveSheet), 'Kasa Hareketleri')
-      XLSX.writeFile(wb, `Kahfe_Lounge_Muhasebe_${receiptFrom}_${receiptTo}.xlsx`)
+      const { exportAccountingWorkbook } = await import('@/lib/excel')
+      await exportAccountingWorkbook([
+        ['Özet', summarySheet], ['Satışlar', salesSheet], ['İndirimler', discountSheet],
+        ['İptaller', voidSheet], ['Borç Hareketleri', debtSheet], ['Kasa Hareketleri', cashMoveSheet],
+      ], `Kahfe_Lounge_Muhasebe_${receiptFrom}_${receiptTo}.xlsx`)
+
     } catch (e: any) {
       alert('✗ Excel oluşturulamadı.\n\n' + (e?.message || String(e)))
     } finally {
@@ -2547,9 +2036,8 @@ export default function AdminPage() {
 
   async function logoutAllDevices() {
     if (!confirm('Bu, şu anda giriş yapmış olan TÜM cihazları (kendi cihazınız dahil) oturumdan çıkaracak. Herkesin tekrar PIN girmesi gerekecek. Devam edilsin mi?')) return
-    const current = await getCurrentSessionEpoch()
-    const next = String(Number(current) + 1)
-    await supabase.from('settings').upsert({ key: 'session_epoch', value: next, updated_at: new Date().toISOString() })
+    const { error } = await supabase.rpc('pos_logout_all')
+    if (writeFailed({error}, 'Oturumları kapatma')) return
     clearSession()
   }
 
@@ -2712,7 +2200,7 @@ export default function AdminPage() {
   function startEditStaff(s: any) {
     setEditingStaffId(s.id)
     setStaffFormName(s.name)
-    setStaffFormPin(s.pin)
+    setStaffFormPin('')
     setStaffFormPermission(s.permission === 'limited' ? 'limited' : 'full')
   }
 
@@ -2726,18 +2214,8 @@ export default function AdminPage() {
   async function saveStaff() {
     const name = staffFormName.trim()
     const pin = staffFormPin.trim()
-    if (!name || !/^\d{4,6}$/.test(pin)) {
+    if (!name || (!editingStaffId && !pin) || (pin && !/^\d{4,6}$/.test(pin))) {
       alert('Lütfen bir isim ve 4-6 haneli bir PIN girin.')
-      return
-    }
-    const { data: reserved } = await supabase.rpc('pin_is_reserved', { p_pin: pin }) as { data: boolean | null }
-    if (reserved) {
-      alert('Bu PIN, yönetici/dokunmatik ekran şifrelerinden biriyle aynı olamaz. Başka bir PIN seçin.')
-      return
-    }
-    const dup = staffList.find(s => s.pin === pin && s.id !== editingStaffId)
-    if (dup) {
-      alert(`Bu PIN zaten ${dup.name} adlı personelde kullanılıyor. Başka bir PIN seçin.`)
       return
     }
     const sessionToken = localStorage.getItem('kahfe_session_token')
@@ -2860,7 +2338,9 @@ export default function AdminPage() {
 
   // Item CRUD
   async function uploadBlob(blob: Blob): Promise<string> {
-    const path = `items/${Date.now()}.jpg`
+    const { data: restaurantId, error: scopeError } = await supabase.rpc('session_restaurant_id')
+    if (scopeError || !restaurantId) throw new Error('Oturum geçersiz. Tekrar giriş yapın.')
+    const path = `${restaurantId}/items/${crypto.randomUUID()}.jpg`
     const { error } = await supabase.storage.from('menu-images').upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
     if (error) throw error
     return supabase.storage.from('menu-images').getPublicUrl(path).data.publicUrl
@@ -2971,7 +2451,7 @@ export default function AdminPage() {
 
   if (!auth) return (
     <div style={{ background: 'var(--a-bg0)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <ConnectivityBanner />
+      <ConnectivityBanner /><QueueStatus />
       <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 32, width: '100%', maxWidth: 360, border: '1px solid var(--a-border)' }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 4, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM PANELİ</div>
@@ -3087,7 +2567,7 @@ export default function AdminPage() {
         showNotif={showNotif} setShowNotif={setShowNotif} newOrderAlert={newOrderAlert} setNewOrderAlert={setNewOrderAlert} queuedCount={queuedCount} realtimeUp={realtimeUp}
       />
       <div className="kahfe-shell" style={{ background: 'var(--a-bg0)', minHeight: '100vh', paddingBottom: 40 }}>
-        <ConnectivityBanner />
+        <ConnectivityBanner /><QueueStatus />
         <div className="kahfe-header kahfe-topnav-header" style={s.header}>
           <div>
             <div style={{ color: '#C9A84C', fontSize: 10, letterSpacing: 3, fontFamily: "'IBM Plex Mono', monospace" }}>YÖNETİM</div>
@@ -4476,7 +3956,7 @@ export default function AdminPage() {
             <div style={{ background: 'var(--a-bg1)', borderRadius: 8, padding: 20, border: '1px solid var(--a-border)', marginBottom: 20 }}>
               <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif", marginBottom: 14 }}>{editingStaffId ? 'Personeli Düzenle' : 'Yeni Personel Ekle'}</div>
               <input value={staffFormName} onChange={e => setStaffFormName(e.target.value)} placeholder="İsim (örn. Ahmet)" style={{ ...s.input, height: 52, marginBottom: 10 }} />
-              <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="4-6 haneli PIN (örn. 4821)" inputMode="numeric" style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.15em', marginBottom: 10 }} />
+              <input value={staffFormPin} onChange={e => setStaffFormPin(e.target.value.replace(/\D/g, ''))} placeholder="Yeni PIN (düzenlemede boşsa değişmez)" inputMode="numeric" style={{ ...s.input, height: 52, fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, letterSpacing: '0.15em', marginBottom: 10 }} />
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 <button onClick={() => setStaffFormPermission('full')}
                   style={{ flex: 1, height: 48, background: staffFormPermission === 'full' ? 'rgba(39,174,96,.14)' : 'transparent', border: staffFormPermission === 'full' ? '1px solid #27ae60' : '1px solid var(--a-border2)', color: staffFormPermission === 'full' ? '#5FD08C' : 'var(--a-text2)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
@@ -4504,7 +3984,7 @@ export default function AdminPage() {
               <div key={s.id} style={{ background: 'var(--a-bg1)', border: '1px solid var(--a-border)', borderRadius: 8, padding: '16px 18px', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: s.active ? 1 : 0.5 }}>
                 <div>
                   <div style={{ color: 'var(--a-text)', fontWeight: 700, fontSize: 16, fontFamily: "'Bricolage Grotesque', sans-serif" }}>{s.name}</div>
-                  <div style={{ color: 'var(--a-text2)', fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>PIN: {s.pin} {!s.active && '· Pasif'} {s.permission === 'limited' && <span style={{ color: '#f39c12' }}>· Kısıtlı</span>}</div>
+                  <div style={{ color: 'var(--a-text2)', fontSize: 13, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>PIN: gizli {!s.active && '· Pasif'} {s.permission === 'limited' && <span style={{ color: '#f39c12' }}>· Kısıtlı</span>}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => startEditStaff(s)} style={{ background: 'transparent', border: '1px solid var(--a-border2)', borderRadius: 8, height: 40, padding: '0 12px', color: '#C9A84C', fontSize: 12, cursor: 'pointer', fontWeight: 600, fontFamily: "'IBM Plex Sans', sans-serif" }}>Düzenle</button>
@@ -5114,3 +4594,4 @@ export default function AdminPage() {
     </>
   )
 }
+

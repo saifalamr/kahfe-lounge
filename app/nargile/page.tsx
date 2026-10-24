@@ -151,8 +151,9 @@ export default function NargilePage() {
 
   async function markDone(id: string) {
     const order = orders.find(o => o.id === id)
+    const { error } = await supabase.rpc('pos_set_order_status', { p_order_id: id, p_status: 'served' })
+    if (error) { alert('Sipariş güncellenemedi: ' + error.message); return }
     setOrders(prev => prev.filter(o => o.id !== id))
-    await supabase.from('orders').update({ status: 'served', handled_by: staffName }).eq('id', id)
     // Start the coal clock the moment nargile actually gets served, not at
     // order time — one per tab (ignoreDuplicates: a second nargile order on
     // the same table doesn't reset an already-running timer; staff resets
@@ -391,3 +392,4 @@ export default function NargilePage() {
     </div>
   )
 }
+

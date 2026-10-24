@@ -2,8 +2,11 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { supabase, Category, MenuItem } from '@/lib/supabase'
 import { useConnectivity } from '@/lib/useConnectivity'
+import { QueueStatus } from '@/lib/QueueStatus'
 import { ConnectivityBanner } from '@/lib/ConnectivityBanner'
-import { queueOrder, flushQueuedOrders } from '@/lib/offlineQueue'
+import { queueOrder, flushQueuedOrders, removeQueuedOrder, getQueuedOrders } from '@/lib/offlineQueue'
+
+import { createOrder, isRetryable, orderLines } from '@/lib/orders'
 
 type CartMap = Record<string, number>
 type Line = MenuItem & { qty: number, _baseId?: string, _optionsText?: string, _optionsTextEn?: string, _optionsTextAr?: string }
@@ -560,7 +563,7 @@ function OrderSummary({ lines, total, count, onClose, onInc, onDec, lang, tableN
               </div>
             )}
             <div style={{ textAlign:'center', fontSize:11, color:'rgba(240,237,232,.35)', letterSpacing:'.5px' }}>
-              {lang==='en'?'Your waiter will come to confirm':lang==='ar'?'سيأتي النادل للتأكيد':'Garsonunuz onaylamak için gelecek'}
+              {lang==='en'?'Your order is sent to the team':lang==='ar'?'يُرسل طلبك إلى الفريق':'Siparişiniz ekibe iletilir'}
             </div>
           </div>
         )}
@@ -642,6 +645,8 @@ export default function MenuPage() {
   const [showOrder, setShowOrder] = useState(false)
   const [pulseKey, setPulseKey] = useState(0)
   const [tableName, setTableName] = useState('')
+  const orderBusy = useRef(false)
+  const [orderError, setOrderError] = useState('')
   const [orderSent, setOrderSent] = useState(false)
   const [orderQueued, setOrderQueued] = useState(false)
   const [sendingOrder, setSendingOrder] = useState(false)
@@ -661,127 +666,31 @@ export default function MenuPage() {
     if (masa) setTableName(decodeURIComponent(masa).toLocaleUpperCase('tr-TR'))
   }, [])
 
-  async function sendTelegramNotification(mesa: string, items: any[], total: number, note: string, orderNum: number) {
-    const BOT_TOKEN = '8218906305:AAHy-4UAX3elRisvShV3stReePkQrlzTHWw'
-    let CHAT_IDS = ['1626976096', '1462247620', '8892775373']
-    try {
-      const { data } = await supabase.from('settings').select('key,value').in('key', ['telegram_recipients', 'telegram_enabled'])
-      const enabledRow = data?.find((r: any) => r.key === 'telegram_enabled')
-      if (enabledRow?.value === false) return // Telegram notifications turned off in Ayarlar - order still registers normally
-      const recipientsRow = data?.find((r: any) => r.key === 'telegram_recipients')
-      if (recipientsRow?.value && Array.isArray(recipientsRow.value) && recipientsRow.value.length > 0) {
-        CHAT_IDS = recipientsRow.value.map((r: any) => r.chat_id)
-      }
-    } catch (e) { /* fall back to the hardcoded list above if settings isn't reachable */ }
-    const now = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    // Items with a selected option (e.g. "Türk Kahvesi (Orta Şekerli)") get
-    // bold+italic so they stand out at a glance — easy to miss a sugar-level
-    // or similar note in a long order otherwise. Plain items stay plain.
-    const hasOption = (name: string) => /\s\([^)]+\)\s*$/.test(name)
-    const itemLines = items.map(i => {
-      const line = `• ${i.quantity}x ${i.name} — ${i.subtotal} ₺`
-      return hasOption(i.name) ? `<b><i>${line}</i></b>` : line
-    }).join('\n')
-    const noteSection = note.trim() ? `\n\n📝 <b><i>Not: ${note.trim()}</i></b>` : ''
-    const message = `🔔 <b>YENİ SİPARİŞ #${orderNum}!</b>\n\n🪑 <b>Masa:</b> ${mesa}\n🕐 <b>Saat:</b> ${now}\n\n${itemLines}${noteSection}\n\n💰 <b>TOPLAM: ${total} ₺</b>`
-    try {
-      await Promise.all(CHAT_IDS.map(chat_id =>
-        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id, text: message, parse_mode: 'HTML' })
-        })
-      ))
-    } catch (e) { console.log('Telegram notification failed:', e) }
-  }
-
   async function submitOrder() {
-    if (count === 0) return
-    setSendingOrder(true)
+    if (orderBusy.current || count === 0) return
+    if (!tableName) { setOrderError('Lütfen masanızdaki QR kodunu okutun.'); return }
+    orderBusy.current = true; setSendingOrder(true); setOrderError(''); setOrderSent(false); setOrderQueued(false)
+    let requestId: string | null = null
     try {
-      const orderItems = lines.map((l: any) => ({
-        id: l._baseId || l.id,
-        name: l._optionsText ? `${l.name} (${l._optionsText})` : l.name,
-        name_en: l._optionsTextEn ? `${l.name_en || l.name} (${l._optionsTextEn})` : (l.name_en || l.name),
-        price: l.price,
-        quantity: l.qty,
-        subtotal: l.price * l.qty
-      }))
-      const mesa = tableName || 'Bilinmiyor'
-
-      if (!isOnline) {
-        // No point even attempting the network calls below — queue
-        // straight away so this doesn't sit "sending" for no reason
-        queueOrder({ table_name: mesa, items: orderItems, total, note: orderNote.trim() || null, created_by: 'Müşteri (QR)' })
-        setOrderQueued(true)
-        setCart({})
-        setOrderNote('')
-        setTimeout(() => { setOrderQueued(false); setShowOrder(false) }, 5000)
-        setSendingOrder(false)
-        return
+      const payload = { table_name: tableName, items: orderLines(lines), total, note: orderNote.trim() || null, created_by: 'Müşteri (QR)' }
+      requestId = queueOrder(payload)
+      if (!isOnline) { setOrderQueued(true); setCart({}); return }
+      try {
+        const saved = await createOrder(requestId, tableName, payload.items, payload.note)
+        removeQueuedOrder(requestId)
+        setOrderNumber(saved.order_number); setOrderSent(true); setCart({}); setOrderNote('')
+      } catch (error: any) {
+        if (!isRetryable(error)) { removeQueuedOrder(requestId); throw error }
+        setOrderQueued(true); setCart({})
       }
-
-      // Get order count for today to generate order number. Local midnight,
-      // not UTC — otherwise this rolls over 3 hours early (Istanbul is
-      // UTC+3), same timezone bug as the admin/owner revenue totals had.
-      const today = new Date(); today.setHours(0, 0, 0, 0)
-      const { data: todayCount } = await supabase.rpc('todays_order_count', { p_since: today.toISOString() })
-      const orderNum = (todayCount || 0) + 1
-      setOrderNumber(orderNum)
-
-      // Find this table's currently open tab, or open a new one — done
-      // atomically server-side so two simultaneous orders can't create
-      // two separate open tabs for the same table
-      const { data: tabId } = await supabase.rpc('get_or_create_open_tab', { p_table_name: mesa })
-
-      await supabase.from('orders').insert({
-        table_name: mesa,
-        items: orderItems,
-        total: total,
-        status: 'pending',
-        note: orderNote.trim() || null,
-        tab_id: tabId,
-        created_by: 'Müşteri (QR)'
-      })
-      // Decrement stock for any stock-tracked items — no-op for items that
-      // don't have stock tracking turned on
-      await supabase.rpc('decrement_stock_for_order', { p_items: orderItems })
-      await sendTelegramNotification(mesa, orderItems, total, orderNote, orderNum)
-      setOrderSent(true)
-      setCart({})
-      setOrderNote('')
-      setTimeout(() => { setOrderSent(false); setShowOrder(false) }, 4000)
-    } catch (e) {
-      // The request itself failed (not just "we already knew we were
-      // offline") — most likely the connection dropped mid-request. Queue
-      // it rather than losing the order entirely.
-      console.error('Order error, queueing instead:', e)
-      const orderItems = lines.map((l: any) => ({
-        id: l._baseId || l.id,
-        name: l._optionsText ? `${l.name} (${l._optionsText})` : l.name,
-        name_en: l._optionsTextEn ? `${l.name_en || l.name} (${l._optionsTextEn})` : (l.name_en || l.name),
-        price: l.price,
-        quantity: l.qty,
-        subtotal: l.price * l.qty
-      }))
-      queueOrder({ table_name: tableName || 'Bilinmiyor', items: orderItems, total, note: orderNote.trim() || null, created_by: 'Müşteri (QR)' })
-      setOrderQueued(true)
-      setCart({})
-      setOrderNote('')
-      setTimeout(() => { setOrderQueued(false); setShowOrder(false) }, 5000)
-    }
-    setSendingOrder(false)
+    } catch (error: any) { setOrderError(error.message || 'Sipariş kaydedilemedi. Sepetiniz korunuyor.') }
+    finally { orderBusy.current = false; setSendingOrder(false); setTimeout(() => { setShowOrder(false); setOrderSent(false); setOrderQueued(false) }, 4000) }
   }
-
-  // Whenever connectivity comes back, try to actually send anything that
-  // got queued while offline — recomputing the order number and sending
-  // the Telegram alert for each one, same as a live order would
   useEffect(() => {
     if (!isOnline) return
-    flushQueuedOrders(async (order) => {
-      const today = new Date(); today.setHours(0, 0, 0, 0)
-      const { data: todayCount } = await supabase.rpc('todays_order_count', { p_since: today.toISOString() })
-      await sendTelegramNotification(order.table_name, order.items, order.total, order.note || '', todayCount || 0)
+    void flushQueuedOrders().then(() => {
+      const blocked = getQueuedOrders().find(o => o.last_error)
+      if (blocked) setOrderError('Bekleyen sipariş: ' + blocked.last_error)
     })
   }, [isOnline])
 
@@ -885,7 +794,7 @@ export default function MenuPage() {
 
     setExtraCartItems(prev => ({
       ...prev,
-      [syntheticId]: { ...pendingOptionItem, id: syntheticId, price: finalPrice, _baseId: pendingOptionItem.id, _optionsText: optionsText, _optionsTextEn: optionsTextEn, _optionsTextAr: optionsTextAr }
+      [syntheticId]: { ...pendingOptionItem, id: syntheticId, price: finalPrice, _baseId: pendingOptionItem.id, _optionsText: optionsText, _optionsTextEn: optionsTextEn, _optionsTextAr: optionsTextAr, _optionChoiceIds: groups.map((g:any)=>pendingSelections[g.id]) }
     }))
     setQty(syntheticId, (cart[syntheticId]||0) + 1)
     setPulseKey(k=>k+1)
@@ -936,7 +845,8 @@ export default function MenuPage() {
         .lang-pick-btn:active{transform:scale(.97);}
       `}</style>
 
-      <ConnectivityBanner />
+      <ConnectivityBanner /><QueueStatus />
+      {orderError && <div role="alert" style={{ position:'fixed',top:12,left:16,right:16,zIndex:300,background:'#721c24',color:'#fff',padding:16,borderRadius:12 }} onClick={()=>setOrderError('')}>{orderError}</div>}
 
       {/* WELCOME POPUP */}
       {showWelcome && (
@@ -1046,3 +956,4 @@ export default function MenuPage() {
     </>
   )
 }
+
