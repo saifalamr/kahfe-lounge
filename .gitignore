@@ -10,3 +10,8 @@ tsconfig.tsbuildinfo
 # on the `backups` branch, never here on main.
 /backups/
 /backups-branch/
+
+
+/supabase/.temp/
+/coverage/
+/test-results/

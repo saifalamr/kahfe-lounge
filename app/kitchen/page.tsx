@@ -104,8 +104,9 @@ export default function KitchenPage() {
   }
 
   async function markDone(id: string) {
+    const { error } = await supabase.rpc('pos_set_order_status', { p_order_id: id, p_status: 'served' })
+    if (error) { alert('Sipariş güncellenemedi: ' + error.message); return }
     setOrders(prev => prev.filter(o => o.id !== id))
-    await supabase.from('orders').update({ status: 'served', handled_by: staffName }).eq('id', id)
   }
 
   function beep() {
@@ -209,3 +210,4 @@ export default function KitchenPage() {
     </div>
   )
 }
+

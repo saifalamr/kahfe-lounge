@@ -1,0 +1,1626 @@
+[
+  {
+    "table_name": "access_pins",
+    "column_name": "role",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "access_pins",
+    "column_name": "pin",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "access_pins",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "type",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "reason",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "created_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cash_movements",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "icon",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "order_index",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "name_en",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "name_ar",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "categories",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "report_date",
+    "data_type": "date",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "total_revenue",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "cash_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "card_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "tab_count",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "counted_cash",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "cash_difference",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "closed_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "transfer_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "debt_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "cash_in_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "cash_out_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "day_close_reports",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "debtor_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "tab_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "fatura_no",
+    "data_type": "bigint",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "type",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "note",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "created_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debt_transactions",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debtors",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debtors",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debtors",
+    "column_name": "phone",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "debtors",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "debtors",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "token",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "role",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "expires_at",
+    "data_type": "timestamp with time zone",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "staff_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "user_agent",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "last_seen_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "ip",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "device_sessions",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "tab_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "original_amount",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "discount_amount",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "reason",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "applied_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "discounts",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "group_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "price_delta",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "order_index",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "name_en",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "name_ar",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "item_option_choices",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "menu_item_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "required",
+    "data_type": "boolean",
+    "column_default": "true",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "order_index",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "name_en",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "name_ar",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "item_option_groups",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "login_attempts",
+    "column_name": "id",
+    "data_type": "bigint",
+    "column_default": "nextval('login_attempts_id_seq'::regclass)",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "login_attempts",
+    "column_name": "ip",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "login_attempts",
+    "column_name": "attempted_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "memberships",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "memberships",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "memberships",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "memberships",
+    "column_name": "role",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "memberships",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "category_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "description",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "price",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "image_url",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "available",
+    "data_type": "boolean",
+    "column_default": "true",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "order_index",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "name_en",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "name_ar",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "description_en",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "description_ar",
+    "data_type": "text",
+    "column_default": "''::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "recommended",
+    "data_type": "boolean",
+    "column_default": "false",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "staff_only",
+    "data_type": "boolean",
+    "column_default": "false",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "track_stock",
+    "data_type": "boolean",
+    "column_default": "false",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "stock_quantity",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "low_stock_threshold",
+    "data_type": "integer",
+    "column_default": "5",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "menu_items",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "month",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "year",
+    "data_type": "integer",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "total_orders",
+    "data_type": "integer",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "total_revenue",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "top_items",
+    "data_type": "jsonb",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "top_tables",
+    "data_type": "jsonb",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "daily_breakdown",
+    "data_type": "jsonb",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "monthly_reports",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "tab_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "started_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "last_checked_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "checked_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "nargile_timers",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "items",
+    "data_type": "jsonb",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "total",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "status",
+    "data_type": "text",
+    "column_default": "'pending'::text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "note",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "tab_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "created_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "handled_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "client_order_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "orders",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "order_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "item_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "quantity",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "old_price",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "new_price",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "reason",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "edited_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "price_edits",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "tab_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "fatura_no",
+    "data_type": "bigint",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "type",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "method",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "reason",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "staff_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "refunds",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "restaurants",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "restaurants",
+    "column_name": "slug",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "restaurants",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "restaurants",
+    "column_name": "active",
+    "data_type": "boolean",
+    "column_default": "true",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "restaurants",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "restaurants",
+    "column_name": "last_invoice_no",
+    "data_type": "bigint",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "settings",
+    "column_name": "key",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "settings",
+    "column_name": "value",
+    "data_type": "jsonb",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "settings",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "settings",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "staff_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "started_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "ended_at",
+    "data_type": "timestamp with time zone",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "counted_cash",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "cash_difference",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "cash_total",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "card_total",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "transfer_total",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "debt_total",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "total_revenue",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "tab_count",
+    "data_type": "integer",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "cash_in_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "cash_out_total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "shifts",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "pin",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "active",
+    "data_type": "boolean",
+    "column_default": "true",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "permission",
+    "data_type": "text",
+    "column_default": "'full'::text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "staff",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "phone",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "contact_person",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "address",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "notes",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "suppliers",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "status",
+    "data_type": "text",
+    "column_default": "'open'::text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "opened_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "closed_at",
+    "data_type": "timestamp with time zone",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "bill_requested",
+    "data_type": "boolean",
+    "column_default": "false",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "payment_method",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "total",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "closed_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "cash_amount",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "card_amount",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "discount_amount",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "discount_reason",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "fatura_no",
+    "data_type": "bigint",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "debt_amount",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "transfer_amount",
+    "data_type": "numeric",
+    "column_default": "0",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "tabs",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "id",
+    "data_type": "uuid",
+    "column_default": "gen_random_uuid()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "order_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "table_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "item_name",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "quantity",
+    "data_type": "integer",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "amount",
+    "data_type": "numeric",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "reason",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "voided_by",
+    "data_type": "text",
+    "column_default": null,
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "column_default": "now()",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "voids",
+    "column_name": "restaurant_id",
+    "data_type": "uuid",
+    "column_default": null,
+    "is_nullable": "NO"
+  }
+]

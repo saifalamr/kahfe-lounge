@@ -1,0 +1,25 @@
+name: POS regression checks
+on:
+  push:
+    branches: [main, 'fix/**']
+  pull_request: {}
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node scripts/build-migrations.mjs --check
+      - run: npm test
+      - run: npm audit --omit=dev
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: isolated-build-placeholder
